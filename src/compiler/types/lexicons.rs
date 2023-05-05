@@ -29,6 +29,7 @@ pub enum Lexicons {
     MulOp,
     DivOp,
     ModOp,
+    BangOp,
     LParen,
     RParen,
     LBracket,
