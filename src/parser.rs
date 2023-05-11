@@ -222,24 +222,4 @@ mod test {
             }
         };
     }
-
-    #[test]
-    fn test_spot_check() {
-        let expr: Result<Expr, parsel::Error> = parsel::parse_str("foo.bar");
-
-        match expr {
-            Ok(ast) => {
-                println!("{:#?}", ast);
-            }
-            Err(err) => {
-                let span = err.span();
-
-                panic!(
-                    "Error from column {} to column {}",
-                    span.start().column,
-                    span.end().column
-                );
-            }
-        }
-    }
 }

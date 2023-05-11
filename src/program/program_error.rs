@@ -15,4 +15,8 @@ impl ProgramError {
     pub fn msg<'a>(&'a self) -> &'a str {
         &self.msg
     }
+
+    pub fn into_str(self) -> String {
+        self.msg
+    }
 }
