@@ -3,10 +3,11 @@ use std::collections::HashMap;
 mod exec_context;
 use crate::{
     program::{Program, ProgramDetails, ProgramResult},
-    value_cell::ValueCell,
+    value_cell::{ValueCell, ValueCellError, ValueCellResult},
 };
 
 pub use exec_context::ExecContext;
+use serde_json::Value;
 
 pub struct CelContext<'a> {
     progs: HashMap<String, Program>,
@@ -62,10 +63,44 @@ impl<'a> CelContext<'a> {
         Some(prog.details())
     }
 
-    pub fn get_param_by_name(&self, name: &str) -> Option<ValueCell> {
+    pub fn get_param_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l Value> {
         let json_value = self.current_ctx?.param(name)?;
 
-        Some(ValueCell::from_ident(json_value))
+        Some(json_value)
+    }
+
+    pub fn resolve_fqn(&self, fqn: &[String]) -> ValueCellResult<ValueCell> {
+        let mut iter = fqn.iter();
+        let current = iter.next().unwrap();
+        let mut working: Vec<String> = Vec::new();
+
+        working.push(current.to_owned());
+        let mut v = if let Some(value) = self.get_param_by_name(current) {
+            ValueCell::from(value)
+        } else {
+            return Err(ValueCellError::with_msg(&format!(
+                "Ident {} does not exist",
+                current
+            )));
+        };
+
+        for member_name in iter {
+            working.push(member_name.to_owned());
+
+            if let ValueCell::Map(obj) = v {
+                match obj.get(member_name) {
+                    Some(val) => v = val.clone(),
+                    None => {
+                        return Err(ValueCellError::with_msg(&format!(
+                            "{} does not exist",
+                            working.join(".")
+                        )))
+                    }
+                };
+            }
+        }
+
+        return Ok(v);
     }
 
     pub fn exec<'l: 'a>(&'l mut self, name: &str, ctx: &'l ExecContext) -> ExecResult<ValueCell> {

@@ -9,21 +9,23 @@ mod kw {
 }
 
 #[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
-pub enum Expr {
+pub struct Expr {
     #[parsel(recursive)]
-    CondOr(Box<ConditionalOr>),
-    Ternary {
-        #[parsel(recursive)]
-        cond_or: Box<ConditionalOr>,
-        #[parsel(recursive)]
-        question: Token![?],
-        #[parsel(recursive)]
-        true_clase: Box<ConditionalOr>,
-        #[parsel(recursive)]
-        colon: Token![:],
-        #[parsel(recursive)]
-        expr: Box<Expr>,
-    },
+    pub cond_or: ConditionalOr,
+    #[parsel(recursive)]
+    pub ternary: Maybe<Ternary>,
+}
+
+#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+pub struct Ternary {
+    #[parsel(recursive)]
+    pub question: Token![?],
+    #[parsel(recursive)]
+    pub true_clause: ConditionalOr,
+    #[parsel(recursive)]
+    pub colon: Token![:],
+    #[parsel(recursive)]
+    pub false_clause: Box<Expr>,
 }
 
 pub type ConditionalOr = LeftAssoc<Token![||], ConditionalAnd>;
@@ -119,7 +121,7 @@ pub enum MemberPrime {
     #[parsel(recursive)]
     Call(Paren<Maybe<ExprList>>),
     #[parsel(recursive)]
-    ArrayAccess(Bracket<ExprList>),
+    ArrayAccess(Bracket<Expr>),
     Empty(Empty),
 }
 
@@ -130,9 +132,9 @@ pub enum Primary {
     #[parsel(recursive)]
     Parens(Paren<Expr>),
     #[parsel(recursive)]
-    ListAccess(Bracket<Maybe<ExprList>>),
+    ListConstruction(Bracket<Maybe<ExprList>>),
     #[parsel(recursive)]
-    ObjectAccess(Brace<Maybe<Punctuated<MapInits, Token![,]>>>),
+    ObjectInit(Brace<Maybe<Punctuated<MapInits, Token![,]>>>),
     #[parsel(recursive)]
     Literal(Literal),
 }
@@ -206,6 +208,7 @@ mod test {
     #[test_case("--foo"; "double neg")]
     #[test_case("foo || true"; "or")]
     #[test_case("int(foo.bar && foo.baz) + 4 - (8 * 7)"; "complex")]
+    #[test_case("true ? 3 : 1"; "ternary")]
     fn test_parser(input: &str) {
         let expr: Result<Expr, parsel::Error> = parsel::parse_str(input);
 

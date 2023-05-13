@@ -25,19 +25,11 @@ impl ProgramDetails {
     }
 
     fn parse_expr(&mut self, ast: &Expr) {
-        match ast {
-            Expr::CondOr(child) => self.parse_or(child),
-            Expr::Ternary {
-                cond_or,
-                question: _,
-                true_clase,
-                colon: _,
-                expr,
-            } => {
-                self.parse_or(cond_or);
-                self.parse_or(true_clase);
-                self.parse_expr(expr);
-            }
+        self.parse_or(&ast.cond_or);
+
+        if let Some(inner) = ast.ternary.as_prefix() {
+            self.parse_or(&inner.true_clause);
+            self.parse_expr(&inner.false_clause);
         }
     }
 
@@ -104,7 +96,21 @@ impl ProgramDetails {
         self.parse_member_prime(&ast.member);
     }
 
-    fn parse_member_prime(&mut self, _ast: &MemberPrime) {}
+    fn parse_member_prime(&mut self, ast: &MemberPrime) {
+        match ast {
+            MemberPrime::MemberAccess {
+                dot: _,
+                ident: _,
+                tail,
+            } => self.parse_member_prime(tail),
+            MemberPrime::Call(list) => match (*list).as_prefix() {
+                Some(exprlist) => self.parse_expr_list(exprlist),
+                None => {}
+            },
+            MemberPrime::ArrayAccess(expr) => self.parse_expr(expr),
+            MemberPrime::Empty(_) => {}
+        }
+    }
 
     fn parse_primary(&mut self, ast: &Primary) {
         match ast {
@@ -113,7 +119,7 @@ impl ProgramDetails {
                 self.params.insert(child.to_string());
             }
             Primary::Parens(child) => self.parse_expr(child.as_ref()),
-            Primary::ListAccess(child) => match child.as_ref().as_prefix() {
+            Primary::ListConstruction(child) => match child.as_ref().as_prefix() {
                 Some(child) => self.parse_expr_list(child),
                 None => {}
             },

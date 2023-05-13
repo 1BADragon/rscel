@@ -73,30 +73,22 @@ impl Program {
     }
 
     fn eval_expr(&self, ast: &Expr, ctx: &CelContext) -> ValueCellResult<ValueCell> {
-        match ast {
-            Expr::CondOr(child) => return self.eval_or(child, ctx),
-            Expr::Ternary {
-                cond_or,
-                question: _,
-                true_clase,
-                colon: _,
-                expr,
-            } => {
-                let res = self.eval_or(cond_or, ctx)?;
+        let expr_res = self.eval_or(&ast.cond_or, ctx)?;
 
-                if let ValueCell::Bool(val) = res {
-                    if val {
-                        return self.eval_or(true_clase, ctx);
-                    } else {
-                        return self.eval_expr(expr, ctx);
-                    }
+        if let Some(ternary) = ast.ternary.as_prefix() {
+            if let ValueCell::Bool(val) = expr_res {
+                if val {
+                    return self.eval_or(&ternary.true_clause, ctx);
+                } else {
+                    return self.eval_expr(&ternary.false_clause, ctx);
                 }
-
-                return Err(ValueCellError::with_msg(&format!(
-                    "Invalid op '?' on type {:?}",
-                    res.as_type()
-                )));
             }
+            return Err(ValueCellError::with_msg(&format!(
+                "Invalid op '?' on type {:?}",
+                expr_res.as_type()
+            )));
+        } else {
+            Ok(expr_res)
         }
     }
 
@@ -290,55 +282,84 @@ impl Program {
                 dot: _,
                 ident,
                 tail,
-            } => match base {
-                ValueCell::Map(base_obj) => match base_obj.get(&ident.to_string()) {
-                    Some(val) => {
-                        return self.eval_member_prime(tail, val.clone(), ctx);
+            } => {
+                if let ValueCell::Ident(mut fqn) = base {
+                    fqn.push(ident.to_string());
+                    return self.eval_member_prime(tail, ValueCell::Ident(fqn), ctx);
+                } else {
+                    return Err(ValueCellError::with_msg("Access error"));
+                }
+            }
+            MemberPrime::Call(_expr_list) => Err(ValueCellError::with_msg("Call not implemented")),
+            MemberPrime::ArrayAccess(expr) => {
+                let base_type = base.as_type();
+                if let ValueCell::Ident(fqn) = base {
+                    let val = ctx.resolve_fqn(&fqn)?;
+                    let expr_res = self.eval_expr(expr, ctx)?;
+
+                    match val {
+                        ValueCell::List(l) => {
+                            let index: usize = match expr_res {
+                                ValueCell::Int(v) => {
+                                    if v < 0 {
+                                        return Err(ValueCellError::with_msg(&format!(
+                                            "Index of {} is invalid",
+                                            v
+                                        )));
+                                    } else {
+                                        v as usize
+                                    }
+                                }
+                                ValueCell::UInt(v) => v as usize,
+                                _ => {
+                                    return Err(ValueCellError::with_msg(&format!(
+                                        "Index of array {:?} is invalid for array",
+                                        base_type
+                                    )))
+                                }
+                            };
+
+                            if index >= l.len() {
+                                return Err(ValueCellError::with_msg(&format!(
+                                    "Index {} out of range on list",
+                                    index
+                                )));
+                            }
+
+                            Ok(l[index].clone())
+                        }
+                        _ => Err(ValueCellError::with_msg(&format!(
+                            "Index operation invalid on type {:?}",
+                            base_type
+                        ))),
                     }
-                    None => {
-                        return Err(ValueCellError::with_msg(&format!(
-                            "Member {} does not exist",
-                            ident.to_string()
-                        )));
-                    }
-                },
-                _ => {
-                    return Err(ValueCellError::with_msg(&format!(
-                        "Member {} does not exist for {:?}",
-                        ident.to_string(),
+                } else {
+                    Err(ValueCellError::with_msg(&format!(
+                        "Array access invalid on {:?}",
                         base
                     )))
                 }
-            },
-            MemberPrime::Call(_expr_list) => Err(ValueCellError::with_msg("Call not implemented")),
-            MemberPrime::ArrayAccess(_exprlist) => {
-                Err(ValueCellError::with_msg("Array access not implemented"))
             }
-            MemberPrime::Empty(_) => Ok(base),
+            MemberPrime::Empty(_) => {
+                if let ValueCell::Ident(fqn) = base {
+                    return ctx.resolve_fqn(&fqn);
+                } else {
+                    Ok(base)
+                }
+            }
         }
     }
 
     fn eval_primary(&self, ast: &Primary, ctx: &CelContext) -> ValueCellResult<ValueCell> {
         match ast {
-            Primary::Ident(child) => match ctx.get_param_by_name(&child.to_string()) {
-                Some(param) => {
-                    if let ValueCell::Ident(inner) = param {
-                        Ok(ValueCell::from(&inner))
-                    } else {
-                        Err(ValueCellError::with_msg("Ident not ident.........."))
-                    }
-                }
-                None => Err(ValueCellError::with_msg(&format!(
-                    "Ident '{}' does not exist",
-                    child.to_string()
-                ))),
-            },
+            Primary::Ident(child) => Ok(ValueCell::from_ident(&child.to_string())),
             Primary::Parens(child) => self.eval_expr(child, ctx),
-            Primary::ListAccess(_child) => {
-                Err(ValueCellError::with_msg("Array Access not implemented"))
-            }
-            Primary::ObjectAccess(_child) => {
-                Err(ValueCellError::with_msg("Object access not implemented"))
+            Primary::ListConstruction(list) => match (*list).as_prefix() {
+                Some(exprlist) => self.eval_expr_list(exprlist, ctx),
+                None => Ok(ValueCell::from_list(&[])),
+            },
+            Primary::ObjectInit(_child) => {
+                Err(ValueCellError::with_msg("Object init not implemented"))
             }
             Primary::Literal(literal) => match literal {
                 Literal::Null(_) => Ok(ValueCell::from_null()),
@@ -365,7 +386,7 @@ impl Program {
         }
     }
 
-    fn parse_expr_list(&self, ast: &ExprList, ctx: &CelContext) -> ValueCellResult<ValueCell> {
+    fn eval_expr_list(&self, ast: &ExprList, ctx: &CelContext) -> ValueCellResult<ValueCell> {
         let mut exprs: Vec<ValueCell> = Vec::new();
         exprs.push(self.eval_expr(&ast.expr, ctx)?);
 
