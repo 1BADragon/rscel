@@ -18,7 +18,7 @@ use parsel::ast::Lit;
 // Re-export
 pub use program_error::ProgramError;
 
-use program_details::ProgramDetails;
+pub use program_details::ProgramDetails;
 
 pub type ProgramResult<T> = Result<T, ProgramError>;
 
@@ -59,6 +59,10 @@ impl Program {
 
     pub fn source<'a>(&'a self) -> &'a str {
         &self.source
+    }
+
+    pub fn details(&self) -> ProgramDetails {
+        self.details.clone()
     }
 
     pub fn eval(&self, ctx: &CelContext) -> ProgramResult<ValueCell> {
@@ -296,7 +300,13 @@ impl Program {
     fn eval_primary(&self, ast: &Primary, ctx: &CelContext) -> ValueCellResult<ValueCell> {
         match ast {
             Primary::Ident(child) => match ctx.get_param_by_name(&child.to_string()) {
-                Some(param) => Ok(param),
+                Some(param) => {
+                    if let ValueCell::Ident(inner) = param {
+                        Ok(ValueCell::from(&inner))
+                    } else {
+                        Err(ValueCellError::with_msg("Ident not ident.........."))
+                    }
+                }
                 None => Err(ValueCellError::with_msg(&format!(
                     "Ident '{}' does not exist",
                     child.to_string()

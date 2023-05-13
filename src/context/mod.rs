@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 mod exec_context;
 use crate::{
-    program::{Program, ProgramResult},
+    program::{Program, ProgramDetails, ProgramResult},
     value_cell::ValueCell,
 };
 
@@ -54,6 +54,12 @@ impl<'a> CelContext<'a> {
 
         self.add_program(name, prog);
         Ok(())
+    }
+
+    pub fn program_details(&self, name: &str) -> Option<ProgramDetails> {
+        let prog = self.progs.get(name)?;
+
+        Some(prog.details())
     }
 
     pub fn get_param_by_name(&self, name: &str) -> Option<ValueCell> {

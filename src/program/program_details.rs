@@ -1,11 +1,11 @@
-use std::collections::HashSet;
-
 use crate::parser::{
     Addition, ConditionalAnd, ConditionalOr, Expr, ExprList, ExprListTail, Member, MemberPrime,
     Multiplication, Primary, Relation, Unary,
 };
+use serde::Serialize;
+use std::collections::HashSet;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ProgramDetails {
     params: HashSet<String>,
 }

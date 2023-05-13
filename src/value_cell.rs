@@ -5,7 +5,7 @@ use std::{
     ops::{Add, Div, Mul, Neg, Not, Sub},
 };
 
-use serde_json::value::Value;
+use serde_json::{value::Value, Map};
 
 #[derive(Debug, Clone)]
 pub enum ValueCell {
@@ -131,7 +131,9 @@ impl ValueCell {
                         match v1.eq(v2) {
                             Ok(res_cell) => {
                                 if let ValueCell::Bool(res) = res_cell {
-                                    return Ok(ValueCell::from_bool(false));
+                                    if !res {
+                                        return Ok(ValueCell::from_bool(false));
+                                    }
                                 }
                             }
                             Err(_) => return Ok(ValueCell::from_bool(false)),
@@ -231,6 +233,36 @@ impl ValueCell {
         ))
     }
 
+    pub fn into_json_value(self) -> Value {
+        match self {
+            ValueCell::Int(val) => Value::from(val),
+            ValueCell::UInt(val) => Value::from(val),
+            ValueCell::Float(val) => Value::from(val),
+            ValueCell::Bool(val) => Value::from(val),
+            ValueCell::String(val) => Value::from(val),
+            ValueCell::Bytes(val) => Value::from(val),
+            ValueCell::List(val) => {
+                let mut partial: Vec<Value> = Vec::new();
+
+                for v in val.into_iter() {
+                    partial.push(v.into_json_value());
+                }
+
+                Value::Array(partial)
+            }
+            ValueCell::Map(val) => {
+                let mut partial: Map<String, Value> = Map::new();
+
+                for (key, value) in val.into_iter() {
+                    partial.insert(key, value.into_json_value());
+                }
+
+                Value::Object(partial)
+            }
+            _ => Value::Null,
+        }
+    }
+
     pub fn as_type(&self) -> ValueCell {
         match self {
             ValueCell::Int(_) => ValueCell::from_type("int"),
@@ -244,6 +276,40 @@ impl ValueCell {
             ValueCell::Null => ValueCell::from_type("null_type"),
             ValueCell::Ident(_) => ValueCell::from_type("ident"),
             ValueCell::Type(_) => ValueCell::from_type("type"),
+        }
+    }
+}
+
+impl From<&Value> for ValueCell {
+    fn from(value: &Value) -> ValueCell {
+        match value {
+            Value::Number(val) => {
+                if let Some(val) = val.as_i64() {
+                    return ValueCell::from_int(val);
+                } else if let Some(val) = val.as_u64() {
+                    return ValueCell::from_uint(val);
+                } else if let Some(val) = val.as_f64() {
+                    return ValueCell::from_float(val);
+                }
+
+                unreachable!()
+            }
+            Value::String(val) => ValueCell::from_string(val),
+            Value::Bool(val) => ValueCell::from_bool(*val),
+            Value::Array(val) => {
+                let list: Vec<ValueCell> = val.iter().map(|x| ValueCell::from(x)).collect();
+                ValueCell::from_list(&list)
+            }
+            Value::Null => ValueCell::from_null(),
+            Value::Object(val) => {
+                let mut map: HashMap<String, ValueCell> = HashMap::new();
+
+                for key in val.keys() {
+                    map.insert(key.clone(), ValueCell::from(&val[key]));
+                }
+
+                ValueCell::from_map(&map)
+            }
         }
     }
 }
