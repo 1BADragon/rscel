@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+mod default_funcs;
 mod exec_context;
 use crate::{
     program::{Program, ProgramDetails, ProgramResult},
@@ -8,6 +9,8 @@ use crate::{
 
 pub use exec_context::ExecContext;
 use serde_json::Value;
+
+use self::exec_context::RsCellCallback;
 
 pub struct CelContext<'a> {
     progs: HashMap<String, Program>,
@@ -69,9 +72,16 @@ impl<'a> CelContext<'a> {
         Some(json_value)
     }
 
+    pub fn get_func_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l RsCellCallback> {
+        self.current_ctx?.func(name)
+    }
+
     pub fn resolve_fqn(&self, fqn: &[String]) -> ValueCellResult<ValueCell> {
         let mut iter = fqn.iter();
-        let current = iter.next().unwrap();
+        let current = match iter.next() {
+            Some(val) => val,
+            None => return Err(ValueCellError::with_msg("Empty Ident")),
+        };
         let mut working: Vec<String> = Vec::new();
 
         working.push(current.to_owned());

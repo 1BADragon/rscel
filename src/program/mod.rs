@@ -164,6 +164,9 @@ impl Program {
                 let lhs = self.eval_relation(lhs, ctx)?;
                 let rhs = self.eval_addition(rhs, ctx)?;
 
+                let lhs_type = lhs.as_type();
+                let rhs_type = rhs.as_type();
+
                 match op {
                     Relop::Lt(_) => return lhs.lt(&rhs),
                     Relop::Le(_) => return lhs.le(&rhs),
@@ -172,7 +175,34 @@ impl Program {
                     Relop::Eq(_) => return lhs.eq(&rhs),
                     Relop::Ne(_) => return lhs.neq(&rhs),
                     Relop::In(_) => {
-                        return Err(ValueCellError::with_msg("Op 'in' not implemented"));
+                        match rhs {
+                            ValueCell::List(l) => {
+                                for value in l.iter() {
+                                    if let Ok(ValueCell::Bool(res)) = lhs.eq(value) {
+                                        if res {
+                                            return Ok(ValueCell::from_bool(true));
+                                        }
+                                    }
+                                }
+
+                                return Ok(ValueCell::from_bool(false));
+                            }
+                            ValueCell::Map(m) => {
+                                if let ValueCell::String(r) = lhs {
+                                    return Ok(ValueCell::from_bool(m.contains_key(&r)));
+                                } else {
+                                    return Err(ValueCellError::with_msg(&format!(
+                                        "Op 'in' invalid between {:?} and {:?}",
+                                        rhs_type, lhs_type
+                                    )));
+                                }
+                            }
+                            _ => {}
+                        }
+                        return Err(ValueCellError::with_msg(&format!(
+                            "Op 'in' invalid between {:?} and {:?}",
+                            rhs_type, lhs_type
+                        )));
                     }
                 }
             }
@@ -290,7 +320,41 @@ impl Program {
                     return Err(ValueCellError::with_msg("Access error"));
                 }
             }
-            MemberPrime::Call(_expr_list) => Err(ValueCellError::with_msg("Call not implemented")),
+            MemberPrime::Call(expr_list) => {
+                let base_type = base.as_type();
+                if let ValueCell::Ident(mut fqn) = base {
+                    let func_name = match fqn.pop() {
+                        Some(name) => name,
+                        None => return Err(ValueCellError::with_msg("Empty function name")),
+                    };
+
+                    let subject = match ctx.resolve_fqn(&fqn) {
+                        Ok(subject) => subject,
+                        Err(_) => ValueCell::from_null(),
+                    };
+
+                    let func = match ctx.get_func_by_name(&func_name) {
+                        Some(func) => func,
+                        None => {
+                            return Err(ValueCellError::with_msg(&format!(
+                                "Function '{}' does not exist",
+                                func_name
+                            )))
+                        }
+                    };
+
+                    let arg_list = match (*expr_list).as_prefix() {
+                        Some(expr_list_ast) => self.eval_expr_list(expr_list_ast, ctx)?,
+                        None => ValueCell::from_list(&[]),
+                    };
+                    func(subject, arg_list)
+                } else {
+                    Err(ValueCellError::with_msg(&format!(
+                        "Call unavailable on type {:?}",
+                        base_type,
+                    )))
+                }
+            }
             MemberPrime::ArrayAccess(expr) => {
                 let base_type = base.as_type();
                 if let ValueCell::Ident(fqn) = base {
@@ -327,6 +391,23 @@ impl Program {
                             }
 
                             Ok(l[index].clone())
+                        }
+                        ValueCell::Map(l) => {
+                            if let ValueCell::String(i) = expr_res {
+                                match l.get(&i) {
+                                    Some(value) => Ok(value.clone()),
+                                    None => Err(ValueCellError::with_msg(&format!(
+                                        "Member '{}' not available for '{}'",
+                                        i,
+                                        fqn.join(".")
+                                    ))),
+                                }
+                            } else {
+                                return Err(ValueCellError::with_msg(&format!(
+                                    "Object access invalid for type {:?}",
+                                    expr_res.as_type()
+                                )));
+                            }
                         }
                         _ => Err(ValueCellError::with_msg(&format!(
                             "Index operation invalid on type {:?}",
