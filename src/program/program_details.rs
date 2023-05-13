@@ -112,7 +112,7 @@ impl ProgramDetails {
                 println!("{:?}", child);
                 self.params.insert(child.to_string());
             }
-            Primary::Parens(child) => self.parse_expr_list(child.as_ref()),
+            Primary::Parens(child) => self.parse_expr(child.as_ref()),
             Primary::ListAccess(child) => match child.as_ref().as_prefix() {
                 Some(child) => self.parse_expr_list(child),
                 None => {}

@@ -283,12 +283,33 @@ impl Program {
         &self,
         ast: &MemberPrime,
         base: ValueCell,
-        _ctx: &CelContext,
+        ctx: &CelContext,
     ) -> ValueCellResult<ValueCell> {
         match ast {
-            MemberPrime::MemberAccess { dot, ident, tail } => {
-                Err(ValueCellError::with_msg("Member access not implemented"))
-            }
+            MemberPrime::MemberAccess {
+                dot: _,
+                ident,
+                tail,
+            } => match base {
+                ValueCell::Map(base_obj) => match base_obj.get(&ident.to_string()) {
+                    Some(val) => {
+                        return self.eval_member_prime(tail, val.clone(), ctx);
+                    }
+                    None => {
+                        return Err(ValueCellError::with_msg(&format!(
+                            "Member {} does not exist",
+                            ident.to_string()
+                        )));
+                    }
+                },
+                _ => {
+                    return Err(ValueCellError::with_msg(&format!(
+                        "Member {} does not exist for {:?}",
+                        ident.to_string(),
+                        base
+                    )))
+                }
+            },
             MemberPrime::Call(_expr_list) => Err(ValueCellError::with_msg("Call not implemented")),
             MemberPrime::ArrayAccess(_exprlist) => {
                 Err(ValueCellError::with_msg("Array access not implemented"))
@@ -312,7 +333,7 @@ impl Program {
                     child.to_string()
                 ))),
             },
-            Primary::Parens(_child) => Err(ValueCellError::with_msg("Call not implemented")),
+            Primary::Parens(child) => self.eval_expr(child, ctx),
             Primary::ListAccess(_child) => {
                 Err(ValueCellError::with_msg("Array Access not implemented"))
             }

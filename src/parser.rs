@@ -128,7 +128,7 @@ pub enum Primary {
     #[parsel(recursive)]
     Ident(Ident),
     #[parsel(recursive)]
-    Parens(Paren<ExprList>),
+    Parens(Paren<Expr>),
     #[parsel(recursive)]
     ListAccess(Bracket<Maybe<ExprList>>),
     #[parsel(recursive)]
