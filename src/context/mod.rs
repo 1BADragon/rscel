@@ -1,16 +1,19 @@
 use std::collections::HashMap;
 
 mod default_funcs;
+mod default_macros;
 mod exec_context;
+mod utils;
 use crate::{
-    program::{Program, ProgramDetails, ProgramResult},
+    parser::Expr,
+    program::{eval_expr, Program, ProgramDetails, ProgramResult},
     value_cell::{ValueCell, ValueCellError, ValueCellResult},
 };
 
 pub use exec_context::ExecContext;
 use serde_json::Value;
 
-use self::exec_context::RsCellCallback;
+use self::exec_context::{RsCellFunction, RsCellMacro};
 
 pub struct CelContext<'a> {
     progs: HashMap<String, Program>,
@@ -67,13 +70,21 @@ impl<'a> CelContext<'a> {
     }
 
     pub fn get_param_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l Value> {
-        let json_value = self.current_ctx?.param(name)?;
+        let json_value = self.current_ctx?.get_param(name)?;
 
         Some(json_value)
     }
 
-    pub fn get_func_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l RsCellCallback> {
-        self.current_ctx?.func(name)
+    pub fn get_func_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l RsCellFunction> {
+        self.current_ctx?.get_func(name)
+    }
+
+    pub fn get_macro_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l RsCellMacro> {
+        self.current_ctx?.get_macro(name)
+    }
+
+    pub fn exec_context(&self) -> Option<ExecContext> {
+        Some((*self.current_ctx?).clone())
     }
 
     pub fn resolve_fqn(&self, fqn: &[ValueCell]) -> ValueCellResult<ValueCell> {
@@ -135,6 +146,28 @@ impl<'a> CelContext<'a> {
 
         self.current_ctx = None;
         return res;
+    }
+
+    pub fn eval_expr<'l: 'a>(
+        &'l mut self,
+        expr: &Expr,
+        ctx: &'l ExecContext,
+    ) -> ValueCellResult<ValueCell> {
+        self.current_ctx = Some(ctx);
+
+        let res = eval_expr(expr, self);
+
+        self.current_ctx = None;
+        return res;
+    }
+}
+
+impl<'a> Clone for CelContext<'a> {
+    fn clone(&self) -> Self {
+        CelContext {
+            progs: self.progs.clone(),
+            current_ctx: None,
+        }
     }
 }
 

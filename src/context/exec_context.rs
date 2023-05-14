@@ -3,17 +3,22 @@ use std::collections::HashMap;
 use serde_json::Value;
 
 use crate::{
+    parser::Expr,
     value_cell::{ValueCell, ValueCellResult},
-    ExecError,
+    CelContext, ExecError,
 };
 
-use super::default_funcs::load_default_funcs;
+use super::{default_funcs::load_default_funcs, default_macros::load_default_macros};
 
-pub type RsCellCallback = fn(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell>;
+pub type RsCellFunction = fn(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell>;
+pub type RsCellMacro =
+    fn(ctx: &CelContext, this: ValueCell, inner: &[&Expr]) -> ValueCellResult<ValueCell>;
 
+#[derive(Clone)]
 pub struct ExecContext {
     params: HashMap<String, Value>,
-    funcs: HashMap<String, RsCellCallback>,
+    funcs: HashMap<String, RsCellFunction>,
+    macros: HashMap<String, RsCellMacro>,
 }
 
 impl ExecContext {
@@ -21,8 +26,10 @@ impl ExecContext {
         let mut ctx = ExecContext {
             params: HashMap::new(),
             funcs: HashMap::new(),
+            macros: HashMap::new(),
         };
 
+        load_default_macros(&mut ctx);
         load_default_funcs(&mut ctx);
         ctx
     }
@@ -44,15 +51,23 @@ impl ExecContext {
         Ok(())
     }
 
-    pub fn bind_func(&mut self, name: &str, func: RsCellCallback) {
+    pub fn bind_func(&mut self, name: &str, func: RsCellFunction) {
         self.funcs.insert(name.to_owned(), func);
     }
 
-    pub fn param(&self, name: &str) -> Option<&Value> {
+    pub fn bind_macro(&mut self, name: &str, macro_: RsCellMacro) {
+        self.macros.insert(name.to_owned(), macro_);
+    }
+
+    pub fn get_param(&self, name: &str) -> Option<&Value> {
         self.params.get(name)
     }
 
-    pub fn func(&self, name: &str) -> Option<&RsCellCallback> {
+    pub fn get_func(&self, name: &str) -> Option<&RsCellFunction> {
         self.funcs.get(name)
+    }
+
+    pub fn get_macro(&self, name: &str) -> Option<&RsCellMacro> {
+        self.macros.get(name)
     }
 }

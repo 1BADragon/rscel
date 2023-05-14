@@ -3,9 +3,9 @@ use crate::{
     ExecContext,
 };
 
-use super::exec_context::RsCellCallback;
+use super::exec_context::RsCellFunction;
 
-const DEFAULT_FUNCS: &[(&str, RsCellCallback)] = &[
+const DEFAULT_FUNCS: &[(&str, RsCellFunction)] = &[
     ("int", int_impl),
     ("uint", uint_impl),
     ("double", double_impl),
