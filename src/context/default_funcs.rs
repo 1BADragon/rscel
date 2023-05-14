@@ -9,6 +9,8 @@ const DEFAULT_FUNCS: &[(&str, RsCellCallback)] = &[
     ("int", int_impl),
     ("uint", uint_impl),
     ("double", double_impl),
+    ("bytes", bytes_impl),
+    ("contains", contains_impl),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut ExecContext) {
@@ -22,7 +24,9 @@ fn int_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
     let arg_list: Vec<ValueCell> = args.try_into()?;
 
     if arg_list.len() != 1 {
-        return Err(ValueCellError::with_msg("int expects exactly one argument"));
+        return Err(ValueCellError::with_msg(
+            "int() expects exactly one argument",
+        ));
     }
 
     match &arg_list[0] {
@@ -48,7 +52,9 @@ fn uint_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
     let arg_list: Vec<ValueCell> = args.try_into()?;
 
     if arg_list.len() != 1 {
-        return Err(ValueCellError::with_msg("int expects exactly one argument"));
+        return Err(ValueCellError::with_msg(
+            "uint() expects exactly one argument",
+        ));
     }
 
     match &arg_list[0] {
@@ -74,7 +80,9 @@ fn double_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
     let arg_list: Vec<ValueCell> = args.try_into()?;
 
     if arg_list.len() != 1 {
-        return Err(ValueCellError::with_msg("int expects exactly one argument"));
+        return Err(ValueCellError::with_msg(
+            "double() expects exactly one argument",
+        ));
     }
 
     match &arg_list[0] {
@@ -92,5 +100,46 @@ fn double_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
             "int conversion invalid for {:?}",
             other
         ))),
+    }
+}
+
+fn bytes_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
+    use ValueCell::*;
+    let arg_list: Vec<ValueCell> = args.try_into()?;
+
+    if arg_list.len() != 1 {
+        return Err(ValueCellError::with_msg(
+            "bytes() expects exactly one argument",
+        ));
+    }
+
+    match &arg_list[0] {
+        String(val) => Ok(ValueCell::from_bytes(val.as_bytes())),
+        other => Err(ValueCellError::with_msg(&format!(
+            "int conversion invalid for {:?}",
+            other
+        ))),
+    }
+}
+
+fn contains_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
+    let arg_list: Vec<ValueCell> = args.try_into()?;
+
+    if arg_list.len() != 1 {
+        return Err(ValueCellError::with_msg(
+            "contains() expects exactly one argument",
+        ));
+    }
+
+    if let ValueCell::String(this_str) = this {
+        if let ValueCell::String(rhs) = &arg_list[0] {
+            Ok(ValueCell::from_bool(this_str.contains(rhs)))
+        } else {
+            Err(ValueCellError::with_msg("contains() arg must be string"))
+        }
+    } else {
+        Err(ValueCellError::with_msg(
+            "contains() can only operate on string",
+        ))
     }
 }

@@ -23,4 +23,15 @@ mod test {
         let res = ctx.exec("main", &exec_ctx);
         assert!(res.is_err());
     }
+
+    #[test]
+    fn test_contains() {
+        let mut ctx = CelContext::new();
+        let exec_ctx = ExecContext::new();
+
+        ctx.add_program_str("main", "\"hello there\".contains(\"hello\")")
+            .unwrap();
+
+        let _res = ctx.exec("main", &exec_ctx).unwrap();
+    }
 }

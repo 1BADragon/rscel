@@ -76,41 +76,50 @@ impl<'a> CelContext<'a> {
         self.current_ctx?.func(name)
     }
 
-    pub fn resolve_fqn(&self, fqn: &[String]) -> ValueCellResult<ValueCell> {
+    pub fn resolve_fqn(&self, fqn: &[ValueCell]) -> ValueCellResult<ValueCell> {
         let mut iter = fqn.iter();
-        let current = match iter.next() {
-            Some(val) => val,
+        let mut current = match iter.next() {
+            Some(ValueCell::Ident(ident)) => match self.get_param_by_name(ident) {
+                Some(val) => ValueCell::from(val),
+                None => {
+                    return Err(ValueCellError::with_msg(&format!(
+                        "Ident '{}' does not exist",
+                        ident
+                    )))
+                }
+            },
+            Some(other) => other.clone(),
             None => return Err(ValueCellError::with_msg("Empty Ident")),
-        };
-        let mut working: Vec<String> = Vec::new();
-
-        working.push(current.to_owned());
-        let mut v = if let Some(value) = self.get_param_by_name(current) {
-            ValueCell::from(value)
-        } else {
-            return Err(ValueCellError::with_msg(&format!(
-                "Ident {} does not exist",
-                current
-            )));
         };
 
         for member_name in iter {
-            working.push(member_name.to_owned());
-
-            if let ValueCell::Map(obj) = v {
-                match obj.get(member_name) {
-                    Some(val) => v = val.clone(),
-                    None => {
-                        return Err(ValueCellError::with_msg(&format!(
-                            "{} does not exist",
-                            working.join(".")
-                        )))
+            match &current {
+                ValueCell::Map(map) => {
+                    if let ValueCell::Ident(member_name_str) = member_name {
+                        current = if let Some(member) = map.get(member_name_str) {
+                            member.clone()
+                        } else {
+                            return Err(ValueCellError::with_msg(&format!(
+                                "member {} does not exist on {:?}",
+                                member_name_str, &current
+                            )));
+                        }
+                    } else {
+                        return Err(ValueCellError::with_msg(
+                            "Only idents can be member accesses",
+                        ));
                     }
-                };
+                }
+                _ => {
+                    return Err(ValueCellError::with_msg(&format!(
+                        "member access invalid on {:?}",
+                        current
+                    )))
+                }
             }
         }
 
-        return Ok(v);
+        return Ok(current);
     }
 
     pub fn exec<'l: 'a>(&'l mut self, name: &str, ctx: &'l ExecContext) -> ExecResult<ValueCell> {

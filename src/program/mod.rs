@@ -298,13 +298,13 @@ impl Program {
     fn eval_member(&self, ast: &Member, ctx: &CelContext) -> ValueCellResult<ValueCell> {
         let primary = self.eval_primary(&ast.primary, ctx)?;
 
-        self.eval_member_prime(&ast.member, primary, ctx)
+        self.eval_member_prime(&ast.member, &mut vec![primary], ctx)
     }
 
     fn eval_member_prime(
         &self,
         ast: &MemberPrime,
-        base: ValueCell,
+        fqn: &mut Vec<ValueCell>,
         ctx: &CelContext,
     ) -> ValueCellResult<ValueCell> {
         match ast {
@@ -313,121 +313,101 @@ impl Program {
                 ident,
                 tail,
             } => {
-                if let ValueCell::Ident(mut fqn) = base {
-                    fqn.push(ident.to_string());
-                    return self.eval_member_prime(tail, ValueCell::Ident(fqn), ctx);
-                } else {
-                    return Err(ValueCellError::with_msg("Access error"));
-                }
+                fqn.push(ValueCell::Ident(ident.to_string()));
+                self.eval_member_prime(tail, fqn, ctx)
             }
             MemberPrime::Call(expr_list) => {
-                let base_type = base.as_type();
-                if let ValueCell::Ident(mut fqn) = base {
-                    let func_name = match fqn.pop() {
-                        Some(name) => name,
-                        None => return Err(ValueCellError::with_msg("Empty function name")),
-                    };
+                let func_name = match fqn.pop() {
+                    Some(ValueCell::Ident(name)) => name,
+                    None => return Err(ValueCellError::with_msg("Empty function name")),
+                    other => {
+                        return Err(ValueCellError::with_msg(&format!(
+                            "{:?} cannot be called",
+                            other.unwrap()
+                        )))
+                    }
+                };
 
-                    let subject = match ctx.resolve_fqn(&fqn) {
-                        Ok(subject) => subject,
-                        Err(_) => ValueCell::from_null(),
-                    };
+                let subject = match ctx.resolve_fqn(&fqn) {
+                    Ok(subject) => subject,
+                    Err(_) => ValueCell::from_null(),
+                };
 
-                    let func = match ctx.get_func_by_name(&func_name) {
-                        Some(func) => func,
-                        None => {
-                            return Err(ValueCellError::with_msg(&format!(
-                                "Function '{}' does not exist",
-                                func_name
-                            )))
-                        }
-                    };
+                let func = match ctx.get_func_by_name(&func_name) {
+                    Some(func) => func,
+                    None => {
+                        return Err(ValueCellError::with_msg(&format!(
+                            "Function '{}' does not exist",
+                            func_name
+                        )))
+                    }
+                };
 
-                    let arg_list = match (*expr_list).as_prefix() {
-                        Some(expr_list_ast) => self.eval_expr_list(expr_list_ast, ctx)?,
-                        None => ValueCell::from_list(&[]),
-                    };
-                    func(subject, arg_list)
-                } else {
-                    Err(ValueCellError::with_msg(&format!(
-                        "Call unavailable on type {:?}",
-                        base_type,
-                    )))
-                }
+                let arg_list = match (*expr_list).as_prefix() {
+                    Some(expr_list_ast) => self.eval_expr_list(expr_list_ast, ctx)?,
+                    None => ValueCell::from_list(&[]),
+                };
+                func(subject, arg_list)
             }
             MemberPrime::ArrayAccess(expr) => {
-                let base_type = base.as_type();
-                if let ValueCell::Ident(fqn) = base {
-                    let val = ctx.resolve_fqn(&fqn)?;
-                    let expr_res = self.eval_expr(expr, ctx)?;
+                let val = ctx.resolve_fqn(&fqn)?;
+                let base_type = val.as_type();
+                let expr_res = self.eval_expr(expr, ctx)?;
 
-                    match val {
-                        ValueCell::List(l) => {
-                            let index: usize = match expr_res {
-                                ValueCell::Int(v) => {
-                                    if v < 0 {
-                                        return Err(ValueCellError::with_msg(&format!(
-                                            "Index of {} is invalid",
-                                            v
-                                        )));
-                                    } else {
-                                        v as usize
-                                    }
-                                }
-                                ValueCell::UInt(v) => v as usize,
-                                _ => {
+                match val {
+                    ValueCell::List(l) => {
+                        let index: usize = match expr_res {
+                            ValueCell::Int(v) => {
+                                if v < 0 {
                                     return Err(ValueCellError::with_msg(&format!(
-                                        "Index of array {:?} is invalid for array",
-                                        base_type
-                                    )))
+                                        "Index of {} is invalid",
+                                        v
+                                    )));
+                                } else {
+                                    v as usize
                                 }
-                            };
-
-                            if index >= l.len() {
-                                return Err(ValueCellError::with_msg(&format!(
-                                    "Index {} out of range on list",
-                                    index
-                                )));
                             }
-
-                            Ok(l[index].clone())
-                        }
-                        ValueCell::Map(l) => {
-                            if let ValueCell::String(i) = expr_res {
-                                match l.get(&i) {
-                                    Some(value) => Ok(value.clone()),
-                                    None => Err(ValueCellError::with_msg(&format!(
-                                        "Member '{}' not available for '{}'",
-                                        i,
-                                        fqn.join(".")
-                                    ))),
-                                }
-                            } else {
+                            ValueCell::UInt(v) => v as usize,
+                            _ => {
                                 return Err(ValueCellError::with_msg(&format!(
-                                    "Object access invalid for type {:?}",
-                                    expr_res.as_type()
-                                )));
+                                    "Index of array {:?} is invalid for array",
+                                    base_type
+                                )))
                             }
+                        };
+
+                        if index >= l.len() {
+                            return Err(ValueCellError::with_msg(&format!(
+                                "Index {} out of range on list",
+                                index
+                            )));
                         }
-                        _ => Err(ValueCellError::with_msg(&format!(
-                            "Index operation invalid on type {:?}",
-                            base_type
-                        ))),
+
+                        Ok(l[index].clone())
                     }
-                } else {
-                    Err(ValueCellError::with_msg(&format!(
-                        "Array access invalid on {:?}",
-                        base
-                    )))
+                    ValueCell::Map(l) => {
+                        if let ValueCell::String(i) = expr_res {
+                            match l.get(&i) {
+                                Some(value) => Ok(value.clone()),
+                                None => Err(ValueCellError::with_msg(&format!(
+                                    "Member '{}' not available for '{:?}'",
+                                    i, base_type
+                                ))),
+                            }
+                        } else {
+                            return Err(ValueCellError::with_msg(&format!(
+                                "Object access invalid for type {:?}",
+                                expr_res.as_type()
+                            )));
+                        }
+                    }
+                    _ => Err(ValueCellError::with_msg(&format!(
+                        "Index operation invalid on type {:?}",
+                        base_type
+                    ))),
                 }
             }
-            MemberPrime::Empty(_) => {
-                if let ValueCell::Ident(fqn) = base {
-                    return ctx.resolve_fqn(&fqn);
-                } else {
-                    Ok(base)
-                }
-            }
+            MemberPrime::Empty(_) => ctx.resolve_fqn(&fqn),
         }
     }
 

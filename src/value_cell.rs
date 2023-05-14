@@ -18,7 +18,7 @@ pub enum ValueCell {
     List(Vec<ValueCell>),
     Map(HashMap<String, ValueCell>),
     Null,
-    Ident(Vec<String>),
+    Ident(String),
     Type(String),
 }
 
@@ -78,8 +78,8 @@ impl ValueCell {
         ValueCell::Null
     }
 
-    pub fn from_ident(val: &String) -> ValueCell {
-        ValueCell::Ident(vec![val.clone()])
+    pub fn from_ident(val: &str) -> ValueCell {
+        ValueCell::Ident(val.to_owned())
     }
 
     pub fn from_type(val: &str) -> ValueCell {
@@ -147,11 +147,6 @@ impl ValueCell {
                     return Ok(ValueCell::from_bool(true));
                 } else {
                     return Ok(ValueCell::from_bool(false));
-                }
-            }
-            ValueCell::Ident(val1) => {
-                if let ValueCell::Ident(val2) = rhs {
-                    return Ok(ValueCell::from_bool(val1 == val2));
                 }
             }
             _ => {}
