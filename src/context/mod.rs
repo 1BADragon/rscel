@@ -10,41 +10,48 @@ use crate::{
     value_cell::{ValueCell, ValueCellError, ValueCellResult},
 };
 
-pub use exec_context::ExecContext;
+pub use exec_context::{ExecContext, RsCellFunction, RsCellMacro};
 use serde_json::Value;
 
-use self::exec_context::{RsCellFunction, RsCellMacro};
-
+/// The CelContext is the core context in RsCel. This context contains
+/// Program information as well as the primary entry point for evaluating
+/// an expression.
 pub struct CelContext<'a> {
     progs: HashMap<String, Program>,
 
     current_ctx: Option<&'a ExecContext>,
 }
 
+/// ExecError is the error type returned by CelContext operations.
 #[derive(Debug)]
 pub struct ExecError {
     msg: String,
 }
 
 impl ExecError {
+    /// Constructs a new ExecError with a given message.
     pub fn new(msg: &str) -> ExecError {
         ExecError {
             msg: msg.to_owned(),
         }
     }
 
+    /// No-copy construction of ExecError
     pub fn from_str(msg: String) -> ExecError {
         ExecError { msg }
     }
 
+    /// Error message contained in the ExecError
     pub fn str<'a>(&'a self) -> &'a str {
         &self.msg
     }
 }
 
-type ExecResult<T> = Result<T, ExecError>;
+/// Result wrapper with ExecError as the error type
+pub type ExecResult<T> = Result<T, ExecError>;
 
 impl<'a> CelContext<'a> {
+    /// Constructs a new empty CelContext
     pub fn new() -> CelContext<'a> {
         CelContext {
             progs: HashMap::new(),
@@ -52,10 +59,16 @@ impl<'a> CelContext<'a> {
         }
     }
 
+    /// Add an already constructed Program to the context with a given name. Using
+    /// This method can allow a Program to be constructed once and shared between
+    /// contexts, if desired. Will override an existing program with same name.
     pub fn add_program(&mut self, name: &str, prog: Program) {
         self.progs.insert(name.to_owned(), prog);
     }
 
+    /// Add a Program to the context with the given name and source string. Return of this
+    /// function indicates parseing result of the constructed Program. This method will not
+    /// allow for a Program to be shared. Will override an existing program with same name.
     pub fn add_program_str(&mut self, name: &str, prog_str: &str) -> ProgramResult<()> {
         let prog = Program::from_source(prog_str)?;
 
@@ -63,31 +76,32 @@ impl<'a> CelContext<'a> {
         Ok(())
     }
 
+    /// Returns ProgramDetails for a program by name if it exists.
     pub fn program_details(&self, name: &str) -> Option<ProgramDetails> {
         let prog = self.progs.get(name)?;
 
         Some(prog.details())
     }
 
-    pub fn get_param_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l Value> {
+    pub(crate) fn get_param_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l Value> {
         let json_value = self.current_ctx?.get_param(name)?;
 
         Some(json_value)
     }
 
-    pub fn get_func_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l RsCellFunction> {
+    pub(crate) fn get_func_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l RsCellFunction> {
         self.current_ctx?.get_func(name)
     }
 
-    pub fn get_macro_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l RsCellMacro> {
+    pub(crate) fn get_macro_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l RsCellMacro> {
         self.current_ctx?.get_macro(name)
     }
 
-    pub fn exec_context(&self) -> Option<ExecContext> {
+    pub(crate) fn exec_context(&self) -> Option<ExecContext> {
         Some((*self.current_ctx?).clone())
     }
 
-    pub fn resolve_fqn(&self, fqn: &[ValueCell]) -> ValueCellResult<ValueCell> {
+    pub(crate) fn resolve_fqn(&self, fqn: &[ValueCell]) -> ValueCellResult<ValueCell> {
         let mut iter = fqn.iter();
         let mut current = match iter.next() {
             Some(ValueCell::Ident(ident)) => match self.get_param_by_name(ident) {
@@ -133,6 +147,10 @@ impl<'a> CelContext<'a> {
         return Ok(current);
     }
 
+    /// Evaluate a Program with the given name with a provided ExecContext. A single CelContext
+    /// can be run multiple times with different ExecContext's. The return of this function is
+    /// a Result with either a ValueCell representing the final solution of the Program or an Error
+    /// that is discovered during execution, such as mismatch of types
     pub fn exec<'l: 'a>(&'l mut self, name: &str, ctx: &'l ExecContext) -> ExecResult<ValueCell> {
         self.current_ctx = Some(ctx);
 
@@ -148,7 +166,7 @@ impl<'a> CelContext<'a> {
         return res;
     }
 
-    pub fn eval_expr<'l: 'a>(
+    pub(crate) fn eval_expr<'l: 'a>(
         &'l mut self,
         expr: &Expr,
         ctx: &'l ExecContext,
