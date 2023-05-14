@@ -2,7 +2,7 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     iter::zip,
-    ops::{Add, Div, Mul, Neg, Not, Sub},
+    ops::{Add, Div, Mul, Neg, Not, Rem, Sub},
 };
 
 use serde_json::{value::Value, Map};
@@ -593,6 +593,34 @@ impl Div for ValueCell {
             ValueCell::Float(val1) => {
                 if let ValueCell::Float(val2) = rhs {
                     return Ok(ValueCell::from(val1 / val2));
+                }
+            }
+            _ => {}
+        }
+
+        Err(ValueCellError::with_msg(&format!(
+            "Invalid op '/' between {:?} and {:?}",
+            type1, type2
+        )))
+    }
+}
+
+impl Rem for ValueCell {
+    type Output = ValueCellResult<ValueCell>;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        let type1 = self.as_type();
+        let type2 = rhs.as_type();
+
+        match self {
+            ValueCell::Int(val1) => {
+                if let ValueCell::Int(val2) = rhs {
+                    return Ok(ValueCell::from(val1 % val2));
+                }
+            }
+            ValueCell::UInt(val1) => {
+                if let ValueCell::UInt(val2) = rhs {
+                    return Ok(ValueCell::from(val1 % val2));
                 }
             }
             _ => {}

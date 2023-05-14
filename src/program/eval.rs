@@ -173,9 +173,7 @@ fn eval_multiplication(ast: &Multiplication, ctx: &CelContext) -> ValueCellResul
             match op {
                 MultOp::Mult(_) => lhs * rhs,
                 MultOp::Div(_) => lhs / rhs,
-                MultOp::Mod(_) => {
-                    return Err(ValueCellError::with_msg("Op 'mod' not implemented"));
-                }
+                MultOp::Mod(_) => lhs % rhs,
             }
         }
         Multiplication::Rhs(child) => eval_unary(child, ctx),

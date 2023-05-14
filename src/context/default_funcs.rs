@@ -11,6 +11,7 @@ const DEFAULT_FUNCS: &[(&str, RsCellFunction)] = &[
     ("double", double_impl),
     ("bytes", bytes_impl),
     ("contains", contains_impl),
+    ("size", size_impl),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut ExecContext) {
@@ -142,4 +143,26 @@ fn contains_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell>
             "contains() can only operate on string",
         ))
     }
+}
+
+fn size_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
+    let arg_list: Vec<ValueCell> = args.try_into()?;
+
+    if arg_list.len() != 1 {
+        return Err(ValueCellError::with_msg(
+            "size() expects exactly one argument",
+        ));
+    }
+
+    Ok(ValueCell::from_uint(match &arg_list[0] {
+        ValueCell::String(s) => s.len() as u64,
+        ValueCell::Bytes(b) => b.len() as u64,
+        ValueCell::List(l) => l.len() as u64,
+        ValueCell::Map(m) => m.len() as u64,
+        _ => {
+            return Err(ValueCellError::with_msg(
+                "size() only available for types {string, bytes, list, map}",
+            ))
+        }
+    }))
 }
