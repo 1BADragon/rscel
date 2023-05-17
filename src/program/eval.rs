@@ -238,7 +238,7 @@ fn eval_member_prime(
             fqn.push(ValueCell::Ident(ident.to_string()));
             eval_member_prime(tail, fqn, ctx)
         }
-        MemberPrime::Call(expr_list) => {
+        MemberPrime::Call { call, tail } => {
             let func_name = match fqn.pop() {
                 Some(ValueCell::Ident(name)) => name,
                 None => return Err(ValueCellError::with_msg("Empty function name")),
@@ -255,14 +255,14 @@ fn eval_member_prime(
                 Err(_) => ValueCell::from_null(),
             };
 
-            if let Some(func) = ctx.get_func_by_name(&func_name) {
-                let arg_list = match (*expr_list).as_prefix() {
+            let call_res = if let Some(func) = ctx.get_func_by_name(&func_name) {
+                let arg_list = match (*call).as_prefix() {
                     Some(expr_list_ast) => eval_expr_list(expr_list_ast, ctx)?,
                     None => ValueCell::from_list(&[]),
                 };
                 func(subject, arg_list)
             } else if let Some(macro_) = ctx.get_macro_by_name(&func_name) {
-                let arg_list: Vec<&Expr> = match (*expr_list).as_prefix() {
+                let arg_list: Vec<&Expr> = match (*call).as_prefix() {
                     Some(expr_list_ast) => {
                         let mut list = Vec::new();
                         list.push(&expr_list_ast.expr);
@@ -280,14 +280,16 @@ fn eval_member_prime(
                     "ident {} not available",
                     func_name
                 )))
-            }
+            };
+
+            eval_member_prime(tail, &mut vec![call_res?], ctx)
         }
-        MemberPrime::ArrayAccess(expr) => {
+        MemberPrime::ArrayAccess { brackets, tail } => {
             let val = ctx.resolve_fqn(&fqn)?;
             let base_type = val.as_type();
-            let expr_res = eval_expr(expr, ctx)?;
+            let expr_res = eval_expr(brackets, ctx)?;
 
-            match val {
+            let call_res = match val {
                 ValueCell::List(l) => {
                     let index: usize = match expr_res {
                         ValueCell::Int(v) => {
@@ -338,7 +340,9 @@ fn eval_member_prime(
                     "Index operation invalid on type {:?}",
                     base_type
                 ))),
-            }
+            };
+
+            eval_member_prime(tail, &mut vec![call_res?], ctx)
         }
         MemberPrime::Empty(_) => ctx.resolve_fqn(&fqn),
     }

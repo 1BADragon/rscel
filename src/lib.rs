@@ -41,7 +41,8 @@ pub use serde_json::Value;
 
 #[cfg(test)]
 mod test {
-    use crate::{CelContext, ExecContext};
+    use crate::{CelContext, ExecContext, ValueCell};
+    use test_case::test_case;
 
     #[test]
     fn test_bad_func_call() {
@@ -63,5 +64,27 @@ mod test {
             .unwrap();
 
         let _res = ctx.exec("main", &exec_ctx).unwrap();
+    }
+
+    #[test_case("3+3", ValueCell::Int(6))]
+    #[test_case("4-3", ValueCell::Int(1))]
+    #[test_case("7 % 2", ValueCell::Int(1))]
+    #[test_case("(4+2) * (6-5)", ValueCell::Int(6))]
+    #[test_case("[1, 2, 3].map(x, x+2)", ValueCell::List(vec![ValueCell::Int(3), ValueCell::Int(4), ValueCell::Int(5)]))]
+    #[test_case("[1,2,3][1]", ValueCell::Int(2))]
+    #[test_case("{\"foo\": 3}.foo", ValueCell::Int(3))]
+    #[test_case("size([1,2,3,4])", ValueCell::UInt(4))]
+    #[test_case("true || false", ValueCell::Bool(true))]
+    #[test_case("false && true", ValueCell::Bool(false))]
+    #[test_case("true && true", ValueCell::Bool(true))]
+    #[test_case("[1,2].map(x, x+1).map(x, x*2)", ValueCell::List(vec![ValueCell::Int(4), ValueCell::Int(6)]))]
+    fn test_equation(prog: &str, res: ValueCell) {
+        let mut ctx = CelContext::new();
+        let exec_ctx = ExecContext::new();
+
+        ctx.add_program_str("main", prog).unwrap();
+
+        let eval_res = ctx.exec("main", &exec_ctx).unwrap();
+        assert!(eval_res == res);
     }
 }

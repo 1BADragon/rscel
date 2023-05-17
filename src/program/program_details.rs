@@ -103,11 +103,17 @@ impl ProgramDetails {
                 ident: _,
                 tail,
             } => self.parse_member_prime(tail),
-            MemberPrime::Call(list) => match (*list).as_prefix() {
-                Some(exprlist) => self.parse_expr_list(exprlist),
-                None => {}
-            },
-            MemberPrime::ArrayAccess(expr) => self.parse_expr(expr),
+            MemberPrime::Call { call, tail } => {
+                match (*call).as_prefix() {
+                    Some(exprlist) => self.parse_expr_list(exprlist),
+                    None => {}
+                };
+                self.parse_member_prime(tail);
+            }
+            MemberPrime::ArrayAccess { brackets, tail } => {
+                self.parse_expr(brackets);
+                self.parse_member_prime(tail)
+            }
             MemberPrime::Empty(_) => {}
         }
     }

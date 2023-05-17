@@ -119,9 +119,19 @@ pub enum MemberPrime {
         tail: Box<MemberPrime>,
     },
     #[parsel(recursive)]
-    Call(Paren<Maybe<ExprList>>),
+    Call {
+        #[parsel(recursive)]
+        call: Paren<Maybe<ExprList>>,
+        #[parsel(recursive)]
+        tail: Box<MemberPrime>,
+    },
     #[parsel(recursive)]
-    ArrayAccess(Bracket<Expr>),
+    ArrayAccess {
+        #[parsel(recursive)]
+        brackets: Bracket<Expr>,
+        #[parsel(recursive)]
+        tail: Box<MemberPrime>,
+    },
     Empty(Empty),
 }
 

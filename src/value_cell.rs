@@ -7,7 +7,7 @@ use std::{
 
 use serde_json::{value::Value, Map};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ValueCell {
     Int(i64),
     UInt(u64),
@@ -92,19 +92,36 @@ impl ValueCell {
 
         match self {
             ValueCell::Int(val1) => {
-                if let ValueCell::Int(val2) = rhs {
-                    return Ok(ValueCell::from_bool(val1 == val2));
-                }
+                match rhs {
+                    ValueCell::Int(val2) => return Ok(ValueCell::from_bool(val1 == val2)),
+                    ValueCell::UInt(val2) => {
+                        return Ok(ValueCell::from_bool(*val1 == *val2 as i64))
+                    }
+                    ValueCell::Float(val2) => {
+                        return Ok(ValueCell::from_bool(*val1 as f64 == *val2))
+                    }
+                    _ => {}
+                };
             }
             ValueCell::UInt(val1) => {
-                if let ValueCell::UInt(val2) = rhs {
-                    return Ok(ValueCell::from_bool(val1 == val2));
-                }
+                match rhs {
+                    ValueCell::Int(val2) => return Ok(ValueCell::from_bool(*val1 as i64 == *val2)),
+                    ValueCell::UInt(val2) => return Ok(ValueCell::from_bool(val1 == val2)),
+                    ValueCell::Float(val2) => {
+                        return Ok(ValueCell::from_bool(*val1 as f64 == *val2))
+                    }
+                    _ => {}
+                };
             }
             ValueCell::Float(val1) => {
-                if let ValueCell::Float(val2) = rhs {
-                    return Ok(ValueCell::from_bool(val1 == val2));
-                }
+                match rhs {
+                    ValueCell::Int(val2) => return Ok(ValueCell::from_bool(*val1 == *val2 as f64)),
+                    ValueCell::UInt(val2) => {
+                        return Ok(ValueCell::from_bool(*val1 == *val2 as f64))
+                    }
+                    ValueCell::Float(val2) => return Ok(ValueCell::from_bool(val1 == val2)),
+                    _ => {}
+                };
             }
             ValueCell::Bool(val1) => {
                 if let ValueCell::Bool(val2) = rhs {
@@ -166,30 +183,29 @@ impl ValueCell {
         unreachable!();
     }
 
-    fn ord(&self, rhs: &ValueCell) -> ValueCellResult<Ordering> {
+    fn ord(&self, rhs: &ValueCell) -> ValueCellResult<Option<Ordering>> {
         let type1 = rhs.as_type();
         let type2 = rhs.as_type();
 
         match self {
-            ValueCell::Int(v1) => {
-                if let ValueCell::Int(v2) = rhs {
-                    return Ok(v1.cmp(v2));
-                }
-            }
-            ValueCell::UInt(v1) => {
-                if let ValueCell::UInt(v2) = rhs {
-                    return Ok(v1.cmp(v2));
-                }
-            }
-            ValueCell::Float(v1) => {
-                if let ValueCell::Float(v2) = rhs {
-                    match v1.partial_cmp(v2) {
-                        Some(res) => return Ok(res),
-                        None => {}
-                    }
-                }
-            }
-
+            ValueCell::Int(v1) => match rhs {
+                ValueCell::Int(v2) => return Ok(Some(v1.cmp(v2))),
+                ValueCell::UInt(v2) => return Ok(Some(v1.cmp(&(*v2 as i64)))),
+                ValueCell::Float(v2) => return Ok((*v1 as f64).partial_cmp(v2)),
+                _ => {}
+            },
+            ValueCell::UInt(v1) => match rhs {
+                ValueCell::Int(v2) => return Ok(Some((*v1 as i64).cmp(v2))),
+                ValueCell::UInt(v2) => return Ok(Some(v1.cmp(v2))),
+                ValueCell::Float(v2) => return Ok((*v1 as f64).partial_cmp(v2)),
+                _ => {}
+            },
+            ValueCell::Float(v1) => match rhs {
+                ValueCell::Int(v2) => return Ok(v1.partial_cmp(&(*v2 as f64))),
+                ValueCell::UInt(v2) => return Ok(v1.partial_cmp(&(*v2 as f64))),
+                ValueCell::Float(v2) => return Ok(v1.partial_cmp(v2)),
+                _ => {}
+            },
             _ => {}
         }
 
@@ -200,18 +216,20 @@ impl ValueCell {
     }
 
     pub fn lt(&self, rhs: &ValueCell) -> ValueCellResult<ValueCell> {
-        Ok(ValueCell::from_bool(self.ord(rhs)? == Ordering::Less))
+        Ok(ValueCell::from_bool(self.ord(rhs)? == Some(Ordering::Less)))
     }
 
     pub fn gt(&self, rhs: &ValueCell) -> ValueCellResult<ValueCell> {
-        Ok(ValueCell::from_bool(self.ord(rhs)? == Ordering::Greater))
+        Ok(ValueCell::from_bool(
+            self.ord(rhs)? == Some(Ordering::Greater),
+        ))
     }
 
     pub fn le(&self, rhs: &ValueCell) -> ValueCellResult<ValueCell> {
         let res = self.ord(rhs)?;
 
         Ok(ValueCell::from_bool(
-            res == Ordering::Less || res == Ordering::Equal,
+            res == Some(Ordering::Less) || res == Some(Ordering::Equal),
         ))
     }
 
@@ -219,7 +237,7 @@ impl ValueCell {
         let res = self.ord(rhs)?;
 
         Ok(ValueCell::from_bool(
-            res == Ordering::Greater || res == Ordering::Equal,
+            res == Some(Ordering::Greater) || res == Some(Ordering::Equal),
         ))
     }
 
