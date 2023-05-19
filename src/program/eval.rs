@@ -1,4 +1,7 @@
-use std::ops::{Neg, Not};
+use std::{
+    collections::HashMap,
+    ops::{Neg, Not},
+};
 
 use parsel::ast::Lit;
 
@@ -356,7 +359,20 @@ fn eval_primary(ast: &Primary, ctx: &CelContext) -> ValueCellResult<ValueCell> {
             Some(exprlist) => eval_expr_list(exprlist, ctx),
             None => Ok(ValueCell::from_list(&[])),
         },
-        Primary::ObjectInit(_child) => Err(ValueCellError::with_msg("Object init not implemented")),
+        Primary::ObjectInit(child) => {
+            let mut obj_map: HashMap<String, ValueCell> = HashMap::new();
+
+            if let Some(inner) = (*child).as_prefix() {
+                for pair in inner.into_iter() {
+                    let key: String = eval_expr(&pair.key, ctx)?.try_into()?;
+
+                    let val = eval_expr(&pair.value, ctx)?;
+                    obj_map.insert(key, val);
+                }
+            }
+
+            Ok(obj_map.into())
+        }
         Primary::Literal(literal) => match literal {
             Literal::Null(_) => Ok(ValueCell::from_null()),
             Literal::Lit(lit) => match lit {

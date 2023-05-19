@@ -16,6 +16,7 @@ const DEFAULT_FUNCS: &[(&str, RsCellFunction)] = &[
     ("startsWith", starts_with_impl),
     ("endsWith", ends_with_impl),
     ("matches", matches_impl),
+    ("type", type_impl),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut ExecContext) {
@@ -277,4 +278,14 @@ fn matches_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> 
     Err(ValueCellError::with_msg(
         "matches has the forms string.(string) or (string, string)",
     ))
+}
+
+fn type_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
+    let arg_vec: Vec<ValueCell> = args.try_into()?;
+
+    if arg_vec.len() != 1 {
+        return Err(ValueCellError::with_msg("type() expects one argument"));
+    }
+
+    Ok(arg_vec[0].as_type())
 }

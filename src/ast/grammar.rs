@@ -144,7 +144,7 @@ pub enum Primary {
     #[parsel(recursive)]
     ListConstruction(Bracket<Maybe<ExprList>>),
     #[parsel(recursive)]
-    ObjectInit(Brace<Maybe<Punctuated<MapInits, Token![,]>>>),
+    ObjectInit(Brace<Maybe<MapInits>>),
     #[parsel(recursive)]
     Literal(Literal),
 }

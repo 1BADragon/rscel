@@ -16,7 +16,7 @@ pub type RsCellMacro =
 
 #[derive(Clone)]
 pub struct ExecContext {
-    params: HashMap<String, Value>,
+    params: HashMap<String, ValueCell>,
     funcs: HashMap<String, RsCellFunction>,
     macros: HashMap<String, RsCellMacro>,
 }
@@ -34,11 +34,11 @@ impl ExecContext {
         ctx
     }
 
-    pub fn bind_param(&mut self, name: &str, value: Value) {
+    pub fn bind_param(&mut self, name: &str, value: ValueCell) {
         self.params.insert(name.to_owned(), value);
     }
 
-    pub fn bind_params_from_json(&mut self, values: Value) -> Result<(), ExecError> {
+    pub fn bind_params_from_json_obj(&mut self, values: Value) -> Result<(), ExecError> {
         let obj = if let Value::Object(o) = values {
             o
         } else {
@@ -46,7 +46,7 @@ impl ExecContext {
         };
 
         for (key, value) in obj.into_iter() {
-            self.params.insert(key, value);
+            self.params.insert(key, ValueCell::from(value));
         }
         Ok(())
     }
@@ -59,7 +59,7 @@ impl ExecContext {
         self.macros.insert(name.to_owned(), macro_);
     }
 
-    pub fn get_param(&self, name: &str) -> Option<&Value> {
+    pub fn get_param(&self, name: &str) -> Option<&ValueCell> {
         self.params.get(name)
     }
 

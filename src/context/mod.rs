@@ -11,7 +11,6 @@ use crate::{
 };
 
 pub use exec_context::{ExecContext, RsCellFunction, RsCellMacro};
-use serde_json::Value;
 
 /// The CelContext is the core context in RsCel. This context contains
 /// Program information as well as the primary entry point for evaluating
@@ -83,10 +82,10 @@ impl<'a> CelContext<'a> {
         Some(prog.details())
     }
 
-    pub(crate) fn get_param_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l Value> {
-        let json_value = self.current_ctx?.get_param(name)?;
+    pub(crate) fn get_param_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l ValueCell> {
+        let value = self.current_ctx?.get_param(name)?;
 
-        Some(json_value)
+        Some(value)
     }
 
     pub(crate) fn get_func_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l RsCellFunction> {
@@ -105,7 +104,7 @@ impl<'a> CelContext<'a> {
         let mut iter = fqn.iter();
         let mut current = match iter.next() {
             Some(ValueCell::Ident(ident)) => match self.get_param_by_name(ident) {
-                Some(val) => ValueCell::from(val),
+                Some(val) => val.clone(),
                 None => {
                     return Err(ValueCellError::with_msg(&format!(
                         "Ident '{}' does not exist",

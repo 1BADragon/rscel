@@ -322,9 +322,61 @@ impl From<&Value> for ValueCell {
     }
 }
 
+impl From<Value> for ValueCell {
+    fn from(value: Value) -> ValueCell {
+        match value {
+            Value::Number(val) => {
+                if let Some(val) = val.as_i64() {
+                    return ValueCell::from_int(val);
+                } else if let Some(val) = val.as_u64() {
+                    return ValueCell::from_uint(val);
+                } else if let Some(val) = val.as_f64() {
+                    return ValueCell::from_float(val);
+                }
+
+                unreachable!()
+            }
+            Value::String(val) => ValueCell::from_string(&val),
+            Value::Bool(val) => ValueCell::from_bool(val),
+            Value::Array(val) => {
+                let list: Vec<ValueCell> = val.iter().map(|x| ValueCell::from(x)).collect();
+                ValueCell::from_list(&list)
+            }
+            Value::Null => ValueCell::from_null(),
+            Value::Object(val) => {
+                let mut map: HashMap<String, ValueCell> = HashMap::new();
+
+                for key in val.keys() {
+                    map.insert(key.clone(), ValueCell::from(&val[key]));
+                }
+
+                ValueCell::from_map(&map)
+            }
+        }
+    }
+}
+
 impl From<i64> for ValueCell {
     fn from(val: i64) -> ValueCell {
         ValueCell::from_int(val)
+    }
+}
+
+impl From<i32> for ValueCell {
+    fn from(val: i32) -> ValueCell {
+        ValueCell::from_int(val as i64)
+    }
+}
+
+impl From<i16> for ValueCell {
+    fn from(val: i16) -> ValueCell {
+        ValueCell::from_int(val as i64)
+    }
+}
+
+impl From<i8> for ValueCell {
+    fn from(val: i8) -> ValueCell {
+        ValueCell::from_int(val as i64)
     }
 }
 
@@ -343,6 +395,24 @@ impl TryInto<i64> for ValueCell {
 impl From<u64> for ValueCell {
     fn from(val: u64) -> ValueCell {
         ValueCell::from_uint(val)
+    }
+}
+
+impl From<u32> for ValueCell {
+    fn from(val: u32) -> ValueCell {
+        ValueCell::from_uint(val as u64)
+    }
+}
+
+impl From<u16> for ValueCell {
+    fn from(val: u16) -> ValueCell {
+        ValueCell::from_uint(val as u64)
+    }
+}
+
+impl From<u8> for ValueCell {
+    fn from(val: u8) -> ValueCell {
+        ValueCell::from_uint(val as u64)
     }
 }
 
@@ -447,6 +517,12 @@ impl From<&[ValueCell]> for ValueCell {
     }
 }
 
+impl From<Vec<ValueCell>> for ValueCell {
+    fn from(val: Vec<ValueCell>) -> ValueCell {
+        ValueCell::List(val)
+    }
+}
+
 impl TryInto<Vec<ValueCell>> for ValueCell {
     type Error = ValueCellError;
 
@@ -512,6 +588,13 @@ impl Add for ValueCell {
                     let mut res = val1;
                     res.extend_from_slice(&val2);
                     return Ok(ValueCell::from(res));
+                }
+            }
+            ValueCell::List(val1) => {
+                if let ValueCell::List(val2) = rhs {
+                    let mut res = val1;
+                    res.extend_from_slice(&val2);
+                    return Ok(res.into());
                 }
             }
             _ => {}

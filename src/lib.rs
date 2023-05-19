@@ -68,6 +68,7 @@ mod test {
 
     #[test_case("3+3", ValueCell::Int(6))]
     #[test_case("4-3", ValueCell::Int(1))]
+    #[test_case("4u + 3u", 7u64.into())]
     #[test_case("7 % 2", ValueCell::Int(1))]
     #[test_case("(4+2) * (6-5)", ValueCell::Int(6))]
     #[test_case("[1, 2, 3].map(x, x+2)", ValueCell::List(vec![ValueCell::Int(3), ValueCell::Int(4), ValueCell::Int(5)]))]

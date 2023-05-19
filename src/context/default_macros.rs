@@ -61,7 +61,7 @@ fn all_impl(ctx: &CelContext, this: ValueCell, exprlist: &[&Expr]) -> ValueCellR
                 None => return Err(ValueCellError::with_msg("Internal Error")),
             };
 
-            exec_ctx.bind_param(&ident_name, v.into_json_value());
+            exec_ctx.bind_param(&ident_name, v);
 
             if let Ok(ValueCell::Bool(res)) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx) {
                 if !res {
@@ -102,7 +102,7 @@ fn exists_impl(
                 None => return Err(ValueCellError::with_msg("Internal Error")),
             };
 
-            exec_ctx.bind_param(&ident_name, v.into_json_value());
+            exec_ctx.bind_param(&ident_name, v);
 
             if let Ok(ValueCell::Bool(res)) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx) {
                 if res {
@@ -144,7 +144,7 @@ fn exists_one_impl(
                 None => return Err(ValueCellError::with_msg("Internal Error")),
             };
 
-            exec_ctx.bind_param(&ident_name, v.into_json_value());
+            exec_ctx.bind_param(&ident_name, v);
 
             if let Ok(ValueCell::Bool(res)) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx) {
                 if res {
@@ -190,7 +190,7 @@ fn filter_impl(
                 None => return Err(ValueCellError::with_msg("Internal Error")),
             };
 
-            exec_ctx.bind_param(&ident_name, v.clone().into_json_value());
+            exec_ctx.bind_param(&ident_name, v.clone());
 
             if let ValueCell::Bool(res) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx)? {
                 if res {
@@ -229,7 +229,7 @@ fn map_impl(ctx: &CelContext, this: ValueCell, exprlist: &[&Expr]) -> ValueCellR
                 None => return Err(ValueCellError::with_msg("Internal Error")),
             };
 
-            exec_ctx.bind_param(&ident_name, v.into_json_value());
+            exec_ctx.bind_param(&ident_name, v);
             mapped_list.push(tmp_ctx.eval_expr(exprlist[1], &exec_ctx)?);
         }
         Ok(ValueCell::List(mapped_list))
