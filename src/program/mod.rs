@@ -10,7 +10,7 @@ pub use program_error::ProgramError;
 
 pub use program_details::ProgramDetails;
 
-use crate::{parser::Expr, value_cell::ValueCell, CelContext};
+use crate::{ast::grammar::Expr, value_cell::ValueCell, CelContext};
 
 pub type ProgramResult<T> = Result<T, ProgramError>;
 

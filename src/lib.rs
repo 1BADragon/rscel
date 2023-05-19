@@ -25,8 +25,8 @@
 //! let res = ctx.exec("main", &exec_ctx).unwrap(); // ValueCell::Int(6)
 //! assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
 //! ```
+mod ast;
 mod context;
-mod parser;
 mod program;
 mod value_cell;
 
@@ -78,6 +78,11 @@ mod test {
     #[test_case("false && true", ValueCell::Bool(false))]
     #[test_case("true && true", ValueCell::Bool(true))]
     #[test_case("[1,2].map(x, x+1).map(x, x*2)", ValueCell::List(vec![ValueCell::Int(4), ValueCell::Int(6)]))]
+    #[test_case("\"hello world\".contains(\"hello\")", true.into(); "test contains")]
+    #[test_case("\"hello world\".endsWith(\"world\")", true.into(); "test endsWith")]
+    #[test_case("\"hello world\".startsWith(\"hello\")", true.into(); "test startsWith")]
+    #[test_case("\"abc123\".matches(\"[a-z]{3}[0-9]{3}\")", true.into(); "test matches")]
+    #[test_case("string(1)", "1".into(); "test string")]
     fn test_equation(prog: &str, res: ValueCell) {
         let mut ctx = CelContext::new();
         let exec_ctx = ExecContext::new();

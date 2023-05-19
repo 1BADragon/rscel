@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde_json::Value;
 
 use crate::{
-    parser::Expr,
+    ast::grammar::Expr,
     value_cell::{ValueCell, ValueCellResult},
     CelContext, ExecError,
 };
