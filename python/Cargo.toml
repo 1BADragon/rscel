@@ -1,0 +1,15 @@
+[package]
+name = "pyrscel"
+version = "0.1.0"
+authors = ["1BADragon <6611786+1BADragon@users.noreply.github.com>"]
+edition = "2021"
+
+[lib]
+name = "pyrscel"
+crate-type = ["cdylib"]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pyo3 = { version = "0.18.3", features = ["extension-module"] }
+rscel = { path = ".." }
+

@@ -121,7 +121,6 @@ impl ProgramDetails {
     fn parse_primary(&mut self, ast: &Primary) {
         match ast {
             Primary::Ident(child) => {
-                println!("{:?}", child);
                 self.params.insert(child.to_string());
             }
             Primary::Parens(child) => self.parse_expr(child.as_ref()),
