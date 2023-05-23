@@ -26,6 +26,7 @@
 //! assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
 //! ```
 mod ast;
+pub mod bindings;
 mod context;
 mod program;
 mod value_cell;
@@ -38,6 +39,12 @@ pub use serde;
 pub use serde_json;
 
 pub use serde_json::Value;
+
+#[cfg(feature = "python")]
+pub use bindings::python::*;
+
+#[cfg(feature = "wasm")]
+pub use bindings::wasm::*;
 
 #[cfg(test)]
 mod test {
