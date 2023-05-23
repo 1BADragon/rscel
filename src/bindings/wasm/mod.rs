@@ -1,6 +1,6 @@
 mod utils;
 
-use rscel::{CelContext, ExecContext, Program};
+use crate::{CelContext, ExecContext, Program};
 use serde::Serialize;
 use serde_json::Value;
 use wasm_bindgen::prelude::*;

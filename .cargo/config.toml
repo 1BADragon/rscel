@@ -1,0 +1,2 @@
+[alias]
+pyrscel = "run maturin develop"

@@ -31,6 +31,6 @@
     "@fluentui/theme": "^2.6.29",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "rscel": "file:../pkg"
+    "rscel": "file:../../pkg"
   }
 }
