@@ -16,9 +16,14 @@ how to convert from JSON to CEL types).
 
 The basic example of how to use:
 ```rust
+use rscel::{CelContext, ExecContext, serde_json};
+
 let mut ctx = CelContext::new();
-let exec_ctx = ExecContext::new();
+let mut exec_ctx = ExecContext::new();
+
 ctx.add_program_str("main", "foo + 3").unwrap();
-exec_ctx.bind_param("foo", Value::Number(3));
+exec_ctx.bind_param("foo", 3.into()); // convert to serde_json::Value
+
 let res = ctx.exec("main", &exec_ctx).unwrap(); // ValueCell::Int(6)
+assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
 ```
