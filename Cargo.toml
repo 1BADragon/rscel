@@ -23,7 +23,7 @@ serde = { version = "1.0.163", features = ["derive"] }
 serde_json = {version = "1.0.29", features = ["raw_value"]}
 
 # Dependencies for python bindings
-pyo3 = { version = "0.18.3", optional = true }
+pyo3 = { version = "0.18.3", optional = true, features = ["extension-module"] }
 
 # Dependencies for wasm bindings
 wasm-bindgen = { version = "0.2.63", optional = true}
