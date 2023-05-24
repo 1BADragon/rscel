@@ -33,7 +33,7 @@ mod value_cell;
 
 pub use context::{CelContext, ExecContext, ExecError, ExecResult, RsCellFunction, RsCellMacro};
 pub use program::{Program, ProgramError};
-pub use value_cell::{ValueCell, ValueCellError, ValueCellResult};
+pub use value_cell::{ValueCell, ValueCellError, ValueCellInner, ValueCellResult};
 
 pub use serde;
 pub use serde_json;
@@ -48,7 +48,7 @@ pub use bindings::wasm::*;
 
 #[cfg(test)]
 mod test {
-    use crate::{CelContext, ExecContext, ValueCell};
+    use crate::{CelContext, ExecContext, ValueCell, ValueCellInner};
     use test_case::test_case;
 
     #[test]
@@ -73,19 +73,19 @@ mod test {
         let _res = ctx.exec("main", &exec_ctx).unwrap();
     }
 
-    #[test_case("3+3", ValueCell::Int(6))]
-    #[test_case("4-3", ValueCell::Int(1))]
+    #[test_case("3+3", 6.into())]
+    #[test_case("4-3", 1.into())]
     #[test_case("4u + 3u", 7u64.into())]
-    #[test_case("7 % 2", ValueCell::Int(1))]
-    #[test_case("(4+2) * (6-5)", ValueCell::Int(6))]
-    #[test_case("[1, 2, 3].map(x, x+2)", ValueCell::List(vec![ValueCell::Int(3), ValueCell::Int(4), ValueCell::Int(5)]))]
-    #[test_case("[1,2,3][1]", ValueCell::Int(2))]
-    #[test_case("{\"foo\": 3}.foo", ValueCell::Int(3))]
-    #[test_case("size([1,2,3,4])", ValueCell::UInt(4))]
-    #[test_case("true || false", ValueCell::Bool(true))]
-    #[test_case("false && true", ValueCell::Bool(false))]
-    #[test_case("true && true", ValueCell::Bool(true))]
-    #[test_case("[1,2].map(x, x+1).map(x, x*2)", ValueCell::List(vec![ValueCell::Int(4), ValueCell::Int(6)]))]
+    #[test_case("7 % 2", 1.into())]
+    #[test_case("(4+2) * (6-5)", 6.into())]
+    #[test_case("[1, 2, 3].map(x, x+2)", ValueCell::from_list(&[3.into(), 4.into(), 5.into()]))]
+    #[test_case("[1,2,3][1]", 2.into())]
+    #[test_case("{\"foo\": 3}.foo", 3.into())]
+    #[test_case("size([1,2,3,4])", 4u64.into())]
+    #[test_case("true || false", true.into())]
+    #[test_case("false && true", false.into())]
+    #[test_case("true && true", true.into())]
+    #[test_case("[1,2].map(x, x+1).map(x, x*2)", ValueCell::from_list(&[4.into(), 6.into()]))]
     #[test_case("\"hello world\".contains(\"hello\")", true.into(); "test contains")]
     #[test_case("\"hello world\".endsWith(\"world\")", true.into(); "test endsWith")]
     #[test_case("\"hello world\".startsWith(\"hello\")", true.into(); "test startsWith")]

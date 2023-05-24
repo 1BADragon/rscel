@@ -8,6 +8,7 @@ use crate::{
     ast::grammar::Expr,
     program::{eval_expr, Program, ProgramDetails, ProgramResult},
     value_cell::{ValueCell, ValueCellError, ValueCellResult},
+    ValueCellInner,
 };
 
 pub use exec_context::{ExecContext, RsCellFunction, RsCellMacro};
@@ -102,24 +103,28 @@ impl<'a> CelContext<'a> {
 
     pub(crate) fn resolve_fqn(&self, fqn: &[ValueCell]) -> ValueCellResult<ValueCell> {
         let mut iter = fqn.iter();
-        let mut current = match iter.next() {
-            Some(ValueCell::Ident(ident)) => match self.get_param_by_name(ident) {
-                Some(val) => val.clone(),
-                None => {
-                    return Err(ValueCellError::with_msg(&format!(
-                        "Ident '{}' does not exist",
-                        ident
-                    )))
-                }
-            },
-            Some(other) => other.clone(),
-            None => return Err(ValueCellError::with_msg("Empty Ident")),
+
+        let mut current = if let Some(vc) = iter.next() {
+            match vc.inner() {
+                ValueCellInner::Ident(ident) => match self.get_param_by_name(ident) {
+                    Some(val) => val.clone(),
+                    None => {
+                        return Err(ValueCellError::with_msg(&format!(
+                            "Ident '{}' does not exist",
+                            ident
+                        )))
+                    }
+                },
+                other => other.clone().into(),
+            }
+        } else {
+            return Err(ValueCellError::with_msg("Empty Ident"));
         };
 
         for member_name in iter {
-            match &current {
-                ValueCell::Map(map) => {
-                    if let ValueCell::Ident(member_name_str) = member_name {
+            match current.inner() {
+                ValueCellInner::Map(map) => {
+                    if let ValueCellInner::Ident(member_name_str) = member_name.inner() {
                         current = if let Some(member) = map.get(member_name_str) {
                             member.clone()
                         } else {
@@ -190,7 +195,6 @@ impl<'a> Clone for CelContext<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::value_cell::ValueCell;
 
     use super::{CelContext, ExecContext};
 
@@ -203,12 +207,6 @@ mod test {
 
         let res = ctx.exec("test_main", &exec_ctx).unwrap();
 
-        println!("{:?}", res);
-
-        if let ValueCell::Int(val) = res {
-            assert!(val == 7);
-        } else {
-            assert!(false);
-        }
+        assert!(TryInto::<i64>::try_into(res).unwrap() == 7)
     }
 }

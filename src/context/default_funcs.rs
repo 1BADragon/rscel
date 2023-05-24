@@ -1,6 +1,6 @@
 use super::exec_context::RsCellFunction;
 use crate::{
-    value_cell::{ValueCell, ValueCellError, ValueCellResult},
+    value_cell::{ValueCell, ValueCellError, ValueCellInner, ValueCellResult},
     ExecContext,
 };
 use regex::Regex;
@@ -26,7 +26,7 @@ pub fn load_default_funcs(exec_ctx: &mut ExecContext) {
 }
 
 fn int_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    use ValueCell::*;
+    use ValueCellInner::*;
     let arg_list: Vec<ValueCell> = args.try_into()?;
 
     if arg_list.len() != 1 {
@@ -35,7 +35,7 @@ fn int_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
         ));
     }
 
-    match &arg_list[0] {
+    match arg_list[0].inner() {
         Int(val) => Ok(ValueCell::from_int(*val)),
         UInt(val) => Ok(ValueCell::from_int(*val as i64)),
         Float(val) => Ok(ValueCell::from_int(*val as i64)),
@@ -54,7 +54,7 @@ fn int_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
 }
 
 fn uint_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    use ValueCell::*;
+    use ValueCellInner::*;
     let arg_list: Vec<ValueCell> = args.try_into()?;
 
     if arg_list.len() != 1 {
@@ -63,7 +63,7 @@ fn uint_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
         ));
     }
 
-    match &arg_list[0] {
+    match arg_list[0].inner() {
         Int(val) => Ok(ValueCell::from_uint(*val as u64)),
         UInt(val) => Ok(ValueCell::from_uint(*val)),
         Float(val) => Ok(ValueCell::from_uint(*val as u64)),
@@ -82,7 +82,7 @@ fn uint_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
 }
 
 fn double_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    use ValueCell::*;
+    use ValueCellInner::*;
     let arg_list: Vec<ValueCell> = args.try_into()?;
 
     if arg_list.len() != 1 {
@@ -91,7 +91,7 @@ fn double_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
         ));
     }
 
-    match &arg_list[0] {
+    match arg_list[0].inner() {
         Int(val) => Ok(ValueCell::from_float(*val as f64)),
         UInt(val) => Ok(ValueCell::from_float(*val as f64)),
         Float(val) => Ok(ValueCell::from_float(*val)),
@@ -110,7 +110,7 @@ fn double_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
 }
 
 fn bytes_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    use ValueCell::*;
+    use ValueCellInner::*;
     let arg_list: Vec<ValueCell> = args.try_into()?;
 
     if arg_list.len() != 1 {
@@ -119,7 +119,7 @@ fn bytes_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
         ));
     }
 
-    match &arg_list[0] {
+    match &arg_list[0].inner() {
         String(val) => Ok(ValueCell::from_bytes(val.as_bytes())),
         other => Err(ValueCellError::with_msg(&format!(
             "int conversion invalid for {:?}",
@@ -129,7 +129,7 @@ fn bytes_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
 }
 
 fn string_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    use ValueCell::*;
+    use ValueCellInner::*;
     let arg_list: Vec<ValueCell> = args.try_into()?;
 
     if arg_list.len() != 1 {
@@ -140,7 +140,7 @@ fn string_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> 
 
     let arg_type = arg_list[0].as_type();
 
-    Ok(match &arg_list[0] {
+    Ok(match arg_list[0].inner() {
         Int(i) => i.to_string().into(),
         UInt(i) => i.to_string().into(),
         Float(f) => f.to_string().into(),
@@ -167,8 +167,8 @@ fn contains_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell>
         ));
     }
 
-    if let ValueCell::String(this_str) = this {
-        if let ValueCell::String(rhs) = &arg_list[0] {
+    if let ValueCellInner::String(this_str) = this.inner() {
+        if let ValueCellInner::String(rhs) = arg_list[0].inner() {
             Ok(ValueCell::from_bool(this_str.contains(rhs)))
         } else {
             Err(ValueCellError::with_msg("contains() arg must be string"))
@@ -189,11 +189,11 @@ fn size_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
         ));
     }
 
-    Ok(ValueCell::from_uint(match &arg_list[0] {
-        ValueCell::String(s) => s.len() as u64,
-        ValueCell::Bytes(b) => b.len() as u64,
-        ValueCell::List(l) => l.len() as u64,
-        ValueCell::Map(m) => m.len() as u64,
+    Ok(ValueCell::from_uint(match arg_list[0].inner() {
+        ValueCellInner::String(s) => s.len() as u64,
+        ValueCellInner::Bytes(b) => b.len() as u64,
+        ValueCellInner::List(l) => l.len() as u64,
+        ValueCellInner::Map(m) => m.len() as u64,
         _ => {
             return Err(ValueCellError::with_msg(
                 "size() only available for types {string, bytes, list, map}",
@@ -211,8 +211,8 @@ fn starts_with_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCe
         ));
     }
 
-    if let ValueCell::String(lhs) = this {
-        if let ValueCell::String(rhs) = &arg_list[0] {
+    if let ValueCellInner::String(lhs) = this.inner() {
+        if let ValueCellInner::String(rhs) = arg_list[0].inner() {
             return Ok(lhs.starts_with(rhs).into());
         }
     }
@@ -231,8 +231,8 @@ fn ends_with_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell
         ));
     }
 
-    if let ValueCell::String(lhs) = this {
-        if let ValueCell::String(rhs) = &arg_list[0] {
+    if let ValueCellInner::String(lhs) = this.inner() {
+        if let ValueCellInner::String(rhs) = arg_list[0].inner() {
             return Ok(lhs.ends_with(rhs).into());
         }
     }
@@ -245,7 +245,7 @@ fn ends_with_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell
 fn matches_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
     let arg_list: Vec<ValueCell> = args.try_into()?;
 
-    let (vc_lhs, vc_rhs) = if let ValueCell::Null = this {
+    let (vc_lhs, vc_rhs) = if let ValueCellInner::Null = this.inner() {
         if arg_list.len() != 2 {
             return Err(ValueCellError::with_msg(
                 "matches() expects exactly two argument",
@@ -261,8 +261,8 @@ fn matches_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> 
         (&this, &arg_list[0])
     };
 
-    if let ValueCell::String(lhs) = vc_lhs {
-        if let ValueCell::String(rhs) = vc_rhs {
+    if let ValueCellInner::String(lhs) = vc_lhs.inner() {
+        if let ValueCellInner::String(rhs) = vc_rhs.inner() {
             match Regex::new(rhs) {
                 Ok(re) => return Ok(re.is_match(lhs).into()),
                 Err(err) => {

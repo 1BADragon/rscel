@@ -3,12 +3,13 @@ use std::{
     collections::HashMap,
     iter::zip,
     ops::{Add, Div, Mul, Neg, Not, Rem, Sub},
+    rc::Rc,
 };
 
 use serde_json::{value::Value, Map};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ValueCell {
+pub enum ValueCellInner {
     Int(i64),
     UInt(u64),
     Float(f64),
@@ -20,6 +21,11 @@ pub enum ValueCell {
     Null,
     Ident(String),
     Type(String),
+}
+
+#[derive(Debug)]
+pub struct ValueCell {
+    inner: Rc<ValueCellInner>,
 }
 
 #[derive(Debug)]
@@ -41,105 +47,148 @@ impl ValueCellError {
 
 pub type ValueCellResult<T> = Result<T, ValueCellError>;
 
+impl From<ValueCellInner> for ValueCell {
+    fn from(inner: ValueCellInner) -> ValueCell {
+        return ValueCell {
+            inner: Rc::new(inner),
+        };
+    }
+}
+
+impl Clone for ValueCell {
+    fn clone(&self) -> ValueCell {
+        ValueCell {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl PartialEq for ValueCell {
+    fn eq(&self, rhs: &ValueCell) -> bool {
+        self.inner().eq(rhs.inner())
+    }
+}
+
+impl AsRef<ValueCellInner> for ValueCell {
+    fn as_ref(&self) -> &ValueCellInner {
+        self.inner()
+    }
+}
+
 impl ValueCell {
     pub fn from_int(val: i64) -> ValueCell {
-        ValueCell::Int(val)
+        ValueCellInner::Int(val).into()
     }
 
     pub fn from_uint(val: u64) -> ValueCell {
-        ValueCell::UInt(val)
+        ValueCellInner::UInt(val).into()
     }
 
     pub fn from_float(val: f64) -> ValueCell {
-        ValueCell::Float(val)
+        ValueCellInner::Float(val).into()
     }
 
     pub fn from_bool(val: bool) -> ValueCell {
-        ValueCell::Bool(val)
+        ValueCellInner::Bool(val).into()
     }
 
     pub fn from_string(val: &str) -> ValueCell {
-        ValueCell::String(val.to_owned())
+        ValueCellInner::String(val.to_owned()).into()
     }
 
     pub fn from_bytes(val: &[u8]) -> ValueCell {
-        ValueCell::Bytes(val.to_vec())
+        ValueCellInner::Bytes(val.to_vec()).into()
     }
 
     pub fn from_list(val: &[ValueCell]) -> ValueCell {
-        ValueCell::List(val.to_vec())
+        ValueCellInner::List(val.to_vec()).into()
     }
 
     pub fn from_map(val: &HashMap<String, ValueCell>) -> ValueCell {
-        ValueCell::Map(val.clone())
+        ValueCellInner::Map(val.clone()).into()
     }
 
     pub fn from_null() -> ValueCell {
-        ValueCell::Null
+        ValueCellInner::Null.into()
     }
 
     pub fn from_ident(val: &str) -> ValueCell {
-        ValueCell::Ident(val.to_owned())
+        ValueCellInner::Ident(val.to_owned()).into()
     }
 
     pub fn from_type(val: &str) -> ValueCell {
-        ValueCell::Type(val.to_owned())
+        ValueCellInner::Type(val.to_owned()).into()
+    }
+
+    pub fn into_inner(self) -> ValueCellInner {
+        match Rc::try_unwrap(self.inner) {
+            Ok(inner) => inner,
+            Err(rc) => (*rc).clone(),
+        }
+    }
+
+    pub fn inner<'l>(&'l self) -> &'l ValueCellInner {
+        &self.inner
     }
 
     pub fn eq(&self, rhs: &ValueCell) -> ValueCellResult<ValueCell> {
         let type1 = rhs.as_type();
         let type2 = rhs.as_type();
 
-        match self {
-            ValueCell::Int(val1) => {
-                match rhs {
-                    ValueCell::Int(val2) => return Ok(ValueCell::from_bool(val1 == val2)),
-                    ValueCell::UInt(val2) => {
+        match self.inner() {
+            ValueCellInner::Int(val1) => {
+                match rhs.inner() {
+                    ValueCellInner::Int(val2) => return Ok(ValueCell::from_bool(val1 == val2)),
+                    ValueCellInner::UInt(val2) => {
                         return Ok(ValueCell::from_bool(*val1 == *val2 as i64))
                     }
-                    ValueCell::Float(val2) => {
+                    ValueCellInner::Float(val2) => {
                         return Ok(ValueCell::from_bool(*val1 as f64 == *val2))
                     }
                     _ => {}
                 };
             }
-            ValueCell::UInt(val1) => {
-                match rhs {
-                    ValueCell::Int(val2) => return Ok(ValueCell::from_bool(*val1 as i64 == *val2)),
-                    ValueCell::UInt(val2) => return Ok(ValueCell::from_bool(val1 == val2)),
-                    ValueCell::Float(val2) => {
+            ValueCellInner::UInt(val1) => {
+                match rhs.inner() {
+                    ValueCellInner::Int(val2) => {
+                        return Ok(ValueCell::from_bool(*val1 as i64 == *val2))
+                    }
+                    ValueCellInner::UInt(val2) => return Ok(ValueCell::from_bool(val1 == val2)),
+                    ValueCellInner::Float(val2) => {
                         return Ok(ValueCell::from_bool(*val1 as f64 == *val2))
                     }
                     _ => {}
                 };
             }
-            ValueCell::Float(val1) => {
-                match rhs {
-                    ValueCell::Int(val2) => return Ok(ValueCell::from_bool(*val1 == *val2 as f64)),
-                    ValueCell::UInt(val2) => {
+            ValueCellInner::Float(val1) => {
+                match rhs.inner() {
+                    ValueCellInner::Int(val2) => {
                         return Ok(ValueCell::from_bool(*val1 == *val2 as f64))
                     }
-                    ValueCell::Float(val2) => return Ok(ValueCell::from_bool(val1 == val2)),
+                    ValueCellInner::UInt(val2) => {
+                        return Ok(ValueCell::from_bool(*val1 == *val2 as f64))
+                    }
+                    ValueCellInner::Float(val2) => return Ok(ValueCell::from_bool(val1 == val2)),
                     _ => {}
                 };
             }
-            ValueCell::Bool(val1) => {
-                if let ValueCell::Bool(val2) = rhs {
+            ValueCellInner::Bool(val1) => {
+                if let ValueCellInner::Bool(val2) = rhs.inner() {
                     return Ok(ValueCell::from_bool(val1 == val2));
                 }
             }
-            ValueCell::String(val1) => {
-                if let ValueCell::String(val2) = rhs {
+            ValueCellInner::String(val1) => {
+                if let ValueCellInner::String(val2) = rhs.inner() {
                     return Ok(ValueCell::from_bool(val1 == val2));
                 }
             }
-            ValueCell::Bytes(val1) => {
-                if let ValueCell::Bytes(val2) = rhs {
+            ValueCellInner::Bytes(val1) => {
+                if let ValueCellInner::Bytes(val2) = rhs.inner() {
                     return Ok(ValueCell::from_bool(val1 == val2));
                 }
             }
-            ValueCell::List(val1) => {
-                if let ValueCell::List(val2) = rhs {
+            ValueCellInner::List(val1) => {
+                if let ValueCellInner::List(val2) = rhs.inner() {
                     if val1.len() != val2.len() {
                         return Ok(ValueCell::from_bool(false));
                     }
@@ -147,7 +196,7 @@ impl ValueCell {
                     for (v1, v2) in zip(val1, val2) {
                         match v1.eq(v2) {
                             Ok(res_cell) => {
-                                if let ValueCell::Bool(res) = res_cell {
+                                if let ValueCellInner::Bool(res) = res_cell.inner() {
                                     if !res {
                                         return Ok(ValueCell::from_bool(false));
                                     }
@@ -159,8 +208,8 @@ impl ValueCell {
                     return Ok(ValueCell::from_bool(true));
                 }
             }
-            ValueCell::Null => {
-                if let ValueCell::Null = rhs {
+            ValueCellInner::Null => {
+                if let ValueCellInner::Null = rhs.inner() {
                     return Ok(ValueCell::from_bool(true));
                 } else {
                     return Ok(ValueCell::from_bool(false));
@@ -176,7 +225,7 @@ impl ValueCell {
     }
 
     pub fn neq(&self, rhs: &ValueCell) -> ValueCellResult<ValueCell> {
-        if let ValueCell::Bool(res) = self.eq(rhs)? {
+        if let ValueCellInner::Bool(res) = self.eq(rhs)?.inner() {
             return Ok(ValueCell::from_bool(!res));
         }
 
@@ -187,23 +236,23 @@ impl ValueCell {
         let type1 = rhs.as_type();
         let type2 = rhs.as_type();
 
-        match self {
-            ValueCell::Int(v1) => match rhs {
-                ValueCell::Int(v2) => return Ok(Some(v1.cmp(v2))),
-                ValueCell::UInt(v2) => return Ok(Some(v1.cmp(&(*v2 as i64)))),
-                ValueCell::Float(v2) => return Ok((*v1 as f64).partial_cmp(v2)),
+        match self.inner() {
+            ValueCellInner::Int(v1) => match rhs.inner() {
+                ValueCellInner::Int(v2) => return Ok(Some(v1.cmp(v2))),
+                ValueCellInner::UInt(v2) => return Ok(Some(v1.cmp(&(*v2 as i64)))),
+                ValueCellInner::Float(v2) => return Ok((*v1 as f64).partial_cmp(v2)),
                 _ => {}
             },
-            ValueCell::UInt(v1) => match rhs {
-                ValueCell::Int(v2) => return Ok(Some((*v1 as i64).cmp(v2))),
-                ValueCell::UInt(v2) => return Ok(Some(v1.cmp(v2))),
-                ValueCell::Float(v2) => return Ok((*v1 as f64).partial_cmp(v2)),
+            ValueCellInner::UInt(v1) => match rhs.inner() {
+                ValueCellInner::Int(v2) => return Ok(Some((*v1 as i64).cmp(v2))),
+                ValueCellInner::UInt(v2) => return Ok(Some(v1.cmp(v2))),
+                ValueCellInner::Float(v2) => return Ok((*v1 as f64).partial_cmp(v2)),
                 _ => {}
             },
-            ValueCell::Float(v1) => match rhs {
-                ValueCell::Int(v2) => return Ok(v1.partial_cmp(&(*v2 as f64))),
-                ValueCell::UInt(v2) => return Ok(v1.partial_cmp(&(*v2 as f64))),
-                ValueCell::Float(v2) => return Ok(v1.partial_cmp(v2)),
+            ValueCellInner::Float(v1) => match rhs.inner() {
+                ValueCellInner::Int(v2) => return Ok(v1.partial_cmp(&(*v2 as f64))),
+                ValueCellInner::UInt(v2) => return Ok(v1.partial_cmp(&(*v2 as f64))),
+                ValueCellInner::Float(v2) => return Ok(v1.partial_cmp(v2)),
                 _ => {}
             },
             _ => {}
@@ -242,14 +291,14 @@ impl ValueCell {
     }
 
     pub fn into_json_value(self) -> Value {
-        match self {
-            ValueCell::Int(val) => Value::from(val),
-            ValueCell::UInt(val) => Value::from(val),
-            ValueCell::Float(val) => Value::from(val),
-            ValueCell::Bool(val) => Value::from(val),
-            ValueCell::String(val) => Value::from(val),
-            ValueCell::Bytes(val) => Value::from(val),
-            ValueCell::List(val) => {
+        match self.into_inner() {
+            ValueCellInner::Int(val) => Value::from(val),
+            ValueCellInner::UInt(val) => Value::from(val),
+            ValueCellInner::Float(val) => Value::from(val),
+            ValueCellInner::Bool(val) => Value::from(val),
+            ValueCellInner::String(val) => Value::from(val),
+            ValueCellInner::Bytes(val) => Value::from(val),
+            ValueCellInner::List(val) => {
                 let mut partial: Vec<Value> = Vec::new();
 
                 for v in val.into_iter() {
@@ -258,7 +307,7 @@ impl ValueCell {
 
                 Value::Array(partial)
             }
-            ValueCell::Map(val) => {
+            ValueCellInner::Map(val) => {
                 let mut partial: Map<String, Value> = Map::new();
 
                 for (key, value) in val.into_iter() {
@@ -272,18 +321,18 @@ impl ValueCell {
     }
 
     pub fn as_type(&self) -> ValueCell {
-        match self {
-            ValueCell::Int(_) => ValueCell::from_type("int"),
-            ValueCell::UInt(_) => ValueCell::from_type("uint"),
-            ValueCell::Float(_) => ValueCell::from_type("float"),
-            ValueCell::Bool(_) => ValueCell::from_type("bool"),
-            ValueCell::String(_) => ValueCell::from_type("string"),
-            ValueCell::Bytes(_) => ValueCell::from_type("bytes"),
-            ValueCell::List(_) => ValueCell::from_type("list"),
-            ValueCell::Map(_) => ValueCell::from_type("map"),
-            ValueCell::Null => ValueCell::from_type("null_type"),
-            ValueCell::Ident(_) => ValueCell::from_type("ident"),
-            ValueCell::Type(_) => ValueCell::from_type("type"),
+        match self.inner() {
+            ValueCellInner::Int(_) => ValueCell::from_type("int"),
+            ValueCellInner::UInt(_) => ValueCell::from_type("uint"),
+            ValueCellInner::Float(_) => ValueCell::from_type("float"),
+            ValueCellInner::Bool(_) => ValueCell::from_type("bool"),
+            ValueCellInner::String(_) => ValueCell::from_type("string"),
+            ValueCellInner::Bytes(_) => ValueCell::from_type("bytes"),
+            ValueCellInner::List(_) => ValueCell::from_type("list"),
+            ValueCellInner::Map(_) => ValueCell::from_type("map"),
+            ValueCellInner::Null => ValueCell::from_type("null_type"),
+            ValueCellInner::Ident(_) => ValueCell::from_type("ident"),
+            ValueCellInner::Type(_) => ValueCell::from_type("type"),
         }
     }
 }
@@ -384,8 +433,8 @@ impl TryInto<i64> for ValueCell {
     type Error = ValueCellError;
 
     fn try_into(self) -> ValueCellResult<i64> {
-        if let ValueCell::Int(val) = self {
-            return Ok(val);
+        if let ValueCellInner::Int(val) = self.inner() {
+            return Ok(*val);
         }
 
         return Err(ValueCellError::with_msg("Convertion Error"));
@@ -420,8 +469,8 @@ impl TryInto<u64> for ValueCell {
     type Error = ValueCellError;
 
     fn try_into(self) -> ValueCellResult<u64> {
-        if let ValueCell::UInt(val) = self {
-            return Ok(val);
+        if let ValueCellInner::UInt(val) = self.inner() {
+            return Ok(*val);
         }
 
         return Err(ValueCellError::with_msg("Convertion Error"));
@@ -438,8 +487,8 @@ impl TryInto<f64> for ValueCell {
     type Error = ValueCellError;
 
     fn try_into(self) -> ValueCellResult<f64> {
-        if let ValueCell::Float(val) = self {
-            return Ok(val);
+        if let ValueCellInner::Float(val) = self.inner() {
+            return Ok(*val);
         }
 
         return Err(ValueCellError::with_msg("Convertion Error"));
@@ -456,8 +505,8 @@ impl TryInto<bool> for ValueCell {
     type Error = ValueCellError;
 
     fn try_into(self) -> ValueCellResult<bool> {
-        if let ValueCell::Bool(val) = self {
-            return Ok(val);
+        if let ValueCellInner::Bool(val) = self.inner() {
+            return Ok(*val);
         }
 
         return Err(ValueCellError::with_msg("Convertion Error"));
@@ -472,7 +521,7 @@ impl From<&str> for ValueCell {
 
 impl From<String> for ValueCell {
     fn from(val: String) -> ValueCell {
-        ValueCell::String(val)
+        ValueCellInner::String(val).into()
     }
 }
 
@@ -480,7 +529,7 @@ impl TryInto<String> for ValueCell {
     type Error = ValueCellError;
 
     fn try_into(self) -> ValueCellResult<String> {
-        if let ValueCell::String(val) = self {
+        if let ValueCellInner::String(val) = self.into_inner() {
             return Ok(val);
         }
 
@@ -495,7 +544,7 @@ impl From<&[u8]> for ValueCell {
 }
 impl From<Vec<u8>> for ValueCell {
     fn from(val: Vec<u8>) -> ValueCell {
-        ValueCell::Bytes(val)
+        ValueCellInner::Bytes(val).into()
     }
 }
 
@@ -503,7 +552,7 @@ impl TryInto<Vec<u8>> for ValueCell {
     type Error = ValueCellError;
 
     fn try_into(self) -> ValueCellResult<Vec<u8>> {
-        if let ValueCell::Bytes(val) = self {
+        if let ValueCellInner::Bytes(val) = self.into_inner() {
             return Ok(val);
         }
 
@@ -519,7 +568,7 @@ impl From<&[ValueCell]> for ValueCell {
 
 impl From<Vec<ValueCell>> for ValueCell {
     fn from(val: Vec<ValueCell>) -> ValueCell {
-        ValueCell::List(val)
+        ValueCellInner::List(val).into()
     }
 }
 
@@ -527,7 +576,7 @@ impl TryInto<Vec<ValueCell>> for ValueCell {
     type Error = ValueCellError;
 
     fn try_into(self) -> ValueCellResult<Vec<ValueCell>> {
-        if let ValueCell::List(val) = self {
+        if let ValueCellInner::List(val) = self.into_inner() {
             return Ok(val);
         }
 
@@ -545,7 +594,7 @@ impl TryInto<HashMap<String, ValueCell>> for ValueCell {
     type Error = ValueCellError;
 
     fn try_into(self) -> ValueCellResult<HashMap<String, ValueCell>> {
-        if let ValueCell::Map(val) = self {
+        if let ValueCellInner::Map(val) = self.into_inner() {
             return Ok(val);
         }
 
@@ -560,41 +609,41 @@ impl Add for ValueCell {
         let type1 = self.as_type();
         let type2 = rhs.as_type();
 
-        match self {
-            ValueCell::Int(val1) => {
-                if let ValueCell::Int(val2) = rhs {
+        match self.into_inner() {
+            ValueCellInner::Int(val1) => {
+                if let ValueCellInner::Int(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 + val2));
                 }
             }
-            ValueCell::UInt(val1) => {
-                if let ValueCell::UInt(val2) = rhs {
+            ValueCellInner::UInt(val1) => {
+                if let ValueCellInner::UInt(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 + val2));
                 }
             }
-            ValueCell::Float(val1) => {
-                if let ValueCell::Float(val2) = rhs {
+            ValueCellInner::Float(val1) => {
+                if let ValueCellInner::Float(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 + val2));
                 }
             }
-            ValueCell::String(val1) => {
-                if let ValueCell::String(val2) = rhs {
+            ValueCellInner::String(val1) => {
+                if let ValueCellInner::String(val2) = rhs.into_inner() {
                     let mut res = val1;
                     res.push_str(&val2);
                     return Ok(ValueCell::from(res));
                 }
             }
-            ValueCell::Bytes(val1) => {
-                if let ValueCell::Bytes(val2) = rhs {
+            ValueCellInner::Bytes(val1) => {
+                if let ValueCellInner::Bytes(val2) = rhs.inner() {
                     let mut res = val1;
                     res.extend_from_slice(&val2);
                     return Ok(ValueCell::from(res));
                 }
             }
-            ValueCell::List(val1) => {
-                if let ValueCell::List(val2) = rhs {
+            ValueCellInner::List(val1) => {
+                if let ValueCellInner::List(val2) = rhs.inner() {
                     let mut res = val1;
                     res.extend_from_slice(&val2);
-                    return Ok(res.into());
+                    return Ok(ValueCell::from(res));
                 }
             }
             _ => {}
@@ -614,19 +663,19 @@ impl Sub for ValueCell {
         let type1 = self.as_type();
         let type2 = rhs.as_type();
 
-        match self {
-            ValueCell::Int(val1) => {
-                if let ValueCell::Int(val2) = rhs {
+        match self.inner() {
+            ValueCellInner::Int(val1) => {
+                if let ValueCellInner::Int(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 - val2));
                 }
             }
-            ValueCell::UInt(val1) => {
-                if let ValueCell::UInt(val2) = rhs {
+            ValueCellInner::UInt(val1) => {
+                if let ValueCellInner::UInt(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 - val2));
                 }
             }
-            ValueCell::Float(val1) => {
-                if let ValueCell::Float(val2) = rhs {
+            ValueCellInner::Float(val1) => {
+                if let ValueCellInner::Float(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 - val2));
                 }
             }
@@ -647,19 +696,19 @@ impl Mul for ValueCell {
         let type1 = self.as_type();
         let type2 = rhs.as_type();
 
-        match self {
-            ValueCell::Int(val1) => {
-                if let ValueCell::Int(val2) = rhs {
+        match self.inner() {
+            ValueCellInner::Int(val1) => {
+                if let ValueCellInner::Int(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 * val2));
                 }
             }
-            ValueCell::UInt(val1) => {
-                if let ValueCell::UInt(val2) = rhs {
+            ValueCellInner::UInt(val1) => {
+                if let ValueCellInner::UInt(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 * val2));
                 }
             }
-            ValueCell::Float(val1) => {
-                if let ValueCell::Float(val2) = rhs {
+            ValueCellInner::Float(val1) => {
+                if let ValueCellInner::Float(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 * val2));
                 }
             }
@@ -680,19 +729,19 @@ impl Div for ValueCell {
         let type1 = self.as_type();
         let type2 = rhs.as_type();
 
-        match self {
-            ValueCell::Int(val1) => {
-                if let ValueCell::Int(val2) = rhs {
+        match self.inner() {
+            ValueCellInner::Int(val1) => {
+                if let ValueCellInner::Int(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 / val2));
                 }
             }
-            ValueCell::UInt(val1) => {
-                if let ValueCell::UInt(val2) = rhs {
+            ValueCellInner::UInt(val1) => {
+                if let ValueCellInner::UInt(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 / val2));
                 }
             }
-            ValueCell::Float(val1) => {
-                if let ValueCell::Float(val2) = rhs {
+            ValueCellInner::Float(val1) => {
+                if let ValueCellInner::Float(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 / val2));
                 }
             }
@@ -713,14 +762,14 @@ impl Rem for ValueCell {
         let type1 = self.as_type();
         let type2 = rhs.as_type();
 
-        match self {
-            ValueCell::Int(val1) => {
-                if let ValueCell::Int(val2) = rhs {
+        match self.inner() {
+            ValueCellInner::Int(val1) => {
+                if let ValueCellInner::Int(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 % val2));
                 }
             }
-            ValueCell::UInt(val1) => {
-                if let ValueCell::UInt(val2) = rhs {
+            ValueCellInner::UInt(val1) => {
+                if let ValueCellInner::UInt(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 % val2));
                 }
             }
@@ -740,11 +789,11 @@ impl Neg for ValueCell {
     fn neg(self) -> Self::Output {
         let type1 = self.as_type();
 
-        match self {
-            ValueCell::Int(val1) => {
+        match self.inner() {
+            ValueCellInner::Int(val1) => {
                 return Ok(ValueCell::from(-val1));
             }
-            ValueCell::Float(val1) => {
+            ValueCellInner::Float(val1) => {
                 return Ok(ValueCell::from(-val1));
             }
             _ => {}
@@ -763,8 +812,8 @@ impl Not for ValueCell {
     fn not(self) -> Self::Output {
         let type1 = self.as_type();
 
-        match self {
-            ValueCell::Bool(val1) => {
+        match self.inner() {
+            ValueCellInner::Bool(val1) => {
                 return Ok(ValueCell::from(!val1));
             }
             _ => {}

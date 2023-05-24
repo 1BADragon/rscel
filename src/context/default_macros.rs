@@ -1,7 +1,7 @@
 use crate::{
     ast::grammar::Expr,
     value_cell::{ValueCell, ValueCellError, ValueCellResult},
-    CelContext, ExecContext,
+    CelContext, ExecContext, ValueCellInner,
 };
 
 use super::{exec_context::RsCellMacro, utils::extract_ident};
@@ -53,7 +53,7 @@ fn all_impl(ctx: &CelContext, this: ValueCell, exprlist: &[&Expr]) -> ValueCellR
         None => return Err(ValueCellError::with_msg("Predicate is invalid map")),
     };
 
-    if let ValueCell::List(list) = this {
+    if let ValueCellInner::List(list) = this.inner() {
         for v in list.into_iter() {
             let mut tmp_ctx = ctx.clone();
             let mut exec_ctx = match ctx.exec_context() {
@@ -61,11 +61,13 @@ fn all_impl(ctx: &CelContext, this: ValueCell, exprlist: &[&Expr]) -> ValueCellR
                 None => return Err(ValueCellError::with_msg("Internal Error")),
             };
 
-            exec_ctx.bind_param(&ident_name, v);
+            exec_ctx.bind_param(&ident_name, v.clone());
 
-            if let Ok(ValueCell::Bool(res)) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx) {
-                if !res {
-                    return Ok(ValueCell::from_bool(false));
+            if let Ok(vc) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx) {
+                if let ValueCellInner::Bool(res) = vc.inner() {
+                    if !res {
+                        return Ok(ValueCell::from_bool(false));
+                    }
                 }
             }
         }
@@ -94,7 +96,7 @@ fn exists_impl(
         None => return Err(ValueCellError::with_msg("Predicate is invalid map")),
     };
 
-    if let ValueCell::List(list) = this {
+    if let ValueCellInner::List(list) = this.inner() {
         for v in list.into_iter() {
             let mut tmp_ctx = ctx.clone();
             let mut exec_ctx = match ctx.exec_context() {
@@ -102,11 +104,13 @@ fn exists_impl(
                 None => return Err(ValueCellError::with_msg("Internal Error")),
             };
 
-            exec_ctx.bind_param(&ident_name, v);
+            exec_ctx.bind_param(&ident_name, v.clone());
 
-            if let Ok(ValueCell::Bool(res)) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx) {
-                if res {
-                    return Ok(ValueCell::from_bool(true));
+            if let Ok(vc) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx) {
+                if let ValueCellInner::Bool(res) = vc.inner() {
+                    if *res {
+                        return Ok(ValueCell::from_bool(true));
+                    }
                 }
             }
         }
@@ -135,7 +139,7 @@ fn exists_one_impl(
         None => return Err(ValueCellError::with_msg("Predicate is invalid map")),
     };
 
-    if let ValueCell::List(list) = this {
+    if let ValueCellInner::List(list) = this.inner() {
         let mut count = 0;
         for v in list.into_iter() {
             let mut tmp_ctx = ctx.clone();
@@ -144,14 +148,16 @@ fn exists_one_impl(
                 None => return Err(ValueCellError::with_msg("Internal Error")),
             };
 
-            exec_ctx.bind_param(&ident_name, v);
+            exec_ctx.bind_param(&ident_name, v.clone());
 
-            if let Ok(ValueCell::Bool(res)) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx) {
-                if res {
-                    count += 1;
+            if let Ok(vc) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx) {
+                if let ValueCellInner::Bool(res) = vc.inner() {
+                    if *res {
+                        count += 1;
 
-                    if count > 1 {
-                        return Ok(ValueCell::from_bool(false));
+                        if count > 1 {
+                            return Ok(ValueCell::from_bool(false));
+                        }
                     }
                 }
             }
@@ -181,7 +187,7 @@ fn filter_impl(
         None => return Err(ValueCellError::with_msg("Predicate is invalid map")),
     };
 
-    if let ValueCell::List(list) = this {
+    if let ValueCellInner::List(list) = this.inner() {
         let mut new_list: Vec<ValueCell> = Vec::new();
         for v in list.into_iter() {
             let mut tmp_ctx = ctx.clone();
@@ -192,14 +198,14 @@ fn filter_impl(
 
             exec_ctx.bind_param(&ident_name, v.clone());
 
-            if let ValueCell::Bool(res) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx)? {
-                if res {
-                    new_list.push(v);
+            if let ValueCellInner::Bool(res) = tmp_ctx.eval_expr(exprlist[1], &exec_ctx)?.inner() {
+                if *res {
+                    new_list.push(v.clone());
                 }
             }
         }
 
-        return Ok(ValueCell::List(new_list));
+        return Ok(new_list.into());
     }
 
     Err(ValueCellError::with_msg(
@@ -219,7 +225,7 @@ fn map_impl(ctx: &CelContext, this: ValueCell, exprlist: &[&Expr]) -> ValueCellR
         None => return Err(ValueCellError::with_msg("Predicate is invalid map")),
     };
 
-    if let ValueCell::List(list) = this {
+    if let ValueCellInner::List(list) = this.inner() {
         let mut mapped_list: Vec<ValueCell> = Vec::new();
         for v in list.into_iter() {
             // make a copy of the context to make borrow checker happy
@@ -229,10 +235,10 @@ fn map_impl(ctx: &CelContext, this: ValueCell, exprlist: &[&Expr]) -> ValueCellR
                 None => return Err(ValueCellError::with_msg("Internal Error")),
             };
 
-            exec_ctx.bind_param(&ident_name, v);
+            exec_ctx.bind_param(&ident_name, v.clone());
             mapped_list.push(tmp_ctx.eval_expr(exprlist[1], &exec_ctx)?);
         }
-        Ok(ValueCell::List(mapped_list))
+        Ok(mapped_list.into())
     } else {
         Err(ValueCellError::with_msg("map() only available on list"))
     }
