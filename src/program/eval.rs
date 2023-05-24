@@ -11,15 +11,15 @@ use crate::{
         MemberPrime, MultOp, Multiplication, NegList, NotList, Primary, Relation, Relop, Unary,
     },
     value_cell::{ValueCell, ValueCellError, ValueCellResult},
-    CelContext,
+    CelContext, ValueCellInner,
 };
 
 pub fn eval_expr(ast: &Expr, ctx: &CelContext) -> ValueCellResult<ValueCell> {
     let expr_res = eval_or(&ast.cond_or, ctx)?;
 
     if let Some(ternary) = ast.ternary.as_prefix() {
-        if let ValueCell::Bool(val) = expr_res {
-            if val {
+        if let ValueCellInner::Bool(val) = expr_res.inner() {
+            if *val {
                 return eval_or(&ternary.true_clause, ctx);
             } else {
                 return eval_expr(&ternary.false_clause, ctx);
@@ -39,7 +39,7 @@ fn eval_or(ast: &ConditionalOr, ctx: &CelContext) -> ValueCellResult<ValueCell> 
         ConditionalOr::Binary { lhs, op: _, rhs } => {
             let left = eval_or(lhs, ctx)?;
 
-            let lhs = if let ValueCell::Bool(res) = left {
+            let lhs = if let ValueCellInner::Bool(res) = left.inner() {
                 res
             } else {
                 return Err(ValueCellError::with_msg(&format!(
@@ -48,12 +48,12 @@ fn eval_or(ast: &ConditionalOr, ctx: &CelContext) -> ValueCellResult<ValueCell> 
                 )));
             };
 
-            if lhs {
+            if *lhs {
                 return Ok(ValueCell::from_bool(true));
             }
 
             let right = eval_and(rhs, ctx)?;
-            let rhs = if let ValueCell::Bool(res) = right {
+            let rhs = if let ValueCellInner::Bool(res) = right.inner() {
                 res
             } else {
                 return Err(ValueCellError::with_msg(&format!(
@@ -62,7 +62,7 @@ fn eval_or(ast: &ConditionalOr, ctx: &CelContext) -> ValueCellResult<ValueCell> 
                 )));
             };
 
-            return Ok(ValueCell::from_bool(rhs));
+            return Ok(ValueCell::from_bool(*rhs));
         }
         ConditionalOr::Rhs(child) => eval_and(child, ctx),
     }
@@ -72,7 +72,7 @@ fn eval_and(ast: &ConditionalAnd, ctx: &CelContext) -> ValueCellResult<ValueCell
     match ast {
         ConditionalAnd::Binary { lhs, op: _, rhs } => {
             let left = eval_and(lhs, ctx)?;
-            let lhs = if let ValueCell::Bool(res) = left {
+            let lhs = if let ValueCellInner::Bool(res) = left.inner() {
                 res
             } else {
                 return Err(ValueCellError::with_msg(&format!(
@@ -86,7 +86,7 @@ fn eval_and(ast: &ConditionalAnd, ctx: &CelContext) -> ValueCellResult<ValueCell
             }
 
             let right = eval_relation(rhs, ctx)?;
-            let rhs = if let ValueCell::Bool(res) = right {
+            let rhs = if let ValueCellInner::Bool(res) = right.inner() {
                 res
             } else {
                 return Err(ValueCellError::with_msg(&format!(
@@ -94,7 +94,7 @@ fn eval_and(ast: &ConditionalAnd, ctx: &CelContext) -> ValueCellResult<ValueCell
                     left.as_type()
                 )));
             };
-            return Ok(ValueCell::from_bool(rhs));
+            return Ok(ValueCell::from_bool(*rhs));
         }
         ConditionalAnd::Rhs(child) => eval_relation(child, ctx),
     }
@@ -117,11 +117,11 @@ fn eval_relation(ast: &Relation, ctx: &CelContext) -> ValueCellResult<ValueCell>
                 Relop::Eq(_) => return lhs.eq(&rhs),
                 Relop::Ne(_) => return lhs.neq(&rhs),
                 Relop::In(_) => {
-                    match rhs {
-                        ValueCell::List(l) => {
+                    match rhs.inner() {
+                        ValueCellInner::List(l) => {
                             for value in l.iter() {
-                                if let Ok(ValueCell::Bool(res)) = lhs.eq(value) {
-                                    if res {
+                                if let ValueCellInner::Bool(res) = lhs.eq(value)?.inner() {
+                                    if *res {
                                         return Ok(ValueCell::from_bool(true));
                                     }
                                 }
@@ -129,9 +129,9 @@ fn eval_relation(ast: &Relation, ctx: &CelContext) -> ValueCellResult<ValueCell>
 
                             return Ok(ValueCell::from_bool(false));
                         }
-                        ValueCell::Map(m) => {
-                            if let ValueCell::String(r) = lhs {
-                                return Ok(ValueCell::from_bool(m.contains_key(&r)));
+                        ValueCellInner::Map(m) => {
+                            if let ValueCellInner::String(r) = lhs.inner() {
+                                return Ok(ValueCell::from_bool(m.contains_key(r)));
                             } else {
                                 return Err(ValueCellError::with_msg(&format!(
                                     "Op 'in' invalid between {:?} and {:?}",
@@ -238,17 +238,21 @@ fn eval_member_prime(
             ident,
             tail,
         } => {
-            fqn.push(ValueCell::Ident(ident.to_string()));
+            fqn.push(ValueCell::from_ident(&ident.to_string()));
             eval_member_prime(tail, fqn, ctx)
         }
         MemberPrime::Call { call, tail } => {
-            let func_name = match fqn.pop() {
-                Some(ValueCell::Ident(name)) => name,
+            let func_cell = match fqn.pop() {
+                Some(cell) => cell,
                 None => return Err(ValueCellError::with_msg("Empty function name")),
+            };
+
+            let func_name = match func_cell.inner() {
+                ValueCellInner::Ident(name) => name,
                 other => {
                     return Err(ValueCellError::with_msg(&format!(
                         "{:?} cannot be called",
-                        other.unwrap()
+                        other
                     )))
                 }
             };
@@ -292,20 +296,20 @@ fn eval_member_prime(
             let base_type = val.as_type();
             let expr_res = eval_expr(brackets, ctx)?;
 
-            let call_res = match val {
-                ValueCell::List(l) => {
-                    let index: usize = match expr_res {
-                        ValueCell::Int(v) => {
-                            if v < 0 {
+            let call_res = match val.inner() {
+                ValueCellInner::List(l) => {
+                    let index: usize = match expr_res.inner() {
+                        ValueCellInner::Int(v) => {
+                            if *v < 0 {
                                 return Err(ValueCellError::with_msg(&format!(
                                     "Index of {} is invalid",
                                     v
                                 )));
                             } else {
-                                v as usize
+                                *v as usize
                             }
                         }
-                        ValueCell::UInt(v) => v as usize,
+                        ValueCellInner::UInt(v) => *v as usize,
                         _ => {
                             return Err(ValueCellError::with_msg(&format!(
                                 "Index of array {:?} is invalid for array",
@@ -323,9 +327,9 @@ fn eval_member_prime(
 
                     Ok(l[index].clone())
                 }
-                ValueCell::Map(l) => {
-                    if let ValueCell::String(i) = expr_res {
-                        match l.get(&i) {
+                ValueCellInner::Map(l) => {
+                    if let ValueCellInner::String(i) = expr_res.inner() {
+                        match l.get(i) {
                             Some(value) => Ok(value.clone()),
                             None => Err(ValueCellError::with_msg(&format!(
                                 "Member '{}' not available for '{:?}'",

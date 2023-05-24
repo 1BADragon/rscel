@@ -1,9 +1,9 @@
 import sys
-import pyrscel
+import rscel
 
 if len(sys.argv) == 3:
-    print(pyrscel.eval(*sys.argv[1:]))
+    print(rscel.eval(*sys.argv[1:]))
 else:
     for i in range(10000):
-        prog = f"{i} + 3"
-        assert pyrscel.eval(prog, "{}") == (i + 3)
+        prog = "foo + 3"
+        assert rscel.eval(prog, f'{{"foo": {i}}}') == (i + 3)
