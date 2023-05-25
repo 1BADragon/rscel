@@ -10,10 +10,10 @@ test-all: test
 	cargo test --no-default-features $(CARGO_ARGS)
 
 wasm-binding:
-	wasm-pack build --target web --features wasm $(CARGO_ARGS)
+	RUSTFLAGS="-C opt-level=s" wasm-pack build --target web --features wasm $(CARGO_ARGS)
 	
 wasm-binding-release:
-	wasm-pack build --target web --release --features wasm $(CARGO_ARGS)
+	RUSTFLAGS="-C opt-level=s" wasm-pack build --target web --release --features wasm $(CARGO_ARGS)
 
 python-binding:
 	source .env/bin/activate && maturin build --features python $(CARGO_ARGS)
