@@ -48,7 +48,7 @@ pub use bindings::wasm::*;
 
 #[cfg(test)]
 mod test {
-    use crate::{CelContext, ExecContext, ValueCell, ValueCellInner};
+    use crate::{CelContext, ExecContext, ValueCell};
     use test_case::test_case;
 
     #[test]
