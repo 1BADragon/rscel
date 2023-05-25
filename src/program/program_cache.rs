@@ -7,20 +7,24 @@ pub fn check_cache(_source: &str) -> Option<ProgramResult<Program>> {
 
 #[cfg(feature = "program_cache")]
 pub fn check_cache(source: &str) -> Option<ProgramResult<Program>> {
-    Some(internal::CACHE.get(source))
+    Some(internal::CACHE.lock().unwrap().get(source))
 }
 
 #[cfg(feature = "program_cache")]
 mod internal {
     use crate::{program::ProgramResult, Program};
     use once_cell::sync::Lazy;
-    use std::{collections::HashMap, sync::Mutex};
+    use std::{
+        collections::{hash_map::Entry, HashMap},
+        sync::{Arc, Mutex},
+    };
 
     pub struct ProgramCache {
-        cache: Mutex<HashMap<String, Program>>,
+        cache: HashMap<String, Program>,
     }
 
-    pub static CACHE: Lazy<ProgramCache> = Lazy::new(|| ProgramCache::new());
+    pub static CACHE: Lazy<Arc<Mutex<ProgramCache>>> =
+        Lazy::new(|| Arc::new(Mutex::new(ProgramCache::new())));
 
     unsafe impl Send for ProgramCache {}
     unsafe impl Sync for ProgramCache {}
@@ -28,18 +32,19 @@ mod internal {
     impl ProgramCache {
         pub fn new() -> ProgramCache {
             ProgramCache {
-                cache: Mutex::new(HashMap::new()),
+                cache: HashMap::new(),
             }
         }
 
-        pub fn get(&self, source: &str) -> ProgramResult<Program> {
-            Ok(self
-                .cache
-                .lock()
-                .unwrap()
-                .entry(source.to_owned())
-                .or_insert(Program::from_source_nocache(source)?)
-                .clone())
+        pub fn get(&mut self, source: &str) -> ProgramResult<Program> {
+            match self.cache.entry(source.to_string()) {
+                Entry::Occupied(o) => Ok(o.get().clone()),
+                Entry::Vacant(v) => {
+                    let prog = Program::from_source_nocache(source)?;
+                    v.insert(prog.clone());
+                    Ok(prog)
+                }
+            }
         }
     }
 }

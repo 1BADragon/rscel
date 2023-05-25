@@ -2,14 +2,13 @@ mod eval;
 mod program_cache;
 mod program_details;
 mod program_error;
-use std::sync::Arc;
 
 use parsel::FromStr;
-// Re-export
-pub use eval::eval_expr;
-pub use program_error::ProgramError;
+use std::sync::Arc;
 
+pub use eval::eval_expr;
 pub use program_details::ProgramDetails;
+pub use program_error::ProgramError;
 
 use crate::{ast::grammar::Expr, value_cell::ValueCell, CelContext};
 
