@@ -1,7 +1,8 @@
 mod eval;
+mod program_cache;
 mod program_details;
 mod program_error;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use parsel::FromStr;
 // Re-export
@@ -17,13 +18,20 @@ pub type ProgramResult<T> = Result<T, ProgramError>;
 #[derive(Debug)]
 pub struct Program {
     source: String,
-    details: Rc<program_details::ProgramDetails>,
+    details: Arc<program_details::ProgramDetails>,
 
-    ast: Rc<Expr>,
+    ast: Arc<Expr>,
 }
 
 impl Program {
     pub fn from_source(source: &str) -> ProgramResult<Program> {
+        match program_cache::check_cache(source) {
+            Some(prog) => prog,
+            None => Program::from_source_nocache(source),
+        }
+    }
+
+    pub fn from_source_nocache(source: &str) -> ProgramResult<Program> {
         let ast: Expr = match parsel::parse_str(source) {
             Ok(expr) => expr,
             Err(err) => {
@@ -40,8 +48,8 @@ impl Program {
 
         Ok(Program {
             source: String::from_str(source).unwrap(),
-            details: Rc::new(ProgramDetails::from_ast(&ast)),
-            ast: Rc::new(ast),
+            details: Arc::new(ProgramDetails::from_ast(&ast)),
+            ast: Arc::new(ast),
         })
     }
 

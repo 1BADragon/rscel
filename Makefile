@@ -5,6 +5,9 @@ default:
 test:
 	cargo test
 
+test-all: test
+	cargo test --no-default-features
+
 wasm-binding:
 	wasm-pack build --target web --features wasm
 	
