@@ -34,8 +34,8 @@ pub type Relation = LeftAssoc<Relop, Addition>;
 
 #[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
 pub enum Relop {
-    Lt(Token![<]),
     Le(Token![<=]),
+    Lt(Token![<]),
     Ge(Token![>=]),
     Gt(Token![>]),
     Eq(Token![==]),
