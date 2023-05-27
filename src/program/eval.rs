@@ -357,6 +357,7 @@ fn eval_member_prime(
 
 fn eval_primary(ast: &Primary, ctx: &CelContext) -> ValueCellResult<ValueCell> {
     match ast {
+        Primary::Type(_) => Ok(ValueCell::from_ident("type")),
         Primary::Ident(child) => Ok(ValueCell::from_ident(&child.to_string())),
         Primary::Parens(child) => eval_expr(child, ctx),
         Primary::ListConstruction(list) => match (*list).as_prefix() {

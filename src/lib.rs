@@ -73,24 +73,25 @@ mod test {
         let _res = ctx.exec("main", &exec_ctx).unwrap();
     }
 
-    #[test_case("3+3", 6.into())]
-    #[test_case("4-3", 1.into())]
-    #[test_case("4u + 3u", 7u64.into())]
-    #[test_case("7 % 2", 1.into())]
-    #[test_case("(4+2) * (6-5)", 6.into())]
-    #[test_case("[1, 2, 3].map(x, x+2)", ValueCell::from_list(&[3.into(), 4.into(), 5.into()]))]
-    #[test_case("[1,2,3][1]", 2.into())]
-    #[test_case("{\"foo\": 3}.foo", 3.into())]
-    #[test_case("size([1,2,3,4])", 4u64.into())]
-    #[test_case("true || false", true.into())]
-    #[test_case("false && true", false.into())]
-    #[test_case("true && true", true.into())]
-    #[test_case("[1,2].map(x, x+1).map(x, x*2)", ValueCell::from_list(&[4.into(), 6.into()]))]
+    #[test_case("3+3", 6.into(); "add signed")]
+    #[test_case("4-3", 1.into(); "sub signed")]
+    #[test_case("4u + 3u", 7u64.into(); "add unsigned")]
+    #[test_case("7 % 2", 1.into(); "test mod")]
+    #[test_case("(4+2) * (6-5)", 6.into(); "test parens")]
+    #[test_case("[1, 2, 3].map(x, x+2)", ValueCell::from_list(&[3.into(), 4.into(), 5.into()]); "test map")]
+    #[test_case("[1,2,3][1]", 2.into(); "array index")]
+    #[test_case("{\"foo\": 3}.foo", 3.into(); "obj dot access")]
+    #[test_case("size([1,2,3,4])", 4u64.into(); "test list size")]
+    #[test_case("true || false", true.into(); "or")]
+    #[test_case("false && true", false.into(); "and falsy")]
+    #[test_case("true && true", true.into(); "and true")]
+    #[test_case("[1,2].map(x, x+1).map(x, x*2)", ValueCell::from_list(&[4.into(), 6.into()]); "double map")]
     #[test_case("\"hello world\".contains(\"hello\")", true.into(); "test contains")]
     #[test_case("\"hello world\".endsWith(\"world\")", true.into(); "test endsWith")]
     #[test_case("\"hello world\".startsWith(\"hello\")", true.into(); "test startsWith")]
     #[test_case("\"abc123\".matches(\"[a-z]{3}[0-9]{3}\")", true.into(); "test matches")]
     #[test_case("string(1)", "1".into(); "test string")]
+    #[test_case("type(1)", ValueCell::from_type("int"); "test type")]
     fn test_equation(prog: &str, res: ValueCell) {
         let mut ctx = CelContext::new();
         let exec_ctx = ExecContext::new();

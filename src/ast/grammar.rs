@@ -1,6 +1,6 @@
 use parsel::{
     ast::{Any, Brace, Bracket, Empty, LeftAssoc, Lit, Maybe, Paren, Punctuated},
-    syn::{Ident, Token},
+    syn::{token::Type, Ident, Token},
     Parse, ToTokens,
 };
 
@@ -137,6 +137,8 @@ pub enum MemberPrime {
 
 #[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
 pub enum Primary {
+    #[parsel(recursive)]
+    Type(Type),
     #[parsel(recursive)]
     Ident(Ident),
     #[parsel(recursive)]
