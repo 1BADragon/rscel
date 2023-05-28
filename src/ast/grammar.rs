@@ -1,6 +1,6 @@
 use parsel::{
     ast::{Any, Brace, Bracket, Empty, LeftAssoc, Lit, Maybe, Paren, Punctuated},
-    syn::{Ident, Token},
+    syn::{token::Type, Ident, Token},
     Parse, ToTokens,
 };
 
@@ -34,8 +34,8 @@ pub type Relation = LeftAssoc<Relop, Addition>;
 
 #[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
 pub enum Relop {
-    Lt(Token![<]),
     Le(Token![<=]),
+    Lt(Token![<]),
     Ge(Token![>=]),
     Gt(Token![>]),
     Eq(Token![==]),
@@ -137,6 +137,8 @@ pub enum MemberPrime {
 
 #[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
 pub enum Primary {
+    #[parsel(recursive)]
+    Type(Type),
     #[parsel(recursive)]
     Ident(Ident),
     #[parsel(recursive)]

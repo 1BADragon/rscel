@@ -16,10 +16,10 @@ pub use exec_context::{ExecContext, RsCellFunction, RsCellMacro};
 /// The CelContext is the core context in RsCel. This context contains
 /// Program information as well as the primary entry point for evaluating
 /// an expression.
-pub struct CelContext<'a> {
+pub struct CelContext {
     progs: HashMap<String, Program>,
 
-    current_ctx: Option<&'a ExecContext>,
+    current_ctx: Option<ExecContext>,
 }
 
 /// ExecError is the error type returned by CelContext operations.
@@ -50,9 +50,9 @@ impl ExecError {
 /// Result wrapper with ExecError as the error type
 pub type ExecResult<T> = Result<T, ExecError>;
 
-impl<'a> CelContext<'a> {
+impl CelContext {
     /// Constructs a new empty CelContext
-    pub fn new() -> CelContext<'a> {
+    pub fn new() -> CelContext {
         CelContext {
             progs: HashMap::new(),
             current_ctx: None,
@@ -83,22 +83,20 @@ impl<'a> CelContext<'a> {
         Some(prog.details())
     }
 
-    pub(crate) fn get_param_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l ValueCell> {
-        let value = self.current_ctx?.get_param(name)?;
-
-        Some(value)
+    pub(crate) fn get_param_by_name(&self, name: &str) -> Option<ValueCell> {
+        self.current_ctx.as_ref()?.get_param(name)
     }
 
-    pub(crate) fn get_func_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l RsCellFunction> {
-        self.current_ctx?.get_func(name)
+    pub(crate) fn get_func_by_name(&self, name: &str) -> Option<RsCellFunction> {
+        self.current_ctx.as_ref()?.get_func(name)
     }
 
-    pub(crate) fn get_macro_by_name<'l: 'a>(&'l self, name: &str) -> Option<&'l RsCellMacro> {
-        self.current_ctx?.get_macro(name)
+    pub(crate) fn get_macro_by_name(&self, name: &str) -> Option<RsCellMacro> {
+        self.current_ctx.as_ref()?.get_macro(name)
     }
 
     pub(crate) fn exec_context(&self) -> Option<ExecContext> {
-        Some((*self.current_ctx?).clone())
+        Some((self.current_ctx.as_ref()?).clone())
     }
 
     pub(crate) fn resolve_fqn(&self, fqn: &[ValueCell]) -> ValueCellResult<ValueCell> {
@@ -155,8 +153,8 @@ impl<'a> CelContext<'a> {
     /// can be run multiple times with different ExecContext's. The return of this function is
     /// a Result with either a ValueCell representing the final solution of the Program or an Error
     /// that is discovered during execution, such as mismatch of types
-    pub fn exec<'l: 'a>(&'l mut self, name: &str, ctx: &'l ExecContext) -> ExecResult<ValueCell> {
-        self.current_ctx = Some(ctx);
+    pub fn exec<'l>(&'l mut self, name: &str, ctx: &'l ExecContext) -> ExecResult<ValueCell> {
+        self.current_ctx = Some(ctx.clone());
 
         let res = match self.progs.get(name) {
             Some(prog) => match prog.eval(self) {
@@ -170,12 +168,12 @@ impl<'a> CelContext<'a> {
         return res;
     }
 
-    pub(crate) fn eval_expr<'l: 'a>(
-        &'l mut self,
+    pub(crate) fn eval_expr(
+        &mut self,
         expr: &Expr,
-        ctx: &'l ExecContext,
+        ctx: &ExecContext,
     ) -> ValueCellResult<ValueCell> {
-        self.current_ctx = Some(ctx);
+        self.current_ctx = Some(ctx.clone());
 
         let res = eval_expr(expr, self);
 
@@ -184,7 +182,7 @@ impl<'a> CelContext<'a> {
     }
 }
 
-impl<'a> Clone for CelContext<'a> {
+impl Clone for CelContext {
     fn clone(&self) -> Self {
         CelContext {
             progs: self.progs.clone(),
