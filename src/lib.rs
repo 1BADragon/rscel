@@ -49,7 +49,7 @@ pub use bindings::wasm::*;
 #[cfg(test)]
 mod test {
     use crate::{CelContext, ExecContext, ValueCell};
-    use chrono::{DateTime, Utc};
+    use chrono::DateTime;
     use std::collections::HashMap;
     use test_case::test_case;
 

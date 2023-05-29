@@ -26,7 +26,7 @@ chrono = "0.4.24"
 duration-str = "0.5.0"
 
 # Dependencies for python bindings
-pyo3 = { version = "0.18.3", optional = true, features = ["extension-module"] }
+pyo3 = { version = "0.18.3", optional = true, features = ["extension-module", "chrono"] }
 
 # Dependencies for wasm bindings
 wasm-bindgen = { version = "0.2.63", optional = true}
