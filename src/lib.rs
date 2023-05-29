@@ -48,9 +48,9 @@ pub use bindings::wasm::*;
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
-
     use crate::{CelContext, ExecContext, ValueCell};
+    use chrono::{DateTime, Utc};
+    use std::collections::HashMap;
     use test_case::test_case;
 
     #[test]
@@ -109,6 +109,35 @@ mod test {
 
         let eval_res = ctx.exec("main", &exec_ctx).unwrap();
         assert!(eval_res == res);
+    }
+
+    #[test]
+    fn test_timestamp() {
+        let mut ctx = CelContext::new();
+        let exec_ctx = ExecContext::new();
+
+        ctx.add_program_str("main", r#"timestamp("2023-04-20T12:00:00Z")"#)
+            .unwrap();
+        let eval_res = ctx.exec("main", &exec_ctx).unwrap();
+
+        let dt = DateTime::parse_from_rfc3339("2023-04-20T12:00:00Z").unwrap();
+        assert!(eval_res == dt.into());
+    }
+
+    #[test]
+    fn test_timeduration() {
+        let mut ctx = CelContext::new();
+        let exec_ctx = ExecContext::new();
+
+        ctx.add_program_str(
+            "main",
+            r#"timestamp("2023-04-20T12:00:00Z") + duration("1h")"#,
+        )
+        .unwrap();
+        let eval_res = ctx.exec("main", &exec_ctx).unwrap();
+
+        let dt = DateTime::parse_from_rfc3339("2023-04-20T13:00:00Z").unwrap();
+        assert!(eval_res == dt.into());
     }
 
     #[test]

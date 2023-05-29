@@ -1,3 +1,4 @@
+use chrono::{offset::Utc, DateTime, Duration, FixedOffset};
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -21,6 +22,8 @@ pub enum ValueCellInner {
     Null,
     Ident(String),
     Type(String),
+    TimeStamp(DateTime<Utc>),
+    Duration(Duration),
 }
 
 #[derive(Debug)]
@@ -120,6 +123,14 @@ impl ValueCell {
         ValueCellInner::Type(val.to_owned()).into()
     }
 
+    pub fn from_timestamp(val: &DateTime<Utc>) -> ValueCell {
+        ValueCellInner::TimeStamp(val.clone()).into()
+    }
+
+    pub fn from_duration(val: &Duration) -> ValueCell {
+        ValueCellInner::Duration(val.clone()).into()
+    }
+
     pub fn into_inner(self) -> ValueCellInner {
         match Rc::try_unwrap(self.inner) {
             Ok(inner) => inner,
@@ -215,6 +226,16 @@ impl ValueCell {
                     return Ok(ValueCell::from_bool(false));
                 }
             }
+            ValueCellInner::TimeStamp(v1) => {
+                if let ValueCellInner::TimeStamp(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_bool(*v1 == *v2));
+                }
+            }
+            ValueCellInner::Duration(v1) => {
+                if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_bool(*v1 == *v2));
+                }
+            }
             _ => {}
         }
 
@@ -255,6 +276,16 @@ impl ValueCell {
                 ValueCellInner::Float(v2) => return Ok(v1.partial_cmp(v2)),
                 _ => {}
             },
+            ValueCellInner::TimeStamp(v1) => {
+                if let ValueCellInner::TimeStamp(v2) = rhs.inner() {
+                    return Ok(v1.partial_cmp(v2));
+                }
+            }
+            ValueCellInner::Duration(v1) => {
+                if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(v1.partial_cmp(v2));
+                }
+            }
             _ => {}
         }
 
@@ -316,6 +347,8 @@ impl ValueCell {
 
                 Value::Object(partial)
             }
+            ValueCellInner::TimeStamp(val) => Value::from(val.to_rfc3339()),
+            ValueCellInner::Duration(val) => Value::from(val.to_string()),
             _ => Value::Null,
         }
     }
@@ -333,6 +366,8 @@ impl ValueCell {
             ValueCellInner::Null => ValueCell::from_type("null_type"),
             ValueCellInner::Ident(_) => ValueCell::from_type("ident"),
             ValueCellInner::Type(_) => ValueCell::from_type("type"),
+            ValueCellInner::TimeStamp(_) => ValueCell::from_type("timestamp"),
+            ValueCellInner::Duration(_) => ValueCell::from_type("duration"),
         }
     }
 }
@@ -602,6 +637,48 @@ impl TryInto<HashMap<String, ValueCell>> for ValueCell {
     }
 }
 
+impl From<DateTime<Utc>> for ValueCell {
+    fn from(val: DateTime<Utc>) -> ValueCell {
+        ValueCell::from_timestamp(&val)
+    }
+}
+
+impl From<DateTime<FixedOffset>> for ValueCell {
+    fn from(val: DateTime<FixedOffset>) -> ValueCell {
+        ValueCell::from_timestamp(&(val.into()))
+    }
+}
+
+impl TryInto<DateTime<Utc>> for ValueCell {
+    type Error = ValueCellError;
+
+    fn try_into(self) -> ValueCellResult<DateTime<Utc>> {
+        if let ValueCellInner::TimeStamp(val) = self.into_inner() {
+            return Ok(val);
+        }
+
+        return Err(ValueCellError::with_msg("Convertion Error"));
+    }
+}
+
+impl From<Duration> for ValueCell {
+    fn from(val: Duration) -> ValueCell {
+        ValueCell::from_duration(&val)
+    }
+}
+
+impl TryInto<Duration> for ValueCell {
+    type Error = ValueCellError;
+
+    fn try_into(self) -> ValueCellResult<Duration> {
+        if let ValueCellInner::Duration(val) = self.into_inner() {
+            return Ok(val);
+        }
+
+        return Err(ValueCellError::with_msg("Convertion Error"));
+    }
+}
+
 impl Add for ValueCell {
     type Output = ValueCellResult<ValueCell>;
 
@@ -646,6 +723,18 @@ impl Add for ValueCell {
                     return Ok(ValueCell::from(res));
                 }
             }
+            ValueCellInner::TimeStamp(v1) => {
+                if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_timestamp(&(v1 + *v2)));
+                }
+            }
+            ValueCellInner::Duration(v1) => {
+                if let ValueCellInner::TimeStamp(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_timestamp(&(*v2 + v1)));
+                } else if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_duration(&(v1 + *v2)));
+                }
+            }
             _ => {}
         }
 
@@ -677,6 +766,18 @@ impl Sub for ValueCell {
             ValueCellInner::Float(val1) => {
                 if let ValueCellInner::Float(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 - val2));
+                }
+            }
+            ValueCellInner::TimeStamp(v1) => {
+                if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_timestamp(&(*v1 - *v2)));
+                }
+            }
+            ValueCellInner::Duration(v1) => {
+                if let ValueCellInner::TimeStamp(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_timestamp(&(*v2 - *v1)));
+                } else if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_duration(&(*v1 - *v2)));
                 }
             }
             _ => {}

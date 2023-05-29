@@ -1,5 +1,10 @@
 use crate::{CelContext, ExecContext, ValueCell};
-use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyBytes};
+use chrono::{Datelike, Timelike};
+use pyo3::{
+    exceptions::PyRuntimeError,
+    prelude::*,
+    types::{timezone_utc, PyBytes, PyDateTime, PyDelta},
+};
 use serde_json;
 use std::collections::HashMap;
 
@@ -51,6 +56,50 @@ fn to_pyobject(py: Python<'_>, valcel: &ValueCell) -> PyObject {
             .map(|(k, v)| (k, to_pyobject(py, v)))
             .collect::<HashMap<_, _>>()
             .to_object(py),
+        TimeStamp(ts) => PyDateTime::new(
+            py,
+            ts.year().try_into().unwrap(),
+            ts.month().try_into().unwrap(),
+            ts.day().try_into().unwrap(),
+            ts.hour().try_into().unwrap(),
+            ts.minute().try_into().unwrap(),
+            ts.second().try_into().unwrap(),
+            0,
+            Some(timezone_utc(py)),
+        )
+        .unwrap()
+        .into(),
+        Duration(d) => match d.num_microseconds() {
+            Some(usec) => {
+                let n_days = usec / 86_400_000_000i64;
+                let n_secs = (usec % 86_400_000_000i64) / 1_000_000i64;
+                let n_usec = usec % 1_000_000i64;
+                PyDelta::new(
+                    py,
+                    n_days.try_into().unwrap(),
+                    n_secs.try_into().unwrap(),
+                    n_usec.try_into().unwrap(),
+                    false,
+                )
+                .unwrap()
+                .into()
+            }
+            None => {
+                let total_millis = d.num_milliseconds();
+                let n_days = total_millis / 86_400_000i64;
+                let n_sec = (total_millis % 86_400_000i64) / 1_000i64;
+                let n_usec = (total_millis % 1_000i64) * 1_000i64;
+                PyDelta::new(
+                    py,
+                    n_days.try_into().unwrap(),
+                    n_sec.try_into().unwrap(),
+                    n_usec.try_into().unwrap(),
+                    false,
+                )
+                .unwrap()
+                .into()
+            }
+        },
         Null => py.None(),
         _ => py.None(),
     }
