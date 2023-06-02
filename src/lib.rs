@@ -28,10 +28,12 @@
 mod ast;
 pub mod bindings;
 mod context;
+mod interp;
 mod program;
 mod value_cell;
 
-pub use context::{CelContext, ExecContext, ExecError, ExecResult, RsCellFunction, RsCellMacro};
+pub use context::{BindContext, CelContext, ExecError, ExecResult, RsCellFunction, RsCellMacro};
+pub use interp::ByteCode;
 pub use program::{Program, ProgramError};
 pub use value_cell::{ValueCell, ValueCellError, ValueCellInner, ValueCellResult};
 
@@ -48,7 +50,7 @@ pub use bindings::wasm::*;
 
 #[cfg(test)]
 mod test {
-    use crate::{CelContext, ExecContext, ValueCell};
+    use crate::{BindContext, CelContext, ValueCell};
     use chrono::DateTime;
     use std::collections::HashMap;
     use test_case::test_case;
@@ -56,7 +58,7 @@ mod test {
     #[test]
     fn test_bad_func_call() {
         let mut ctx = CelContext::new();
-        let exec_ctx = ExecContext::new();
+        let exec_ctx = BindContext::new();
 
         ctx.add_program_str("main", "foo(3)").unwrap();
 
@@ -67,7 +69,7 @@ mod test {
     #[test]
     fn test_contains() {
         let mut ctx = CelContext::new();
-        let exec_ctx = ExecContext::new();
+        let exec_ctx = BindContext::new();
 
         ctx.add_program_str("main", "\"hello there\".contains(\"hello\")")
             .unwrap();
@@ -103,7 +105,7 @@ mod test {
     #[test_case("3 in [1,2,3,4,5]", true.into(); "test in")]
     fn test_equation(prog: &str, res: ValueCell) {
         let mut ctx = CelContext::new();
-        let exec_ctx = ExecContext::new();
+        let exec_ctx = BindContext::new();
 
         ctx.add_program_str("main", prog).unwrap();
 
@@ -114,7 +116,7 @@ mod test {
     #[test]
     fn test_timestamp() {
         let mut ctx = CelContext::new();
-        let exec_ctx = ExecContext::new();
+        let exec_ctx = BindContext::new();
 
         ctx.add_program_str("main", r#"timestamp("2023-04-20T12:00:00Z")"#)
             .unwrap();
@@ -127,7 +129,7 @@ mod test {
     #[test]
     fn test_timeduration() {
         let mut ctx = CelContext::new();
-        let exec_ctx = ExecContext::new();
+        let exec_ctx = BindContext::new();
 
         ctx.add_program_str(
             "main",
@@ -143,7 +145,18 @@ mod test {
     #[test]
     fn test_binding() {
         let mut ctx = CelContext::new();
-        let mut exec_ctx = ExecContext::new();
+        let mut binding = BindContext::new();
+
+        ctx.add_program_str("main", "foo + 9").unwrap();
+
+        binding.bind_param("foo", 3.into());
+        assert!(ctx.exec("main", &binding).unwrap() == 12.into());
+    }
+
+    #[test]
+    fn test_dict_binding() {
+        let mut ctx = CelContext::new();
+        let mut exec_ctx = BindContext::new();
 
         ctx.add_program_str("func1", "foo.bar + 4").unwrap();
         ctx.add_program_str("func2", "foo.bar % 4").unwrap();

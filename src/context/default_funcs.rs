@@ -1,7 +1,7 @@
-use super::exec_context::RsCellFunction;
+use super::bind_context::RsCellFunction;
 use crate::{
     value_cell::{ValueCell, ValueCellError, ValueCellInner, ValueCellResult},
-    ExecContext,
+    BindContext,
 };
 use chrono::{DateTime, Utc};
 use regex::Regex;
@@ -22,7 +22,7 @@ const DEFAULT_FUNCS: &[(&str, RsCellFunction)] = &[
     ("duration", duration_impl),
 ];
 
-pub fn load_default_funcs(exec_ctx: &mut ExecContext) {
+pub fn load_default_funcs(exec_ctx: &mut BindContext) {
     for (name, func) in DEFAULT_FUNCS.iter() {
         exec_ctx.bind_func(name, *func);
     }

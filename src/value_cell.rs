@@ -2,12 +2,15 @@ use chrono::{offset::Utc, DateTime, Duration, FixedOffset};
 use std::{
     cmp::Ordering,
     collections::HashMap,
+    fmt,
     iter::zip,
     ops::{Add, Div, Mul, Neg, Not, Rem, Sub},
     rc::Rc,
 };
 
 use serde_json::{value::Value, Map};
+
+use crate::{context::RsCallable, interp::ByteCode};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueCellInner {
@@ -24,9 +27,13 @@ pub enum ValueCellInner {
     Type(String),
     TimeStamp(DateTime<Utc>),
     Duration(Duration),
+    ByteCode(Vec<ByteCode>),
+    BoundCall {
+        callable: RsCallable,
+        value: ValueCell,
+    },
 }
 
-#[derive(Debug)]
 pub struct ValueCell {
     inner: Rc<ValueCellInner>,
 }
@@ -45,6 +52,10 @@ impl ValueCellError {
 
     pub fn msg<'a>(&'a self) -> &'a str {
         return &self.msg;
+    }
+
+    pub fn into_string(self) -> String {
+        self.msg
     }
 }
 
@@ -129,6 +140,18 @@ impl ValueCell {
 
     pub fn from_duration(val: &Duration) -> ValueCell {
         ValueCellInner::Duration(val.clone()).into()
+    }
+
+    pub(crate) fn from_bytecode(val: &[ByteCode]) -> ValueCell {
+        ValueCellInner::ByteCode(val.to_owned()).into()
+    }
+
+    pub(crate) fn from_binding(callable: RsCallable, value: &ValueCell) -> ValueCell {
+        ValueCellInner::BoundCall {
+            callable,
+            value: value.clone(),
+        }
+        .into()
     }
 
     pub fn into_inner(self) -> ValueCellInner {
@@ -321,6 +344,32 @@ impl ValueCell {
         ))
     }
 
+    pub fn or(&self, rhs: &ValueCell) -> ValueCellResult<ValueCell> {
+        if let ValueCellInner::Bool(lhs) = self.inner() {
+            if let ValueCellInner::Bool(rhs) = rhs.inner() {
+                return Ok((*lhs || *rhs).into());
+            }
+        }
+        return Err(ValueCellError::with_msg(&format!(
+            "|| operator invalid for {:?} and {:?}",
+            self.as_type(),
+            rhs.as_type(),
+        )));
+    }
+
+    pub fn and(&self, rhs: &ValueCell) -> ValueCellResult<ValueCell> {
+        if let ValueCellInner::Bool(lhs) = self.inner() {
+            if let ValueCellInner::Bool(rhs) = rhs.inner() {
+                return Ok((*lhs && *rhs).into());
+            }
+        }
+        return Err(ValueCellError::with_msg(&format!(
+            "&& operator invalid for {:?} and {:?}",
+            self.as_type(),
+            rhs.as_type(),
+        )));
+    }
+
     pub fn into_json_value(self) -> Value {
         match self.into_inner() {
             ValueCellInner::Int(val) => Value::from(val),
@@ -368,6 +417,11 @@ impl ValueCell {
             ValueCellInner::Type(_) => ValueCell::from_type("type"),
             ValueCellInner::TimeStamp(_) => ValueCell::from_type("timestamp"),
             ValueCellInner::Duration(_) => ValueCell::from_type("duration"),
+            ValueCellInner::ByteCode(_) => ValueCell::from_type("bytecode"),
+            ValueCellInner::BoundCall {
+                callable: _,
+                value: _,
+            } => ValueCell::from_type("bound call"),
         }
     }
 }
@@ -679,6 +733,24 @@ impl TryInto<Duration> for ValueCell {
     }
 }
 
+impl From<Vec<ByteCode>> for ValueCell {
+    fn from(val: Vec<ByteCode>) -> ValueCell {
+        ValueCell::from_bytecode(&val)
+    }
+}
+
+impl TryInto<Vec<ByteCode>> for ValueCell {
+    type Error = ValueCellError;
+
+    fn try_into(self) -> ValueCellResult<Vec<ByteCode>> {
+        if let ValueCellInner::ByteCode(val) = self.into_inner() {
+            return Ok(val);
+        }
+
+        return Err(ValueCellError::with_msg("Convertion Error"));
+    }
+}
+
 impl Add for ValueCell {
     type Output = ValueCellResult<ValueCell>;
 
@@ -924,6 +996,12 @@ impl Not for ValueCell {
             "Invalid op '-' on {:?}",
             type1
         )))
+    }
+}
+
+impl fmt::Debug for ValueCell {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.inner())
     }
 }
 

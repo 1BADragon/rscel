@@ -1,0 +1,77 @@
+use crate::ValueCell;
+use std::fmt;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum JmpWhen {
+    True,
+    False,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum ByteCode {
+    Push(ValueCell),
+    Or,
+    And,
+    Not,
+    Neg,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Lt,
+    Le,
+    Eq,
+    Ne,
+    Ge,
+    Gt,
+    In,
+    Jmp(u32),
+    JmpCond {
+        when: JmpWhen,
+        dist: u32,
+        leave_val: bool,
+    },
+    MkList(u32),
+    MkDict(u32),
+    Index,
+    Access,
+    Call(u32),
+}
+
+impl fmt::Debug for ByteCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use ByteCode::*;
+
+        match self {
+            Push(val) => write!(f, "PUSH {:?}", val),
+            Or => write!(f, "OR"),
+            And => write!(f, "AND"),
+            Not => write!(f, "NOT"),
+            Neg => write!(f, "NEG"),
+            Add => write!(f, "ADD"),
+            Sub => write!(f, "SUB"),
+            Mul => write!(f, "MUL"),
+            Div => write!(f, "DIV"),
+            Mod => write!(f, "MOD"),
+            Lt => write!(f, "LT"),
+            Le => write!(f, "LE"),
+            Eq => write!(f, "EQ"),
+            Ne => write!(f, "NE"),
+            Ge => write!(f, "GE"),
+            Gt => write!(f, "GT"),
+            In => write!(f, "IN"),
+            Jmp(dist) => write!(f, "JMP {}", dist),
+            JmpCond {
+                when,
+                dist,
+                leave_val: _,
+            } => write!(f, "JMP {:?} {}", when, dist),
+            MkList(size) => write!(f, "MKLIST {}", size),
+            MkDict(size) => write!(f, "MKDICT {}", size),
+            Index => write!(f, "INDEX"),
+            Access => write!(f, "ACCESS"),
+            Call(size) => write!(f, "CALL {}", size),
+        }
+    }
+}

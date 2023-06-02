@@ -26,8 +26,8 @@ mod internal {
     pub static CACHE: Lazy<Arc<Mutex<ProgramCache>>> =
         Lazy::new(|| Arc::new(Mutex::new(ProgramCache::new())));
 
-    unsafe impl Send for ProgramCache {}
-    unsafe impl Sync for ProgramCache {}
+    // unsafe impl Send for ProgramCache {}
+    // unsafe impl Sync for ProgramCache {}
 
     impl ProgramCache {
         pub fn new() -> ProgramCache {

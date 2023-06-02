@@ -11,6 +11,12 @@ pub struct ProgramDetails {
 }
 
 impl ProgramDetails {
+    pub fn new() -> ProgramDetails {
+        ProgramDetails {
+            params: HashSet::new(),
+        }
+    }
+
     pub fn from_ast(ast: &Expr) -> ProgramDetails {
         let mut dets = ProgramDetails {
             params: HashSet::new(),
@@ -18,6 +24,10 @@ impl ProgramDetails {
 
         dets.parse_expr(ast);
         dets
+    }
+
+    pub fn add_param(&mut self, name: &str) {
+        self.params.insert(name.to_owned());
     }
 
     pub fn params<'a>(&'a self) -> Vec<&'a str> {

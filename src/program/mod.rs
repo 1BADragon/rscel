@@ -1,25 +1,23 @@
-mod eval;
+mod compile;
+// mod eval;
 mod program_cache;
 mod program_details;
 mod program_error;
 
-use parsel::FromStr;
-use std::sync::Arc;
-
-pub use eval::eval_expr;
+use crate::interp::ByteCode;
+use compile::ProgramCompiler;
+// pub use eval::eval_expr;
 pub use program_details::ProgramDetails;
 pub use program_error::ProgramError;
-
-use crate::{ast::grammar::Expr, value_cell::ValueCell, CelContext};
 
 pub type ProgramResult<T> = Result<T, ProgramError>;
 
 #[derive(Debug)]
 pub struct Program {
     source: String,
-    details: Arc<program_details::ProgramDetails>,
+    details: program_details::ProgramDetails,
 
-    ast: Arc<Expr>,
+    bytecode: Vec<ByteCode>,
 }
 
 impl Program {
@@ -31,25 +29,7 @@ impl Program {
     }
 
     pub fn from_source_nocache(source: &str) -> ProgramResult<Program> {
-        let ast: Expr = match parsel::parse_str(source) {
-            Ok(expr) => expr,
-            Err(err) => {
-                let span = err.span();
-                return Err(ProgramError::new(&format!(
-                    "Error on {}:{} ending at {}:{}",
-                    span.start().line,
-                    span.start().column,
-                    span.end().line,
-                    span.end().column
-                )));
-            }
-        };
-
-        Ok(Program {
-            source: String::from_str(source).unwrap(),
-            details: Arc::new(ProgramDetails::from_ast(&ast)),
-            ast: Arc::new(ast),
-        })
+        ProgramCompiler::new().with_source(source).build()
     }
 
     pub fn params<'a>(&'a self) -> Vec<&'a str> {
@@ -60,15 +40,22 @@ impl Program {
         &self.source
     }
 
-    pub fn details(&self) -> ProgramDetails {
-        self.details.as_ref().clone()
+    pub fn details<'a>(&'a self) -> &'a ProgramDetails {
+        &self.details
     }
 
-    pub fn eval(&self, ctx: &CelContext) -> ProgramResult<ValueCell> {
-        match eval_expr(&self.ast, ctx) {
-            Ok(val) => Ok(val),
-            Err(err) => Err(ProgramError::new(err.msg())),
+    pub fn bytecode<'a>(&'a self) -> &'a [ByteCode] {
+        &self.bytecode
+    }
+
+    pub fn dumps_bc(&self) -> String {
+        let mut lines = Vec::new();
+
+        for code in self.bytecode.iter() {
+            lines.push(format!("{:?}", code))
         }
+
+        lines.join("\n")
     }
 }
 
@@ -77,7 +64,7 @@ impl Clone for Program {
         Program {
             source: self.source.clone(),
             details: self.details.clone(),
-            ast: self.ast.clone(),
+            bytecode: self.bytecode.clone(),
         }
     }
 }
