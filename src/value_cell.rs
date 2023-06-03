@@ -5,7 +5,7 @@ use std::{
     fmt,
     iter::zip,
     ops::{Add, Div, Mul, Neg, Not, Rem, Sub},
-    rc::Rc,
+    sync::Arc,
 };
 
 use serde_json::{value::Value, Map};
@@ -35,7 +35,7 @@ pub enum ValueCellInner {
 }
 
 pub struct ValueCell {
-    inner: Rc<ValueCellInner>,
+    inner: Arc<ValueCellInner>,
 }
 
 #[derive(Debug)]
@@ -64,7 +64,7 @@ pub type ValueCellResult<T> = Result<T, ValueCellError>;
 impl From<ValueCellInner> for ValueCell {
     fn from(inner: ValueCellInner) -> ValueCell {
         return ValueCell {
-            inner: Rc::new(inner),
+            inner: Arc::new(inner),
         };
     }
 }
@@ -155,7 +155,7 @@ impl ValueCell {
     }
 
     pub fn into_inner(self) -> ValueCellInner {
-        match Rc::try_unwrap(self.inner) {
+        match Arc::try_unwrap(self.inner) {
             Ok(inner) => inner,
             Err(rc) => (*rc).clone(),
         }
@@ -1023,6 +1023,5 @@ mod test {
         let res = ValueCell::from(3i64) + ValueCell::from(4.2);
 
         assert!(res.is_err());
-        println!("Failure: {}", res.err().unwrap().msg());
     }
 }

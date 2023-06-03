@@ -1,11 +1,10 @@
 use crate::{
-    ast::grammar::Expr,
     interp::Interpreter,
     value_cell::{ValueCell, ValueCellError, ValueCellResult},
     BindContext, ByteCode, CelContext, ValueCellInner,
 };
 
-use super::{bind_context::RsCellMacro, utils::extract_ident};
+use super::bind_context::RsCellMacro;
 
 const DEFAULT_MACROS: &[(&str, RsCellMacro)] = &[
     // ("has", has_impl),

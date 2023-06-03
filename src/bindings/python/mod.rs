@@ -1,4 +1,4 @@
-use crate::{CelContext, ExecContext, ValueCell};
+use crate::{BindContext, CelContext, ValueCell};
 
 use chrono::{DateTime, Duration, Utc};
 use pyo3::{
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 #[pyfunction]
 fn eval(py: Python<'_>, prog_str: String, bindings: &PyDict) -> PyResult<PyObject> {
     let mut ctx = CelContext::new();
-    let mut exec_ctx = ExecContext::new();
+    let mut exec_ctx = BindContext::new();
 
     ctx.add_program_str("entry", &prog_str).unwrap();
 

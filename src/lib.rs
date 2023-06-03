@@ -14,10 +14,10 @@
 //!
 //! The basic example of how to use:
 //! ```
-//! use rscel::{CelContext, ExecContext, serde_json};
+//! use rscel::{CelContext, BindContext, serde_json};
 //!
 //! let mut ctx = CelContext::new();
-//! let mut exec_ctx = ExecContext::new();
+//! let mut exec_ctx = BindContext::new();
 //!
 //! ctx.add_program_str("main", "foo + 3").unwrap();
 //! exec_ctx.bind_param("foo", 3.into()); // convert to serde_json::Value

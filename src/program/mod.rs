@@ -1,12 +1,10 @@
 mod compile;
-// mod eval;
 mod program_cache;
 mod program_details;
 mod program_error;
 
 use crate::interp::ByteCode;
 use compile::ProgramCompiler;
-// pub use eval::eval_expr;
 pub use program_details::ProgramDetails;
 pub use program_error::ProgramError;
 

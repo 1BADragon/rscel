@@ -9,6 +9,7 @@ use crate::{
 };
 
 use super::default_funcs::load_default_funcs;
+use super::default_macros::load_default_macros;
 
 pub type RsCellFunction = fn(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell>;
 pub type RsCellMacro = for<'a> fn(
@@ -53,7 +54,7 @@ impl BindContext {
             macros: HashMap::new(),
         };
 
-        // load_default_macros(&mut ctx);
+        load_default_macros(&mut ctx);
         load_default_funcs(&mut ctx);
         ctx
     }

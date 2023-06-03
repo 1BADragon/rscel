@@ -3,7 +3,6 @@ use std::collections::HashMap;
 mod bind_context;
 mod default_funcs;
 mod default_macros;
-mod utils;
 use crate::{
     interp::Interpreter,
     program::{Program, ProgramDetails, ProgramResult},
@@ -16,8 +15,6 @@ pub use bind_context::{BindContext, RsCallable, RsCellFunction, RsCellMacro};
 /// an expression.
 pub struct CelContext {
     progs: HashMap<String, Program>,
-
-    current_ctx: Option<BindContext>,
 }
 
 /// ExecError is the error type returned by CelContext operations.
@@ -53,7 +50,6 @@ impl CelContext {
     pub fn new() -> CelContext {
         CelContext {
             progs: HashMap::new(),
-            current_ctx: None,
         }
     }
 
@@ -116,7 +112,6 @@ impl Clone for CelContext {
     fn clone(&self) -> Self {
         CelContext {
             progs: self.progs.clone(),
-            current_ctx: None,
         }
     }
 }

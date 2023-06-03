@@ -52,8 +52,21 @@ impl<'a> InterpStack<'a> {
         }
     }
 
-    fn len(&self) -> usize {
-        self.stack.len()
+    fn pop_tryresolve(&mut self) -> ValueCellResult<ValueCell> {
+        match self.stack.pop() {
+            Some(val) => {
+                if let ValueCellInner::Ident(name) = val.inner() {
+                    if let Some(val) = self.ctx.get_param_by_name(name) {
+                        Ok(val.clone())
+                    } else {
+                        Ok(val)
+                    }
+                } else {
+                    Ok(val)
+                }
+            }
+            None => Err(ValueCellError::with_msg("No value on stack!")),
+        }
     }
 }
 
@@ -76,6 +89,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
+    #[cfg(test)]
     fn empty() -> Interpreter<'a> {
         Interpreter {
             cel: None,
@@ -107,8 +121,6 @@ impl<'a> Interpreter<'a> {
     }
 
     pub fn run_raw(&self, prog: &[ByteCode]) -> ValueCellResult<ValueCell> {
-        println!("Running prog: {:?}", prog);
-
         let mut pc: usize = 0;
         let mut stack = InterpStack::new(self);
 
@@ -359,40 +371,17 @@ impl<'a> Interpreter<'a> {
                             match map.get(ident.as_str()) {
                                 Some(val) => stack.push(val.clone()),
                                 None => {
-                                    if let Some(func) = self.get_func_by_name(ident.as_str()) {
-                                        stack.push(ValueCell::from_binding(
-                                            RsCallable::Function(func),
-                                            &obj,
-                                        ));
-                                    } else if let Some(macro_) =
-                                        self.get_macro_by_name(ident.as_str())
-                                    {
-                                        stack.push(ValueCell::from_binding(
-                                            RsCallable::Macro(macro_),
-                                            &obj,
-                                        ));
-                                    } else {
-                                        return Err(ValueCellError::with_msg(&format!(
-                                            "Object does not contain key \"{}\"",
-                                            ident
-                                        )));
-                                    }
+                                    stack.push(ValueCell::from_binding(
+                                        self.callable_by_name(ident.as_str())?,
+                                        &obj,
+                                    ));
                                 }
                             }
                         } else {
-                            if let Some(func) = self.get_func_by_name(ident.as_str()) {
-                                stack
-                                    .push(ValueCell::from_binding(RsCallable::Function(func), &obj))
-                            } else if let Some(macro_) = self.get_macro_by_name(ident.as_str()) {
-                                stack
-                                    .push(ValueCell::from_binding(RsCallable::Macro(macro_), &obj));
-                            } else {
-                                return Err(ValueCellError::with_msg(&format!(
-                                    "Index operator invalide between {:?} and {:?}",
-                                    index.as_type(),
-                                    obj.as_type()
-                                )));
-                            }
+                            stack.push(ValueCell::from_binding(
+                                self.callable_by_name(ident.as_str())?,
+                                &obj,
+                            ));
                         }
                     } else {
                         return Err(ValueCellError::with_msg(&format!(
@@ -446,7 +435,7 @@ impl<'a> Interpreter<'a> {
             };
         }
 
-        Ok(stack.pop().unwrap())
+        stack.pop_tryresolve()
     }
 
     fn resolve_args(&self, args: Vec<ValueCell>) -> Result<Vec<ValueCell>, ValueCellError> {
@@ -468,58 +457,22 @@ impl<'a> Interpreter<'a> {
     fn get_func_by_name(&self, name: &str) -> Option<RsCellFunction> {
         self.bindings?.get_func(name)
     }
+
     fn get_macro_by_name(&self, name: &str) -> Option<RsCellMacro> {
         self.bindings?.get_macro(name)
     }
 
-    fn resolve_fqn(&self, fqn: &[ValueCell]) -> ValueCellResult<ValueCell> {
-        let mut iter = fqn.iter();
-
-        let mut current = if let Some(vc) = iter.next() {
-            match vc.inner() {
-                ValueCellInner::Ident(ident) => match self.get_param_by_name(ident) {
-                    Some(val) => val.clone(),
-                    None => {
-                        return Err(ValueCellError::with_msg(&format!(
-                            "Ident '{}' does not exist",
-                            ident
-                        )))
-                    }
-                },
-                other => other.clone().into(),
-            }
+    fn callable_by_name(&self, name: &str) -> ValueCellResult<RsCallable> {
+        if let Some(func) = self.get_func_by_name(name) {
+            Ok(RsCallable::Function(func))
+        } else if let Some(macro_) = self.get_macro_by_name(name) {
+            Ok(RsCallable::Macro(macro_))
         } else {
-            return Err(ValueCellError::with_msg("Empty Ident"));
-        };
-
-        for member_name in iter {
-            match current.inner() {
-                ValueCellInner::Map(map) => {
-                    if let ValueCellInner::Ident(member_name_str) = member_name.inner() {
-                        current = if let Some(member) = map.get(member_name_str) {
-                            member.clone()
-                        } else {
-                            return Err(ValueCellError::with_msg(&format!(
-                                "member {} does not exist on {:?}",
-                                member_name_str, &current
-                            )));
-                        }
-                    } else {
-                        return Err(ValueCellError::with_msg(
-                            "Only idents can be member accesses",
-                        ));
-                    }
-                }
-                _ => {
-                    return Err(ValueCellError::with_msg(&format!(
-                        "member access invalid on {:?}",
-                        current
-                    )))
-                }
-            }
+            Err(ValueCellError::with_msg(&format!(
+                "{} is not callable",
+                name
+            )))
         }
-
-        return Ok(current);
     }
 }
 
