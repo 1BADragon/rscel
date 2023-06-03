@@ -1,6 +1,6 @@
 mod utils;
 
-use crate::{CelContext, ExecContext, Program};
+use crate::{BindContext, CelContext, Program};
 use serde::Serialize;
 use serde_json::Value;
 use wasm_bindgen::prelude::*;
@@ -47,7 +47,7 @@ impl EvalResult {
 #[wasm_bindgen]
 pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
     let mut ctx = CelContext::new();
-    let mut exec_ctx = ExecContext::new();
+    let mut exec_ctx = BindContext::new();
 
     if let Err(err) = ctx.add_program_str("entry", prog) {
         return serde_wasm_bindgen::to_value(&EvalResult::from_error(err)).unwrap();
