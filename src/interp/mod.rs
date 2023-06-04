@@ -89,12 +89,15 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    #[cfg(test)]
-    fn empty() -> Interpreter<'a> {
+    pub fn empty() -> Interpreter<'a> {
         Interpreter {
             cel: None,
             bindings: None,
         }
+    }
+
+    pub fn add_bindings(&mut self, bindings: &'a BindContext) {
+        self.bindings = Some(bindings);
     }
 
     pub fn cel_copy(&self) -> Option<CelContext> {
@@ -403,6 +406,12 @@ impl<'a> Interpreter<'a> {
                             if let Some(func) = self.get_func_by_name(&func_name) {
                                 let arg_values = self.resolve_args(args)?;
                                 stack.push(func(ValueCell::from_null(), arg_values.into())?);
+                            } else if let Some(macro_) = self.get_macro_by_name(&func_name) {
+                                stack.push(self.call_macro(
+                                    &ValueCell::from_null(),
+                                    &args,
+                                    macro_,
+                                )?);
                             } else {
                                 return Err(ValueCellError::with_msg(&format!(
                                     "{} is not callable",
@@ -416,17 +425,7 @@ impl<'a> Interpreter<'a> {
                                 stack.push(func(value, arg_values.into())?);
                             }
                             RsCallable::Macro(macro_) => {
-                                let mut v = Vec::new();
-                                for arg in args.iter() {
-                                    if let ValueCellInner::ByteCode(bc) = arg.inner() {
-                                        v.push(bc.as_slice());
-                                    } else {
-                                        return Err(ValueCellError::with_msg(
-                                            "macro args must be bytecode",
-                                        ));
-                                    }
-                                }
-                                stack.push(macro_(self, value, &v)?);
+                                stack.push(self.call_macro(&value, &args, macro_)?);
                             }
                         },
                         _ => return Err(ValueCellError::with_msg("only idents are callable")),
@@ -436,6 +435,24 @@ impl<'a> Interpreter<'a> {
         }
 
         stack.pop_tryresolve()
+    }
+
+    fn call_macro(
+        &self,
+        this: &ValueCell,
+        args: &Vec<ValueCell>,
+        macro_: fn(&Interpreter, ValueCell, &[&[ByteCode]]) -> Result<ValueCell, ValueCellError>,
+    ) -> Result<ValueCell, ValueCellError> {
+        let mut v = Vec::new();
+        for arg in args.iter() {
+            if let ValueCellInner::ByteCode(bc) = arg.inner() {
+                v.push(bc.as_slice());
+            } else {
+                return Err(ValueCellError::with_msg("macro args must be bytecode"));
+            }
+        }
+        let res = macro_(self, this.clone(), &v)?;
+        Ok(res)
     }
 
     fn resolve_args(&self, args: Vec<ValueCell>) -> Result<Vec<ValueCell>, ValueCellError> {

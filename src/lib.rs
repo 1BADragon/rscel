@@ -26,20 +26,25 @@
 //! assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
 //! ```
 mod ast;
-pub mod bindings;
 mod context;
 mod interp;
 mod program;
 mod value_cell;
 
+// Export some public interface
+pub mod utils;
 pub use context::{BindContext, CelContext, ExecError, ExecResult, RsCellFunction, RsCellMacro};
 pub use interp::ByteCode;
 pub use program::{Program, ProgramError};
 pub use value_cell::{ValueCell, ValueCellError, ValueCellInner, ValueCellResult};
 
+// If any of the binding featurs are enabled, export them
+#[cfg(any(feature = "python", feature = "wasm"))]
+pub mod bindings;
+
+// Some re-exports to allow a consistent use of serde
 pub use serde;
 pub use serde_json;
-
 pub use serde_json::Value;
 
 #[cfg(feature = "python")]
@@ -103,6 +108,14 @@ mod test {
     #[test_case("5 == 5", true.into(); "test eq")]
     #[test_case("5 != 5", false.into(); "test ne")]
     #[test_case("3 in [1,2,3,4,5]", true.into(); "test in")]
+    #[test_case(r#"has({"foo": 3}.foo)"#, true.into(); "test has")]
+    #[test_case("[1,2,3,4].all(x, x < 5)", true.into(); "test all true")]
+    #[test_case("[1,2,3,4,5].all(x, x < 5)", false.into(); "test all false")]
+    #[test_case("[1,2,3,4].exists(x, x < 3)", true.into(); "test exists true")]
+    #[test_case("[1,2,3,4].exists(x, x == 5)", false.into(); "test exists false")]
+    #[test_case("[1,2,3,4].exists_one(x, x == 4)", true.into(); "test exists one true")]
+    #[test_case("[1,2,3,4].exists_one(x, x == 5)", false.into(); "test exists one false")]
+    #[test_case("[1,2,3,4].filter(x, x % 2 == 0)", ValueCell::from_list(&[2.into(), 4.into()]); "test filter")]
     fn test_equation(prog: &str, res: ValueCell) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
