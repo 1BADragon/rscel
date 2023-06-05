@@ -1,13 +1,15 @@
+use serde::{Deserialize, Serialize};
+
 use crate::ValueCell;
 use std::fmt;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum JmpWhen {
     True,
     False,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum ByteCode {
     Push(ValueCell),
     Or,

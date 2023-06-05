@@ -2,10 +2,10 @@ use crate::ast::grammar::{
     Addition, ConditionalAnd, ConditionalOr, Expr, ExprList, ExprListTail, Member, MemberPrime,
     Multiplication, Primary, Relation, Unary,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProgramDetails {
     params: HashSet<String>,
 }

@@ -1,4 +1,6 @@
 use chrono::{offset::Utc, DateTime, Duration, FixedOffset};
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -12,7 +14,8 @@ use serde_json::{value::Value, Map};
 
 use crate::{context::RsCallable, interp::ByteCode};
 
-#[derive(Debug, Clone, PartialEq)]
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ValueCellInner {
     Int(i64),
     UInt(u64),
@@ -25,15 +28,19 @@ pub enum ValueCellInner {
     Null,
     Ident(String),
     Type(String),
+    #[serde(skip_serializing, skip_deserializing)]
     TimeStamp(DateTime<Utc>),
+    #[serde(skip_serializing, skip_deserializing)]
     Duration(Duration),
     ByteCode(Vec<ByteCode>),
+    #[serde(skip_serializing, skip_deserializing)]
     BoundCall {
         callable: RsCallable,
         value: ValueCell,
     },
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ValueCell {
     inner: Arc<ValueCellInner>,
 }

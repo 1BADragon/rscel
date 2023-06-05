@@ -7,10 +7,11 @@ use crate::interp::ByteCode;
 use compile::ProgramCompiler;
 pub use program_details::ProgramDetails;
 pub use program_error::ProgramError;
+use serde::{Deserialize, Serialize};
 
 pub type ProgramResult<T> = Result<T, ProgramError>;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Program {
     source: String,
     details: program_details::ProgramDetails,
