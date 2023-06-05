@@ -1,8 +1,9 @@
-use super::exec_context::RsCellFunction;
+use super::bind_context::RsCellFunction;
 use crate::{
     value_cell::{ValueCell, ValueCellError, ValueCellInner, ValueCellResult},
-    ExecContext,
+    BindContext,
 };
+use chrono::{DateTime, Utc};
 use regex::Regex;
 
 const DEFAULT_FUNCS: &[(&str, RsCellFunction)] = &[
@@ -17,9 +18,11 @@ const DEFAULT_FUNCS: &[(&str, RsCellFunction)] = &[
     ("endsWith", ends_with_impl),
     ("matches", matches_impl),
     ("type", type_impl),
+    ("timestamp", timestamp_impl),
+    ("duration", duration_impl),
 ];
 
-pub fn load_default_funcs(exec_ctx: &mut ExecContext) {
+pub fn load_default_funcs(exec_ctx: &mut BindContext) {
     for (name, func) in DEFAULT_FUNCS.iter() {
         exec_ctx.bind_func(name, *func);
     }
@@ -46,6 +49,7 @@ fn int_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
                 val
             ))),
         },
+        TimeStamp(val) => Ok(ValueCell::from_int(val.timestamp())),
         other => Err(ValueCellError::with_msg(&format!(
             "int conversion invalid for {:?}",
             other
@@ -149,6 +153,8 @@ fn string_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> 
             Ok(s) => s.into(),
             Err(_) => return Err(ValueCellError::with_msg("Bad bytes in utf8 convertion")),
         },
+        TimeStamp(ts) => ts.to_rfc3339().into(),
+        Duration(d) => d.to_string().into(),
         _ => {
             return Err(ValueCellError::with_msg(&format!(
                 "string() invalid for {:?}",
@@ -288,4 +294,42 @@ fn type_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
     }
 
     Ok(arg_vec[0].as_type())
+}
+
+fn timestamp_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
+    let arg_vec: Vec<ValueCell> = args.try_into()?;
+
+    if arg_vec.len() != 1 {
+        return Err(ValueCellError::with_msg("timestamp() expect one argument"));
+    }
+
+    if let ValueCellInner::String(str_val) = arg_vec[0].inner() {
+        match (&str_val).parse::<DateTime<Utc>>() {
+            Ok(val) => Ok(ValueCell::from_timestamp(&val)),
+            Err(_) => Err(ValueCellError::with_msg("Invalid timestamp format")),
+        }
+    } else {
+        Err(ValueCellError::with_msg(
+            "timestamp() expects a string argument",
+        ))
+    }
+}
+
+fn duration_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
+    let arg_vec: Vec<ValueCell> = args.try_into()?;
+
+    if arg_vec.len() != 1 {
+        return Err(ValueCellError::with_msg("duration() expects on argument"));
+    }
+
+    if let ValueCellInner::String(str_val) = arg_vec[0].inner() {
+        match duration_str::parse_chrono(str_val) {
+            Ok(val) => Ok(ValueCell::from_duration(&val)),
+            Err(_) => Err(ValueCellError::with_msg("Invalid duration format")),
+        }
+    } else {
+        Err(ValueCellError::with_msg(
+            "duration() expects a string argument",
+        ))
+    }
 }

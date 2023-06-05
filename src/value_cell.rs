@@ -1,14 +1,21 @@
+use chrono::{offset::Utc, DateTime, Duration, FixedOffset};
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::{
     cmp::Ordering,
     collections::HashMap,
+    fmt,
     iter::zip,
     ops::{Add, Div, Mul, Neg, Not, Rem, Sub},
-    rc::Rc,
+    sync::Arc,
 };
 
 use serde_json::{value::Value, Map};
 
-#[derive(Debug, Clone, PartialEq)]
+use crate::{context::RsCallable, interp::ByteCode};
+
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ValueCellInner {
     Int(i64),
     UInt(u64),
@@ -21,11 +28,21 @@ pub enum ValueCellInner {
     Null,
     Ident(String),
     Type(String),
+    #[serde(skip_serializing, skip_deserializing)]
+    TimeStamp(DateTime<Utc>),
+    #[serde(skip_serializing, skip_deserializing)]
+    Duration(Duration),
+    ByteCode(Vec<ByteCode>),
+    #[serde(skip_serializing, skip_deserializing)]
+    BoundCall {
+        callable: RsCallable,
+        value: ValueCell,
+    },
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct ValueCell {
-    inner: Rc<ValueCellInner>,
+    inner: Arc<ValueCellInner>,
 }
 
 #[derive(Debug)]
@@ -43,6 +60,10 @@ impl ValueCellError {
     pub fn msg<'a>(&'a self) -> &'a str {
         return &self.msg;
     }
+
+    pub fn into_string(self) -> String {
+        self.msg
+    }
 }
 
 pub type ValueCellResult<T> = Result<T, ValueCellError>;
@@ -50,7 +71,7 @@ pub type ValueCellResult<T> = Result<T, ValueCellError>;
 impl From<ValueCellInner> for ValueCell {
     fn from(inner: ValueCellInner) -> ValueCell {
         return ValueCell {
-            inner: Rc::new(inner),
+            inner: Arc::new(inner),
         };
     }
 }
@@ -120,8 +141,28 @@ impl ValueCell {
         ValueCellInner::Type(val.to_owned()).into()
     }
 
+    pub fn from_timestamp(val: &DateTime<Utc>) -> ValueCell {
+        ValueCellInner::TimeStamp(val.clone()).into()
+    }
+
+    pub fn from_duration(val: &Duration) -> ValueCell {
+        ValueCellInner::Duration(val.clone()).into()
+    }
+
+    pub(crate) fn from_bytecode(val: &[ByteCode]) -> ValueCell {
+        ValueCellInner::ByteCode(val.to_owned()).into()
+    }
+
+    pub(crate) fn from_binding(callable: RsCallable, value: &ValueCell) -> ValueCell {
+        ValueCellInner::BoundCall {
+            callable,
+            value: value.clone(),
+        }
+        .into()
+    }
+
     pub fn into_inner(self) -> ValueCellInner {
-        match Rc::try_unwrap(self.inner) {
+        match Arc::try_unwrap(self.inner) {
             Ok(inner) => inner,
             Err(rc) => (*rc).clone(),
         }
@@ -215,6 +256,16 @@ impl ValueCell {
                     return Ok(ValueCell::from_bool(false));
                 }
             }
+            ValueCellInner::TimeStamp(v1) => {
+                if let ValueCellInner::TimeStamp(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_bool(*v1 == *v2));
+                }
+            }
+            ValueCellInner::Duration(v1) => {
+                if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_bool(*v1 == *v2));
+                }
+            }
             _ => {}
         }
 
@@ -255,6 +306,16 @@ impl ValueCell {
                 ValueCellInner::Float(v2) => return Ok(v1.partial_cmp(v2)),
                 _ => {}
             },
+            ValueCellInner::TimeStamp(v1) => {
+                if let ValueCellInner::TimeStamp(v2) = rhs.inner() {
+                    return Ok(v1.partial_cmp(v2));
+                }
+            }
+            ValueCellInner::Duration(v1) => {
+                if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(v1.partial_cmp(v2));
+                }
+            }
             _ => {}
         }
 
@@ -290,6 +351,32 @@ impl ValueCell {
         ))
     }
 
+    pub fn or(&self, rhs: &ValueCell) -> ValueCellResult<ValueCell> {
+        if let ValueCellInner::Bool(lhs) = self.inner() {
+            if let ValueCellInner::Bool(rhs) = rhs.inner() {
+                return Ok((*lhs || *rhs).into());
+            }
+        }
+        return Err(ValueCellError::with_msg(&format!(
+            "|| operator invalid for {:?} and {:?}",
+            self.as_type(),
+            rhs.as_type(),
+        )));
+    }
+
+    pub fn and(&self, rhs: &ValueCell) -> ValueCellResult<ValueCell> {
+        if let ValueCellInner::Bool(lhs) = self.inner() {
+            if let ValueCellInner::Bool(rhs) = rhs.inner() {
+                return Ok((*lhs && *rhs).into());
+            }
+        }
+        return Err(ValueCellError::with_msg(&format!(
+            "&& operator invalid for {:?} and {:?}",
+            self.as_type(),
+            rhs.as_type(),
+        )));
+    }
+
     pub fn into_json_value(self) -> Value {
         match self.into_inner() {
             ValueCellInner::Int(val) => Value::from(val),
@@ -316,6 +403,8 @@ impl ValueCell {
 
                 Value::Object(partial)
             }
+            ValueCellInner::TimeStamp(val) => Value::from(val.to_rfc3339()),
+            ValueCellInner::Duration(val) => Value::from(val.to_string()),
             _ => Value::Null,
         }
     }
@@ -333,6 +422,13 @@ impl ValueCell {
             ValueCellInner::Null => ValueCell::from_type("null_type"),
             ValueCellInner::Ident(_) => ValueCell::from_type("ident"),
             ValueCellInner::Type(_) => ValueCell::from_type("type"),
+            ValueCellInner::TimeStamp(_) => ValueCell::from_type("timestamp"),
+            ValueCellInner::Duration(_) => ValueCell::from_type("duration"),
+            ValueCellInner::ByteCode(_) => ValueCell::from_type("bytecode"),
+            ValueCellInner::BoundCall {
+                callable: _,
+                value: _,
+            } => ValueCell::from_type("bound call"),
         }
     }
 }
@@ -602,6 +698,66 @@ impl TryInto<HashMap<String, ValueCell>> for ValueCell {
     }
 }
 
+impl From<DateTime<Utc>> for ValueCell {
+    fn from(val: DateTime<Utc>) -> ValueCell {
+        ValueCell::from_timestamp(&val)
+    }
+}
+
+impl From<DateTime<FixedOffset>> for ValueCell {
+    fn from(val: DateTime<FixedOffset>) -> ValueCell {
+        ValueCell::from_timestamp(&(val.into()))
+    }
+}
+
+impl TryInto<DateTime<Utc>> for ValueCell {
+    type Error = ValueCellError;
+
+    fn try_into(self) -> ValueCellResult<DateTime<Utc>> {
+        if let ValueCellInner::TimeStamp(val) = self.into_inner() {
+            return Ok(val);
+        }
+
+        return Err(ValueCellError::with_msg("Convertion Error"));
+    }
+}
+
+impl From<Duration> for ValueCell {
+    fn from(val: Duration) -> ValueCell {
+        ValueCell::from_duration(&val)
+    }
+}
+
+impl TryInto<Duration> for ValueCell {
+    type Error = ValueCellError;
+
+    fn try_into(self) -> ValueCellResult<Duration> {
+        if let ValueCellInner::Duration(val) = self.into_inner() {
+            return Ok(val);
+        }
+
+        return Err(ValueCellError::with_msg("Convertion Error"));
+    }
+}
+
+impl From<Vec<ByteCode>> for ValueCell {
+    fn from(val: Vec<ByteCode>) -> ValueCell {
+        ValueCell::from_bytecode(&val)
+    }
+}
+
+impl TryInto<Vec<ByteCode>> for ValueCell {
+    type Error = ValueCellError;
+
+    fn try_into(self) -> ValueCellResult<Vec<ByteCode>> {
+        if let ValueCellInner::ByteCode(val) = self.into_inner() {
+            return Ok(val);
+        }
+
+        return Err(ValueCellError::with_msg("Convertion Error"));
+    }
+}
+
 impl Add for ValueCell {
     type Output = ValueCellResult<ValueCell>;
 
@@ -646,6 +802,18 @@ impl Add for ValueCell {
                     return Ok(ValueCell::from(res));
                 }
             }
+            ValueCellInner::TimeStamp(v1) => {
+                if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_timestamp(&(v1 + *v2)));
+                }
+            }
+            ValueCellInner::Duration(v1) => {
+                if let ValueCellInner::TimeStamp(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_timestamp(&(*v2 + v1)));
+                } else if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_duration(&(v1 + *v2)));
+                }
+            }
             _ => {}
         }
 
@@ -677,6 +845,18 @@ impl Sub for ValueCell {
             ValueCellInner::Float(val1) => {
                 if let ValueCellInner::Float(val2) = rhs.inner() {
                     return Ok(ValueCell::from(val1 - val2));
+                }
+            }
+            ValueCellInner::TimeStamp(v1) => {
+                if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_timestamp(&(*v1 - *v2)));
+                }
+            }
+            ValueCellInner::Duration(v1) => {
+                if let ValueCellInner::TimeStamp(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_timestamp(&(*v2 - *v1)));
+                } else if let ValueCellInner::Duration(v2) = rhs.inner() {
+                    return Ok(ValueCell::from_duration(&(*v1 - *v2)));
                 }
             }
             _ => {}
@@ -826,6 +1006,12 @@ impl Not for ValueCell {
     }
 }
 
+impl fmt::Debug for ValueCell {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.inner())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::ValueCell;
@@ -844,6 +1030,5 @@ mod test {
         let res = ValueCell::from(3i64) + ValueCell::from(4.2);
 
         assert!(res.is_err());
-        println!("Failure: {}", res.err().unwrap().msg());
     }
 }

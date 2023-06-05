@@ -1,25 +1,20 @@
 use std::collections::HashMap;
 
+mod bind_context;
 mod default_funcs;
 mod default_macros;
-mod exec_context;
-mod utils;
 use crate::{
-    ast::grammar::Expr,
-    program::{eval_expr, Program, ProgramDetails, ProgramResult},
-    value_cell::{ValueCell, ValueCellError, ValueCellResult},
-    ValueCellInner,
+    interp::Interpreter,
+    program::{Program, ProgramDetails, ProgramResult},
+    value_cell::ValueCell,
 };
-
-pub use exec_context::{ExecContext, RsCellFunction, RsCellMacro};
+pub use bind_context::{BindContext, RsCallable, RsCellFunction, RsCellMacro};
 
 /// The CelContext is the core context in RsCel. This context contains
 /// Program information as well as the primary entry point for evaluating
 /// an expression.
 pub struct CelContext {
     progs: HashMap<String, Program>,
-
-    current_ctx: Option<ExecContext>,
 }
 
 /// ExecError is the error type returned by CelContext operations.
@@ -55,7 +50,6 @@ impl CelContext {
     pub fn new() -> CelContext {
         CelContext {
             progs: HashMap::new(),
-            current_ctx: None,
         }
     }
 
@@ -77,116 +71,47 @@ impl CelContext {
     }
 
     /// Returns ProgramDetails for a program by name if it exists.
-    pub fn program_details(&self, name: &str) -> Option<ProgramDetails> {
+    pub fn program_details<'a>(&'a self, name: &str) -> Option<&'a ProgramDetails> {
         let prog = self.progs.get(name)?;
 
         Some(prog.details())
     }
 
-    pub(crate) fn get_param_by_name(&self, name: &str) -> Option<ValueCell> {
-        self.current_ctx.as_ref()?.get_param(name)
-    }
-
-    pub(crate) fn get_func_by_name(&self, name: &str) -> Option<RsCellFunction> {
-        self.current_ctx.as_ref()?.get_func(name)
-    }
-
-    pub(crate) fn get_macro_by_name(&self, name: &str) -> Option<RsCellMacro> {
-        self.current_ctx.as_ref()?.get_macro(name)
-    }
-
-    pub(crate) fn exec_context(&self) -> Option<ExecContext> {
-        Some((self.current_ctx.as_ref()?).clone())
-    }
-
-    pub(crate) fn resolve_fqn(&self, fqn: &[ValueCell]) -> ValueCellResult<ValueCell> {
-        let mut iter = fqn.iter();
-
-        let mut current = if let Some(vc) = iter.next() {
-            match vc.inner() {
-                ValueCellInner::Ident(ident) => match self.get_param_by_name(ident) {
-                    Some(val) => val.clone(),
-                    None => {
-                        return Err(ValueCellError::with_msg(&format!(
-                            "Ident '{}' does not exist",
-                            ident
-                        )))
-                    }
-                },
-                other => other.clone().into(),
-            }
-        } else {
-            return Err(ValueCellError::with_msg("Empty Ident"));
-        };
-
-        for member_name in iter {
-            match current.inner() {
-                ValueCellInner::Map(map) => {
-                    if let ValueCellInner::Ident(member_name_str) = member_name.inner() {
-                        current = if let Some(member) = map.get(member_name_str) {
-                            member.clone()
-                        } else {
-                            return Err(ValueCellError::with_msg(&format!(
-                                "member {} does not exist on {:?}",
-                                member_name_str, &current
-                            )));
-                        }
-                    } else {
-                        return Err(ValueCellError::with_msg(
-                            "Only idents can be member accesses",
-                        ));
-                    }
-                }
-                _ => {
-                    return Err(ValueCellError::with_msg(&format!(
-                        "member access invalid on {:?}",
-                        current
-                    )))
-                }
-            }
-        }
-
-        return Ok(current);
+    pub fn get_program<'a>(&'a self, name: &str) -> Option<&'a Program> {
+        self.progs.get(name)
     }
 
     /// Evaluate a Program with the given name with a provided ExecContext. A single CelContext
     /// can be run multiple times with different ExecContext's. The return of this function is
     /// a Result with either a ValueCell representing the final solution of the Program or an Error
     /// that is discovered during execution, such as mismatch of types
-    pub fn exec<'l>(&'l mut self, name: &str, ctx: &'l ExecContext) -> ExecResult<ValueCell> {
-        self.current_ctx = Some(ctx.clone());
+    pub fn exec<'l>(&'l mut self, name: &str, bindings: &'l BindContext) -> ExecResult<ValueCell> {
+        let interp = Interpreter::new(&self, bindings);
 
-        let res = match self.progs.get(name) {
-            Some(prog) => match prog.eval(self) {
-                Ok(res) => Ok(res),
-                Err(err) => Err(ExecError::from_str(err.into_str())),
-            },
-            None => Err(ExecError::new(&format!("Program {} does not exist", name))),
-        };
-
-        self.current_ctx = None;
-        return res;
+        match interp.run_program(name) {
+            Ok(good) => Ok(good),
+            Err(err) => Err(ExecError::from_str(err.into_string())),
+        }
     }
 
-    pub(crate) fn eval_expr(
-        &mut self,
-        expr: &Expr,
-        ctx: &ExecContext,
-    ) -> ValueCellResult<ValueCell> {
-        self.current_ctx = Some(ctx.clone());
+    // pub(crate) fn eval_expr(
+    //     &mut self,
+    //     expr: &Expr,
+    //     ctx: &BindContext,
+    // ) -> ValueCellResult<ValueCell> {
+    //     self.current_ctx = Some(ctx.clone());
 
-        let res = eval_expr(expr, self);
+    //     let res = eval_expr(expr, self);
 
-        self.current_ctx = None;
-        return res;
-    }
+    //     self.current_ctx = None;
+    //     return res;
+    // }
 }
 
 impl Clone for CelContext {
     fn clone(&self) -> Self {
         CelContext {
             progs: self.progs.clone(),
-            current_ctx: None,
         }
     }
 }
@@ -194,12 +119,12 @@ impl Clone for CelContext {
 #[cfg(test)]
 mod test {
 
-    use super::{CelContext, ExecContext};
+    use super::{BindContext, CelContext};
 
     #[test]
     fn test_eval_basic() {
         let mut ctx = CelContext::new();
-        let exec_ctx = ExecContext::new();
+        let exec_ctx = BindContext::new();
 
         ctx.add_program_str("test_main", "3 + 4").unwrap();
 

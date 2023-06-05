@@ -1,5 +1,5 @@
 use chrono::prelude::*;
-use rscel::{CelContext, ExecContext};
+use rscel::{BindContext, CelContext};
 
 type BenchmarkFn = fn();
 
@@ -27,7 +27,7 @@ fn main() {
 
 fn bench_run_one_nobindings() {
     let mut cel = CelContext::new();
-    let exec = ExecContext::new();
+    let exec = BindContext::new();
 
     cel.add_program_str("entry", "((4 * 3) - 4) + 3").unwrap();
 
@@ -36,7 +36,7 @@ fn bench_run_one_nobindings() {
 
 fn bench_run_many_no_bindings() {
     let mut cel = CelContext::new();
-    let exec = ExecContext::new();
+    let exec = BindContext::new();
 
     cel.add_program_str("entry", "((4 * 3) - 4) + 3").unwrap();
 
@@ -47,7 +47,7 @@ fn bench_run_many_no_bindings() {
 
 fn bench_run_one_with_binding() {
     let mut cel = CelContext::new();
-    let mut exec = ExecContext::new();
+    let mut exec = BindContext::new();
 
     cel.add_program_str("entry", "((4 * 3) - foo) + 3").unwrap();
     exec.bind_param("foo", 6.into());
@@ -57,7 +57,7 @@ fn bench_run_one_with_binding() {
 
 fn bench_run_one_with_many_bindings() {
     let mut cel = CelContext::new();
-    let mut exec = ExecContext::new();
+    let mut exec = BindContext::new();
 
     cel.add_program_str("entry", "((4 * 3) - foo) + 3").unwrap();
 
@@ -80,7 +80,7 @@ fn bench_build_many() {
 fn bench_construct_many_with_bindings() {
     for o in 0..10_000 {
         let mut cel = CelContext::new();
-        let mut exec = ExecContext::new();
+        let mut exec = BindContext::new();
 
         cel.add_program_str("entry", "((4 * 3) - foo) + 3").unwrap();
         exec.bind_param("foo", o.into());

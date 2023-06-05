@@ -14,10 +14,10 @@
 //!
 //! The basic example of how to use:
 //! ```
-//! use rscel::{CelContext, ExecContext, serde_json};
+//! use rscel::{CelContext, BindContext, serde_json};
 //!
 //! let mut ctx = CelContext::new();
-//! let mut exec_ctx = ExecContext::new();
+//! let mut exec_ctx = BindContext::new();
 //!
 //! ctx.add_program_str("main", "foo + 3").unwrap();
 //! exec_ctx.bind_param("foo", 3.into()); // convert to serde_json::Value
@@ -26,18 +26,25 @@
 //! assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
 //! ```
 mod ast;
-pub mod bindings;
 mod context;
+mod interp;
 mod program;
 mod value_cell;
 
-pub use context::{CelContext, ExecContext, ExecError, ExecResult, RsCellFunction, RsCellMacro};
+// Export some public interface
+pub mod utils;
+pub use context::{BindContext, CelContext, ExecError, ExecResult, RsCellFunction, RsCellMacro};
+pub use interp::ByteCode;
 pub use program::{Program, ProgramError};
 pub use value_cell::{ValueCell, ValueCellError, ValueCellInner, ValueCellResult};
 
+// If any of the binding featurs are enabled, export them
+#[cfg(any(feature = "python", feature = "wasm"))]
+pub mod bindings;
+
+// Some re-exports to allow a consistent use of serde
 pub use serde;
 pub use serde_json;
-
 pub use serde_json::Value;
 
 #[cfg(feature = "python")]
@@ -48,15 +55,15 @@ pub use bindings::wasm::*;
 
 #[cfg(test)]
 mod test {
+    use crate::{BindContext, CelContext, Program, ValueCell};
+    use chrono::DateTime;
     use std::collections::HashMap;
-
-    use crate::{CelContext, ExecContext, ValueCell};
     use test_case::test_case;
 
     #[test]
     fn test_bad_func_call() {
         let mut ctx = CelContext::new();
-        let exec_ctx = ExecContext::new();
+        let exec_ctx = BindContext::new();
 
         ctx.add_program_str("main", "foo(3)").unwrap();
 
@@ -67,7 +74,7 @@ mod test {
     #[test]
     fn test_contains() {
         let mut ctx = CelContext::new();
-        let exec_ctx = ExecContext::new();
+        let exec_ctx = BindContext::new();
 
         ctx.add_program_str("main", "\"hello there\".contains(\"hello\")")
             .unwrap();
@@ -101,9 +108,17 @@ mod test {
     #[test_case("5 == 5", true.into(); "test eq")]
     #[test_case("5 != 5", false.into(); "test ne")]
     #[test_case("3 in [1,2,3,4,5]", true.into(); "test in")]
+    #[test_case(r#"has({"foo": 3}.foo)"#, true.into(); "test has")]
+    #[test_case("[1,2,3,4].all(x, x < 5)", true.into(); "test all true")]
+    #[test_case("[1,2,3,4,5].all(x, x < 5)", false.into(); "test all false")]
+    #[test_case("[1,2,3,4].exists(x, x < 3)", true.into(); "test exists true")]
+    #[test_case("[1,2,3,4].exists(x, x == 5)", false.into(); "test exists false")]
+    #[test_case("[1,2,3,4].exists_one(x, x == 4)", true.into(); "test exists one true")]
+    #[test_case("[1,2,3,4].exists_one(x, x == 5)", false.into(); "test exists one false")]
+    #[test_case("[1,2,3,4].filter(x, x % 2 == 0)", ValueCell::from_list(&[2.into(), 4.into()]); "test filter")]
     fn test_equation(prog: &str, res: ValueCell) {
         let mut ctx = CelContext::new();
-        let exec_ctx = ExecContext::new();
+        let exec_ctx = BindContext::new();
 
         ctx.add_program_str("main", prog).unwrap();
 
@@ -112,9 +127,49 @@ mod test {
     }
 
     #[test]
+    fn test_timestamp() {
+        let mut ctx = CelContext::new();
+        let exec_ctx = BindContext::new();
+
+        ctx.add_program_str("main", r#"timestamp("2023-04-20T12:00:00Z")"#)
+            .unwrap();
+        let eval_res = ctx.exec("main", &exec_ctx).unwrap();
+
+        let dt = DateTime::parse_from_rfc3339("2023-04-20T12:00:00Z").unwrap();
+        assert!(eval_res == dt.into());
+    }
+
+    #[test]
+    fn test_timeduration() {
+        let mut ctx = CelContext::new();
+        let exec_ctx = BindContext::new();
+
+        ctx.add_program_str(
+            "main",
+            r#"timestamp("2023-04-20T12:00:00Z") + duration("1h")"#,
+        )
+        .unwrap();
+        let eval_res = ctx.exec("main", &exec_ctx).unwrap();
+
+        let dt = DateTime::parse_from_rfc3339("2023-04-20T13:00:00Z").unwrap();
+        assert!(eval_res == dt.into());
+    }
+
+    #[test]
     fn test_binding() {
         let mut ctx = CelContext::new();
-        let mut exec_ctx = ExecContext::new();
+        let mut binding = BindContext::new();
+
+        ctx.add_program_str("main", "foo + 9").unwrap();
+
+        binding.bind_param("foo", 3.into());
+        assert!(ctx.exec("main", &binding).unwrap() == 12.into());
+    }
+
+    #[test]
+    fn test_dict_binding() {
+        let mut ctx = CelContext::new();
+        let mut exec_ctx = BindContext::new();
 
         ctx.add_program_str("func1", "foo.bar + 4").unwrap();
         ctx.add_program_str("func2", "foo.bar % 4").unwrap();
@@ -125,5 +180,21 @@ mod test {
 
         assert!(ctx.exec("func1", &exec_ctx).unwrap() == 11.into());
         assert!(ctx.exec("func2", &exec_ctx).unwrap() == 3.into());
+    }
+
+    #[test]
+    fn test_serialization() {
+        let json_str = {
+            let prog = Program::from_source_nocache("4+7*2").unwrap();
+            serde_json::to_string(&prog).unwrap()
+        };
+
+        let prog: Program = serde_json::from_str(&json_str).unwrap();
+
+        let mut cel = CelContext::new();
+        cel.add_program("main", prog);
+        let bindings = BindContext::new();
+
+        assert!(cel.exec("main", &bindings).unwrap() == 18.into())
     }
 }
