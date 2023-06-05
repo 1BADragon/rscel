@@ -55,7 +55,7 @@ pub use bindings::wasm::*;
 
 #[cfg(test)]
 mod test {
-    use crate::{BindContext, CelContext, ValueCell};
+    use crate::{BindContext, CelContext, Program, ValueCell};
     use chrono::DateTime;
     use std::collections::HashMap;
     use test_case::test_case;
@@ -180,5 +180,21 @@ mod test {
 
         assert!(ctx.exec("func1", &exec_ctx).unwrap() == 11.into());
         assert!(ctx.exec("func2", &exec_ctx).unwrap() == 3.into());
+    }
+
+    #[test]
+    fn test_serialization() {
+        let json_str = {
+            let prog = Program::from_source_nocache("4+7*2").unwrap();
+            serde_json::to_string(&prog).unwrap()
+        };
+
+        let prog: Program = serde_json::from_str(&json_str).unwrap();
+
+        let mut cel = CelContext::new();
+        cel.add_program("main", prog);
+        let bindings = BindContext::new();
+
+        assert!(cel.exec("main", &bindings).unwrap() == 18.into())
     }
 }
