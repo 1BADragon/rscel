@@ -40,6 +40,11 @@ impl ExecError {
     pub fn str<'a>(&'a self) -> &'a str {
         &self.msg
     }
+
+    /// Drop the error returning the underlying error message
+    pub fn into_str(self) -> String {
+        self.msg
+    }
 }
 
 /// Result wrapper with ExecError as the error type
