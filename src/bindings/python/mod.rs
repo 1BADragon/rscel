@@ -29,10 +29,65 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &PyDict) -> PyResult<PyObjec
     }
 }
 
+#[pyclass(name = "CelContext")]
+struct PyCelContext {
+    ctx: CelContext,
+}
+
+#[pymethods]
+impl PyCelContext {
+    #[new]
+    pub fn new() -> PyCelContext {
+        PyCelContext {
+            ctx: CelContext::new(),
+        }
+    }
+
+    pub fn add_program_str(mut slf: PyRefMut<'_, Self>, name: &str, prog: &str) -> PyResult<()> {
+        if let Err(err) = slf.ctx.add_program_str(name, prog) {
+            Err(PyValueError::new_err(err.into_str()))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn exec(
+        mut slf: PyRefMut<'_, Self>,
+        name: &str,
+        bindings: &PyBindContext,
+    ) -> PyResult<PyObject> {
+        match slf.ctx.exec(name, &bindings.ctx) {
+            Ok(val) => Ok(val.to_object(slf.py())),
+            Err(err) => Err(PyValueError::new_err(err.into_str())),
+        }
+    }
+}
+
+#[pyclass(name = "BindContext")]
+struct PyBindContext {
+    ctx: BindContext,
+}
+
+#[pymethods]
+impl PyBindContext {
+    #[new]
+    pub fn new() -> PyBindContext {
+        PyBindContext {
+            ctx: BindContext::new(),
+        }
+    }
+
+    pub fn bind(mut slf: PyRefMut<'_, Self>, name: &str, val: ValueCell) {
+        slf.ctx.bind_param(name, val);
+    }
+}
+
 /* Module decl */
 #[pymodule]
 fn rscel(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(eval, m)?)?;
+    m.add_class::<PyCelContext>()?;
+    m.add_class::<PyBindContext>()?;
     Ok(())
 }
 
