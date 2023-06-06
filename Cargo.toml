@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["program_cache", "python"]
+default = ["program_cache"]
 ast_ser = []
 program_cache = []
 python = ["dep:pyo3"]
