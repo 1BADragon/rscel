@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt};
 pub use types::{ByteCode, JmpWhen};
 
 use crate::{
-    context::RsCallable, BindContext, CelContext, RsCellFunction, RsCellMacro, ValueCell,
+    context::RsCallable, BindContext, CelContext, RsCelFunction, RsCelMacro, ValueCell,
     ValueCellError, ValueCellInner, ValueCellResult,
 };
 
@@ -405,7 +405,7 @@ impl<'a> Interpreter<'a> {
                         ValueCellInner::Ident(func_name) => {
                             if let Some(func) = self.get_func_by_name(&func_name) {
                                 let arg_values = self.resolve_args(args)?;
-                                stack.push(func(ValueCell::from_null(), arg_values.into())?);
+                                stack.push(func(ValueCell::from_null(), &arg_values)?);
                             } else if let Some(macro_) = self.get_macro_by_name(&func_name) {
                                 stack.push(self.call_macro(
                                     &ValueCell::from_null(),
@@ -422,7 +422,7 @@ impl<'a> Interpreter<'a> {
                         ValueCellInner::BoundCall { callable, value } => match callable {
                             RsCallable::Function(func) => {
                                 let arg_values = self.resolve_args(args)?;
-                                stack.push(func(value, arg_values.into())?);
+                                stack.push(func(value, &arg_values)?);
                             }
                             RsCallable::Macro(macro_) => {
                                 stack.push(self.call_macro(&value, &args, macro_)?);
@@ -471,11 +471,11 @@ impl<'a> Interpreter<'a> {
         self.bindings?.get_param(name)
     }
 
-    fn get_func_by_name(&self, name: &str) -> Option<RsCellFunction> {
+    fn get_func_by_name(&self, name: &str) -> Option<RsCelFunction> {
         self.bindings?.get_func(name)
     }
 
-    fn get_macro_by_name(&self, name: &str) -> Option<RsCellMacro> {
+    fn get_macro_by_name(&self, name: &str) -> Option<RsCelMacro> {
         self.bindings?.get_macro(name)
     }
 

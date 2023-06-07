@@ -283,7 +283,7 @@ impl ProgramCompiler {
                     bytecode.push(ByteCode::MkList(n_frags as u32));
                     Ok(bytecode)
                 }
-                None => Ok(vec![ByteCode::Push(ValueCell::from_list(&[]))]),
+                None => Ok(vec![ByteCode::Push(ValueCell::from_list(vec![]))]),
             },
             Primary::ObjectInit(child) => {
                 let mut count = 0;
@@ -316,8 +316,8 @@ impl ProgramCompiler {
                         }
                         Lit::Float(val) => ValueCell::from_float(*val.into_inner()),
                         Lit::Bool(val) => ValueCell::from_bool(val.into_inner()),
-                        Lit::Str(val) => ValueCell::from_string(val),
-                        Lit::ByteStr(val) => ValueCell::from_bytes(val),
+                        Lit::Str(val) => ValueCell::from_string(val.value()),
+                        Lit::ByteStr(val) => ValueCell::from_bytes(val.to_vec()),
                         _ => return Err(ProgramError::new("Byte and Char literal not allowed")),
                     },
                 })];

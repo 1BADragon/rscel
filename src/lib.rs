@@ -20,7 +20,7 @@
 //! let mut exec_ctx = BindContext::new();
 //!
 //! ctx.add_program_str("main", "foo + 3").unwrap();
-//! exec_ctx.bind_param("foo", 3.into()); // convert to serde_json::Value
+//! exec_ctx.bind_param("foo", 3.into()); // 3 converted to ValueCell
 //!
 //! let res = ctx.exec("main", &exec_ctx).unwrap(); // ValueCell::Int(6)
 //! assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
@@ -33,7 +33,7 @@ mod value_cell;
 
 // Export some public interface
 pub mod utils;
-pub use context::{BindContext, CelContext, ExecError, ExecResult, RsCellFunction, RsCellMacro};
+pub use context::{BindContext, CelContext, ExecError, ExecResult, RsCelFunction, RsCelMacro};
 pub use interp::ByteCode;
 pub use program::{Program, ProgramError};
 pub use value_cell::{ValueCell, ValueCellError, ValueCellInner, ValueCellResult};
@@ -45,7 +45,6 @@ pub mod bindings;
 // Some re-exports to allow a consistent use of serde
 pub use serde;
 pub use serde_json;
-pub use serde_json::Value;
 
 #[cfg(feature = "python")]
 pub use bindings::python::*;
@@ -87,14 +86,14 @@ mod test {
     #[test_case("4u + 3u", 7u64.into(); "add unsigned")]
     #[test_case("7 % 2", 1.into(); "test mod")]
     #[test_case("(4+2) * (6-5)", 6.into(); "test parens")]
-    #[test_case("[1, 2, 3].map(x, x+2)", ValueCell::from_list(&[3.into(), 4.into(), 5.into()]); "test map")]
+    #[test_case("[1, 2, 3].map(x, x+2)", ValueCell::from_list(vec![3.into(), 4.into(), 5.into()]); "test map")]
     #[test_case("[1,2,3][1]", 2.into(); "array index")]
     #[test_case("{\"foo\": 3}.foo", 3.into(); "obj dot access")]
     #[test_case("size([1,2,3,4])", 4u64.into(); "test list size")]
     #[test_case("true || false", true.into(); "or")]
     #[test_case("false && true", false.into(); "and falsy")]
     #[test_case("true && true", true.into(); "and true")]
-    #[test_case("[1,2].map(x, x+1).map(x, x*2)", ValueCell::from_list(&[4.into(), 6.into()]); "double map")]
+    #[test_case("[1,2].map(x, x+1).map(x, x*2)", ValueCell::from_list(vec![4.into(), 6.into()]); "double map")]
     #[test_case("\"hello world\".contains(\"hello\")", true.into(); "test contains")]
     #[test_case("\"hello world\".endsWith(\"world\")", true.into(); "test endsWith")]
     #[test_case("\"hello world\".startsWith(\"hello\")", true.into(); "test startsWith")]
@@ -115,7 +114,7 @@ mod test {
     #[test_case("[1,2,3,4].exists(x, x == 5)", false.into(); "test exists false")]
     #[test_case("[1,2,3,4].exists_one(x, x == 4)", true.into(); "test exists one true")]
     #[test_case("[1,2,3,4].exists_one(x, x == 5)", false.into(); "test exists one false")]
-    #[test_case("[1,2,3,4].filter(x, x % 2 == 0)", ValueCell::from_list(&[2.into(), 4.into()]); "test filter")]
+    #[test_case("[1,2,3,4].filter(x, x % 2 == 0)", ValueCell::from_list(vec![2.into(), 4.into()]); "test filter")]
     fn test_equation(prog: &str, res: ValueCell) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
@@ -123,7 +122,7 @@ mod test {
         ctx.add_program_str("main", prog).unwrap();
 
         let eval_res = ctx.exec("main", &exec_ctx).unwrap();
-        assert!(eval_res == res);
+        assert_eq!(eval_res, res);
     }
 
     #[test]
@@ -136,7 +135,7 @@ mod test {
         let eval_res = ctx.exec("main", &exec_ctx).unwrap();
 
         let dt = DateTime::parse_from_rfc3339("2023-04-20T12:00:00Z").unwrap();
-        assert!(eval_res == dt.into());
+        assert_eq!(eval_res, dt.into());
     }
 
     #[test]
@@ -152,7 +151,7 @@ mod test {
         let eval_res = ctx.exec("main", &exec_ctx).unwrap();
 
         let dt = DateTime::parse_from_rfc3339("2023-04-20T13:00:00Z").unwrap();
-        assert!(eval_res == dt.into());
+        assert_eq!(eval_res, dt.into());
     }
 
     #[test]
@@ -163,7 +162,7 @@ mod test {
         ctx.add_program_str("main", "foo + 9").unwrap();
 
         binding.bind_param("foo", 3.into());
-        assert!(ctx.exec("main", &binding).unwrap() == 12.into());
+        assert_eq!(ctx.exec("main", &binding).unwrap(), 12.into());
     }
 
     #[test]
@@ -178,8 +177,8 @@ mod test {
         foo.insert("bar".to_owned(), 7.into());
         exec_ctx.bind_param("foo", foo.into());
 
-        assert!(ctx.exec("func1", &exec_ctx).unwrap() == 11.into());
-        assert!(ctx.exec("func2", &exec_ctx).unwrap() == 3.into());
+        assert_eq!(ctx.exec("func1", &exec_ctx).unwrap(), 11.into());
+        assert_eq!(ctx.exec("func2", &exec_ctx).unwrap(), 3.into());
     }
 
     #[test]
@@ -195,6 +194,6 @@ mod test {
         cel.add_program("main", prog);
         let bindings = BindContext::new();
 
-        assert!(cel.exec("main", &bindings).unwrap() == 18.into())
+        assert_eq!(cel.exec("main", &bindings).unwrap(), 18.into())
     }
 }

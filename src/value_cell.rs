@@ -113,19 +113,19 @@ impl ValueCell {
         ValueCellInner::Bool(val).into()
     }
 
-    pub fn from_string(val: &str) -> ValueCell {
-        ValueCellInner::String(val.to_owned()).into()
+    pub fn from_string(val: String) -> ValueCell {
+        ValueCellInner::String(val).into()
     }
 
-    pub fn from_bytes(val: &[u8]) -> ValueCell {
-        ValueCellInner::Bytes(val.to_vec()).into()
+    pub fn from_bytes(val: Vec<u8>) -> ValueCell {
+        ValueCellInner::Bytes(val).into()
     }
 
-    pub fn from_list(val: &[ValueCell]) -> ValueCell {
+    pub fn from_list(val: Vec<ValueCell>) -> ValueCell {
         ValueCellInner::List(val.to_vec()).into()
     }
 
-    pub fn from_map(val: &HashMap<String, ValueCell>) -> ValueCell {
+    pub fn from_map(val: HashMap<String, ValueCell>) -> ValueCell {
         ValueCellInner::Map(val.clone()).into()
     }
 
@@ -447,11 +447,11 @@ impl From<&Value> for ValueCell {
 
                 unreachable!()
             }
-            Value::String(val) => ValueCell::from_string(val),
+            Value::String(val) => ValueCell::from_string(val.clone()),
             Value::Bool(val) => ValueCell::from_bool(*val),
             Value::Array(val) => {
                 let list: Vec<ValueCell> = val.iter().map(|x| ValueCell::from(x)).collect();
-                ValueCell::from_list(&list)
+                ValueCell::from_list(list)
             }
             Value::Null => ValueCell::from_null(),
             Value::Object(val) => {
@@ -461,7 +461,7 @@ impl From<&Value> for ValueCell {
                     map.insert(key.clone(), ValueCell::from(&val[key]));
                 }
 
-                ValueCell::from_map(&map)
+                ValueCell::from_map(map)
             }
         }
     }
@@ -481,11 +481,11 @@ impl From<Value> for ValueCell {
 
                 unreachable!()
             }
-            Value::String(val) => ValueCell::from_string(&val),
+            Value::String(val) => ValueCell::from_string(val),
             Value::Bool(val) => ValueCell::from_bool(val),
             Value::Array(val) => {
                 let list: Vec<ValueCell> = val.iter().map(|x| ValueCell::from(x)).collect();
-                ValueCell::from_list(&list)
+                ValueCell::from_list(list)
             }
             Value::Null => ValueCell::from_null(),
             Value::Object(val) => {
@@ -495,7 +495,7 @@ impl From<Value> for ValueCell {
                     map.insert(key.clone(), ValueCell::from(&val[key]));
                 }
 
-                ValueCell::from_map(&map)
+                ValueCell::from_map(map)
             }
         }
     }
@@ -611,13 +611,13 @@ impl TryInto<bool> for ValueCell {
 
 impl From<&str> for ValueCell {
     fn from(val: &str) -> ValueCell {
-        ValueCell::from_string(val)
+        ValueCell::from_string(val.to_owned())
     }
 }
 
 impl From<String> for ValueCell {
     fn from(val: String) -> ValueCell {
-        ValueCellInner::String(val).into()
+        ValueCell::from_string(val)
     }
 }
 
@@ -635,9 +635,10 @@ impl TryInto<String> for ValueCell {
 
 impl From<&[u8]> for ValueCell {
     fn from(val: &[u8]) -> ValueCell {
-        ValueCell::from_bytes(val)
+        ValueCell::from_bytes(val.to_owned())
     }
 }
+
 impl From<Vec<u8>> for ValueCell {
     fn from(val: Vec<u8>) -> ValueCell {
         ValueCellInner::Bytes(val).into()
@@ -658,7 +659,7 @@ impl TryInto<Vec<u8>> for ValueCell {
 
 impl From<&[ValueCell]> for ValueCell {
     fn from(val: &[ValueCell]) -> ValueCell {
-        ValueCell::from_list(val)
+        ValueCell::from_list(val.to_vec())
     }
 }
 
@@ -682,7 +683,7 @@ impl TryInto<Vec<ValueCell>> for ValueCell {
 
 impl From<HashMap<String, ValueCell>> for ValueCell {
     fn from(val: HashMap<String, ValueCell>) -> ValueCell {
-        ValueCell::from_map(&val)
+        ValueCell::from_map(val)
     }
 }
 

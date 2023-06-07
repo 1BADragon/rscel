@@ -5,9 +5,9 @@ use crate::{
     BindContext, ByteCode, CelContext, ValueCellInner,
 };
 
-use super::bind_context::RsCellMacro;
+use super::bind_context::RsCelMacro;
 
-const DEFAULT_MACROS: &[(&str, RsCellMacro)] = &[
+const DEFAULT_MACROS: &[(&str, RsCelMacro)] = &[
     ("has", has_impl),
     ("all", all_impl),
     ("exists", exists_impl),
