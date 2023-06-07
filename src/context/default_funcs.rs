@@ -1,4 +1,4 @@
-use super::bind_context::RsCellFunction;
+use super::bind_context::RsCelFunction;
 use crate::{
     value_cell::{ValueCell, ValueCellError, ValueCellInner, ValueCellResult},
     BindContext,
@@ -6,7 +6,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use regex::Regex;
 
-const DEFAULT_FUNCS: &[(&str, RsCellFunction)] = &[
+const DEFAULT_FUNCS: &[(&str, RsCelFunction)] = &[
     ("int", int_impl),
     ("uint", uint_impl),
     ("double", double_impl),
@@ -28,17 +28,16 @@ pub fn load_default_funcs(exec_ctx: &mut BindContext) {
     }
 }
 
-fn int_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
+fn int_impl(_: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
     use ValueCellInner::*;
-    let arg_list: Vec<ValueCell> = args.try_into()?;
 
-    if arg_list.len() != 1 {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg(
             "int() expects exactly one argument",
         ));
     }
 
-    match arg_list[0].inner() {
+    match args[0].inner() {
         Int(val) => Ok(ValueCell::from_int(*val)),
         UInt(val) => Ok(ValueCell::from_int(*val as i64)),
         Float(val) => Ok(ValueCell::from_int(*val as i64)),
@@ -57,17 +56,16 @@ fn int_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
     }
 }
 
-fn uint_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
+fn uint_impl(_: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
     use ValueCellInner::*;
-    let arg_list: Vec<ValueCell> = args.try_into()?;
 
-    if arg_list.len() != 1 {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg(
             "uint() expects exactly one argument",
         ));
     }
 
-    match arg_list[0].inner() {
+    match args[0].inner() {
         Int(val) => Ok(ValueCell::from_uint(*val as u64)),
         UInt(val) => Ok(ValueCell::from_uint(*val)),
         Float(val) => Ok(ValueCell::from_uint(*val as u64)),
@@ -85,17 +83,16 @@ fn uint_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
     }
 }
 
-fn double_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
+fn double_impl(_: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
     use ValueCellInner::*;
-    let arg_list: Vec<ValueCell> = args.try_into()?;
 
-    if arg_list.len() != 1 {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg(
             "double() expects exactly one argument",
         ));
     }
 
-    match arg_list[0].inner() {
+    match args[0].inner() {
         Int(val) => Ok(ValueCell::from_float(*val as f64)),
         UInt(val) => Ok(ValueCell::from_float(*val as f64)),
         Float(val) => Ok(ValueCell::from_float(*val)),
@@ -113,18 +110,16 @@ fn double_impl(_: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
     }
 }
 
-fn bytes_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
+fn bytes_impl(_this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
     use ValueCellInner::*;
-    let arg_list: Vec<ValueCell> = args.try_into()?;
-
-    if arg_list.len() != 1 {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg(
             "bytes() expects exactly one argument",
         ));
     }
 
-    match &arg_list[0].inner() {
-        String(val) => Ok(ValueCell::from_bytes(val.as_bytes())),
+    match &args[0].inner() {
+        String(val) => Ok(ValueCell::from_bytes(val.as_bytes().to_vec())),
         other => Err(ValueCellError::with_msg(&format!(
             "int conversion invalid for {:?}",
             other
@@ -132,19 +127,18 @@ fn bytes_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
     }
 }
 
-fn string_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
+fn string_impl(_this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
     use ValueCellInner::*;
-    let arg_list: Vec<ValueCell> = args.try_into()?;
 
-    if arg_list.len() != 1 {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg(
             "string() expects exactly one argument",
         ));
     }
 
-    let arg_type = arg_list[0].as_type();
+    let arg_type = args[0].as_type();
 
-    Ok(match arg_list[0].inner() {
+    Ok(match args[0].inner() {
         Int(i) => i.to_string().into(),
         UInt(i) => i.to_string().into(),
         Float(f) => f.to_string().into(),
@@ -164,17 +158,15 @@ fn string_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> 
     })
 }
 
-fn contains_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    let arg_list: Vec<ValueCell> = args.try_into()?;
-
-    if arg_list.len() != 1 {
+fn contains_impl(this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg(
             "contains() expects exactly one argument",
         ));
     }
 
-    if let ValueCellInner::String(this_str) = this.inner() {
-        if let ValueCellInner::String(rhs) = arg_list[0].inner() {
+    if let ValueCellInner::String(this_str) = this.into_inner() {
+        if let ValueCellInner::String(rhs) = args[0].inner() {
             Ok(ValueCell::from_bool(this_str.contains(rhs)))
         } else {
             Err(ValueCellError::with_msg("contains() arg must be string"))
@@ -186,16 +178,14 @@ fn contains_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell>
     }
 }
 
-fn size_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    let arg_list: Vec<ValueCell> = args.try_into()?;
-
-    if arg_list.len() != 1 {
+fn size_impl(_this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg(
             "size() expects exactly one argument",
         ));
     }
 
-    Ok(ValueCell::from_uint(match arg_list[0].inner() {
+    Ok(ValueCell::from_uint(match args[0].inner() {
         ValueCellInner::String(s) => s.len() as u64,
         ValueCellInner::Bytes(b) => b.len() as u64,
         ValueCellInner::List(l) => l.len() as u64,
@@ -208,17 +198,15 @@ fn size_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
     }))
 }
 
-fn starts_with_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    let arg_list: Vec<ValueCell> = args.try_into()?;
-
-    if arg_list.len() != 1 {
+fn starts_with_impl(this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg(
             "endsWith() expects exactly one argument",
         ));
     }
 
     if let ValueCellInner::String(lhs) = this.inner() {
-        if let ValueCellInner::String(rhs) = arg_list[0].inner() {
+        if let ValueCellInner::String(rhs) = args[0].inner() {
             return Ok(lhs.starts_with(rhs).into());
         }
     }
@@ -228,17 +216,15 @@ fn starts_with_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCe
     ))
 }
 
-fn ends_with_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    let arg_list: Vec<ValueCell> = args.try_into()?;
-
-    if arg_list.len() != 1 {
+fn ends_with_impl(this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg(
             "endsWith() expects exactly one argument",
         ));
     }
 
     if let ValueCellInner::String(lhs) = this.inner() {
-        if let ValueCellInner::String(rhs) = arg_list[0].inner() {
+        if let ValueCellInner::String(rhs) = args[0].inner() {
             return Ok(lhs.ends_with(rhs).into());
         }
     }
@@ -248,23 +234,21 @@ fn ends_with_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell
     ))
 }
 
-fn matches_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    let arg_list: Vec<ValueCell> = args.try_into()?;
-
+fn matches_impl(this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
     let (vc_lhs, vc_rhs) = if let ValueCellInner::Null = this.inner() {
-        if arg_list.len() != 2 {
+        if args.len() != 2 {
             return Err(ValueCellError::with_msg(
                 "matches() expects exactly two argument",
             ));
         }
-        (&arg_list[0], &arg_list[1])
+        (&args[0], &args[1])
     } else {
-        if arg_list.len() != 1 {
+        if args.len() != 1 {
             return Err(ValueCellError::with_msg(
                 "matches() expects exactly one argument",
             ));
         }
-        (&this, &arg_list[0])
+        (&this, &args[0])
     };
 
     if let ValueCellInner::String(lhs) = vc_lhs.inner() {
@@ -286,24 +270,20 @@ fn matches_impl(this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> 
     ))
 }
 
-fn type_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    let arg_vec: Vec<ValueCell> = args.try_into()?;
-
-    if arg_vec.len() != 1 {
+fn type_impl(_this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg("type() expects one argument"));
     }
 
-    Ok(arg_vec[0].as_type())
+    Ok(args[0].as_type())
 }
 
-fn timestamp_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    let arg_vec: Vec<ValueCell> = args.try_into()?;
-
-    if arg_vec.len() != 1 {
+fn timestamp_impl(_this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg("timestamp() expect one argument"));
     }
 
-    if let ValueCellInner::String(str_val) = arg_vec[0].inner() {
+    if let ValueCellInner::String(str_val) = args[0].inner() {
         match (&str_val).parse::<DateTime<Utc>>() {
             Ok(val) => Ok(ValueCell::from_timestamp(&val)),
             Err(_) => Err(ValueCellError::with_msg("Invalid timestamp format")),
@@ -315,14 +295,12 @@ fn timestamp_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCel
     }
 }
 
-fn duration_impl(_this: ValueCell, args: ValueCell) -> ValueCellResult<ValueCell> {
-    let arg_vec: Vec<ValueCell> = args.try_into()?;
-
-    if arg_vec.len() != 1 {
+fn duration_impl(_this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
+    if args.len() != 1 {
         return Err(ValueCellError::with_msg("duration() expects on argument"));
     }
 
-    if let ValueCellInner::String(str_val) = arg_vec[0].inner() {
+    if let ValueCellInner::String(str_val) = args[0].inner() {
         match duration_str::parse_chrono(str_val) {
             Ok(val) => Ok(ValueCell::from_duration(&val)),
             Err(_) => Err(ValueCellError::with_msg("Invalid duration format")),
