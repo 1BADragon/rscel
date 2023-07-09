@@ -56,7 +56,7 @@ pub use bindings::wasm::*;
 mod test {
     use crate::{BindContext, CelContext, Program, ValueCell};
     use chrono::DateTime;
-    use std::collections::HashMap;
+    use std::{assert, assert_eq, collections::HashMap};
     use test_case::test_case;
 
     #[test]
@@ -194,6 +194,29 @@ mod test {
         cel.add_program("main", prog);
         let bindings = BindContext::new();
 
-        assert_eq!(cel.exec("main", &bindings).unwrap(), 18.into())
+        assert_eq!(cel.exec("main", &bindings).unwrap(), 18.into());
+    }
+
+    #[test]
+    fn test_nested() {
+        let mut ctx = CelContext::new();
+        let mut exec_ctx = BindContext::new();
+
+        ctx.add_program_str("foo", "val + 3").unwrap();
+        ctx.add_program_str("bar", "foo * 3").unwrap();
+
+        exec_ctx.bind_param("val", 7.into());
+
+        assert_eq!(ctx.exec("bar", &exec_ctx).unwrap(), 30.into());
+    }
+
+    #[test]
+    fn test_call_depth_failure() {
+        let mut ctx = CelContext::new();
+        let exec = BindContext::new();
+
+        ctx.add_program_str("entry", "entry + 3").unwrap();
+
+        assert!(ctx.exec("entry", &exec).is_err());
     }
 }

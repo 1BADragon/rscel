@@ -3,8 +3,8 @@ use std::{collections::HashMap, fmt};
 pub use types::{ByteCode, JmpWhen};
 
 use crate::{
-    context::RsCallable, BindContext, CelContext, RsCelFunction, RsCelMacro, ValueCell,
-    ValueCellError, ValueCellInner, ValueCellResult,
+    context::RsCallable, utils::ScopedCounter, BindContext, CelContext, RsCelFunction, RsCelMacro,
+    ValueCell, ValueCellError, ValueCellInner, ValueCellResult,
 };
 
 struct InterpStack<'a> {
@@ -30,13 +30,18 @@ impl<'a> InterpStack<'a> {
             Some(val) => {
                 if let ValueCellInner::Ident(name) = val.inner() {
                     if let Some(val) = self.ctx.get_param_by_name(name) {
-                        Ok(val.clone())
-                    } else {
-                        Err(ValueCellError::with_msg(&format!(
-                            "Ident {} is not bound",
-                            name
-                        )))
+                        return Ok(val.clone());
+                    } else if let Some(ctx) = self.ctx.cel {
+                        // Allow for loaded programs to run as values
+                        if let Some(prog) = ctx.get_program(name) {
+                            return self.ctx.run_raw(prog.bytecode());
+                        }
                     }
+
+                    return Err(ValueCellError::with_msg(&format!(
+                        "Ident {} is not bound",
+                        name
+                    )));
                 } else {
                     Ok(val)
                 }
@@ -79,6 +84,7 @@ impl<'a> fmt::Debug for InterpStack<'a> {
 pub struct Interpreter<'a> {
     cel: Option<&'a CelContext>,
     bindings: Option<&'a BindContext>,
+    depth: ScopedCounter,
 }
 
 impl<'a> Interpreter<'a> {
@@ -86,6 +92,7 @@ impl<'a> Interpreter<'a> {
         Interpreter {
             cel: Some(cel),
             bindings: Some(bindings),
+            depth: ScopedCounter::new(),
         }
     }
 
@@ -93,6 +100,7 @@ impl<'a> Interpreter<'a> {
         Interpreter {
             cel: None,
             bindings: None,
+            depth: ScopedCounter::new(),
         }
     }
 
@@ -126,6 +134,12 @@ impl<'a> Interpreter<'a> {
     pub fn run_raw(&self, prog: &[ByteCode]) -> ValueCellResult<ValueCell> {
         let mut pc: usize = 0;
         let mut stack = InterpStack::new(self);
+
+        let count = self.depth.inc();
+
+        if count.count() > 32 {
+            return Err(ValueCellError::with_msg("Max call depth excceded"));
+        }
 
         while pc < prog.len() {
             let oldpc = pc;
