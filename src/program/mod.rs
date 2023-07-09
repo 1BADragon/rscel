@@ -1,15 +1,11 @@
 mod compile;
 mod program_cache;
 mod program_details;
-mod program_error;
 
-use crate::interp::ByteCode;
+use crate::{cel_error::CelResult, interp::ByteCode};
 use compile::ProgramCompiler;
 pub use program_details::ProgramDetails;
-pub use program_error::ProgramError;
 use serde::{Deserialize, Serialize};
-
-pub type ProgramResult<T> = Result<T, ProgramError>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Program {
@@ -20,14 +16,14 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn from_source(source: &str) -> ProgramResult<Program> {
+    pub fn from_source(source: &str) -> CelResult<Program> {
         match program_cache::check_cache(source) {
             Some(prog) => prog,
             None => Program::from_source_nocache(source),
         }
     }
 
-    pub fn from_source_nocache(source: &str) -> ProgramResult<Program> {
+    pub fn from_source_nocache(source: &str) -> CelResult<Program> {
         ProgramCompiler::new().with_source(source).build()
     }
 

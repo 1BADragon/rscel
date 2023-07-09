@@ -1,4 +1,4 @@
-use super::{Program, ProgramResult};
+use crate::{CelResult, Program};
 
 #[cfg(not(feature = "program_cache"))]
 pub fn check_cache(_source: &str) -> Option<ProgramResult<Program>> {
@@ -6,13 +6,13 @@ pub fn check_cache(_source: &str) -> Option<ProgramResult<Program>> {
 }
 
 #[cfg(feature = "program_cache")]
-pub fn check_cache(source: &str) -> Option<ProgramResult<Program>> {
+pub fn check_cache(source: &str) -> Option<CelResult<Program>> {
     Some(internal::CACHE.lock().unwrap().get(source))
 }
 
 #[cfg(feature = "program_cache")]
 mod internal {
-    use crate::{program::ProgramResult, Program};
+    use crate::{CelResult, Program};
     use once_cell::sync::Lazy;
     use std::{
         collections::{hash_map::Entry, HashMap},
@@ -36,7 +36,7 @@ mod internal {
             }
         }
 
-        pub fn get(&mut self, source: &str) -> ProgramResult<Program> {
+        pub fn get(&mut self, source: &str) -> CelResult<Program> {
             match self.cache.entry(source.to_string()) {
                 Entry::Occupied(o) => Ok(o.get().clone()),
                 Entry::Vacant(v) => {

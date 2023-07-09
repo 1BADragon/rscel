@@ -3,8 +3,9 @@ use std::{collections::HashMap, fmt};
 use serde_json::Value;
 
 use crate::{
+    cel_error::CelResult,
     interp::{ByteCode, Interpreter},
-    value_cell::{ValueCell, ValueCellResult},
+    value_cell::CelValue,
     ExecError,
 };
 
@@ -24,19 +25,19 @@ use super::default_macros::load_default_macros;
 /// ```
 /// use rscel::*;
 ///
-/// fn keys_impl(this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell> {
+/// fn keys_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 ///     if args.len() == 0 {
-///         return Err(ValueCellError::with_msg("keys() expects 0 arguments"));    
+///         return Err(CelError::with_msg("keys() expects 0 arguments"));    
 ///     }
 ///     
-///     if let ValueCellInner::Map(map) = this.into_inner() {
-///         Ok(ValueCell::from_list(map.keys().map(|x| x.as_str().into()).collect()))
+///     if let CelValueInner::Map(map) = this.into_inner() {
+///         Ok(CelValue::from_list(map.keys().map(|x| x.as_str().into()).collect()))
 ///     } else {
-///        Err(ValueCellError::with_msg("keys() only supported for map type"))
+///        Err(CelError::with_msg("keys() only supported for map type"))
 ///     }
 /// }
 /// ```
-pub type RsCelFunction = fn(this: ValueCell, args: &[ValueCell]) -> ValueCellResult<ValueCell>;
+pub type RsCelFunction = fn(this: CelValue, args: &[CelValue]) -> CelResult<CelValue>;
 
 /// Prototype for a macro binding.
 ///
@@ -48,9 +49,9 @@ pub type RsCelFunction = fn(this: ValueCell, args: &[ValueCell]) -> ValueCellRes
 /// the Interpreter context, is provided to the macro for bytecode resolution.
 pub type RsCelMacro = for<'a> fn(
     ctx: &'a Interpreter<'a>,
-    this: ValueCell,
+    this: CelValue,
     inner: &'a [&'a [ByteCode]],
-) -> ValueCellResult<ValueCell>;
+) -> CelResult<CelValue>;
 
 /// Wrapper enum that contains either an RsCelCallable or an RsCelFunction. Used
 /// as a ValueCell value.
@@ -84,7 +85,7 @@ impl PartialEq for RsCallable {
 /// to maintain multiple copies of the programs.
 #[derive(Clone)]
 pub struct BindContext {
-    params: HashMap<String, ValueCell>,
+    params: HashMap<String, CelValue>,
     funcs: HashMap<String, RsCelFunction>,
     macros: HashMap<String, RsCelMacro>,
 }
@@ -104,7 +105,7 @@ impl BindContext {
     }
 
     /// Bind a param with the given name and value.
-    pub fn bind_param(&mut self, name: &str, value: ValueCell) {
+    pub fn bind_param(&mut self, name: &str, value: CelValue) {
         self.params.insert(name.to_owned(), value);
     }
 
@@ -117,7 +118,7 @@ impl BindContext {
         };
 
         for (key, value) in obj.into_iter() {
-            self.params.insert(key, ValueCell::from(value));
+            self.params.insert(key, CelValue::from(value));
         }
         Ok(())
     }
@@ -133,7 +134,7 @@ impl BindContext {
     }
 
     /// Get a param by name.
-    pub fn get_param<'a>(&'a self, name: &str) -> Option<&'a ValueCell> {
+    pub fn get_param<'a>(&'a self, name: &str) -> Option<&'a CelValue> {
         Some(self.params.get(name)?)
     }
 
