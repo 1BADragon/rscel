@@ -1,22 +1,31 @@
+use std::fmt;
+
 #[derive(Debug)]
-pub struct CelError {
-    msg: String,
+pub enum CelError {
+    Misc(String),
 }
+pub type CelResult<T> = Result<T, CelError>;
 
 impl CelError {
-    pub fn with_msg(msg: &str) -> CelError {
-        CelError {
-            msg: msg.to_owned(),
+    pub fn misc(msg: &str) -> CelError {
+        CelError::Misc(msg.to_owned())
+    }
+
+    pub fn type_string(&self) -> &'static str {
+        use CelError::*;
+
+        match self {
+            Misc(_msg) => "MISC",
         }
-    }
-
-    pub fn msg<'a>(&'a self) -> &'a str {
-        return &self.msg;
-    }
-
-    pub fn into_string(self) -> String {
-        self.msg
     }
 }
 
-pub type CelResult<T> = Result<T, CelError>;
+impl fmt::Display for CelError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use CelError::*;
+
+        match self {
+            Misc(msg) => write!(f, "{}", msg),
+        }
+    }
+}

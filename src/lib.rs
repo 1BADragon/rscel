@@ -27,18 +27,18 @@
 //! ```
 mod ast;
 mod cel_error;
+mod cel_value;
 mod context;
 mod interp;
 mod program;
-mod value_cell;
 
 // Export some public interface
 pub mod utils;
 pub use cel_error::{CelError, CelResult};
-pub use context::{BindContext, CelContext, ExecError, ExecResult, RsCelFunction, RsCelMacro};
+pub use cel_value::{CelValue, CelValueInner};
+pub use context::{BindContext, CelContext, RsCelFunction, RsCelMacro};
 pub use interp::ByteCode;
 pub use program::Program;
-pub use value_cell::{CelValue, CelValueInner};
 
 // If any of the binding featurs are enabled, export them
 #[cfg(any(feature = "python", feature = "wasm"))]

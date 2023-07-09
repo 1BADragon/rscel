@@ -246,7 +246,7 @@ impl CelValue {
             _ => {}
         }
 
-        return Err(CelError::with_msg(&format!(
+        return Err(CelError::misc(&format!(
             "Invalid op '==' between {:?} and {:?}",
             type1, type2
         )));
@@ -296,7 +296,7 @@ impl CelValue {
             _ => {}
         }
 
-        return Err(CelError::with_msg(&format!(
+        return Err(CelError::misc(&format!(
             "Invalid op 'ord' between {:?} and {:?}",
             type1, type2
         )));
@@ -334,7 +334,7 @@ impl CelValue {
                 return Ok((*lhs || *rhs).into());
             }
         }
-        return Err(CelError::with_msg(&format!(
+        return Err(CelError::misc(&format!(
             "|| operator invalid for {:?} and {:?}",
             self.as_type(),
             rhs.as_type(),
@@ -347,7 +347,7 @@ impl CelValue {
                 return Ok((*lhs && *rhs).into());
             }
         }
-        return Err(CelError::with_msg(&format!(
+        return Err(CelError::misc(&format!(
             "&& operator invalid for {:?} and {:?}",
             self.as_type(),
             rhs.as_type(),
@@ -510,7 +510,7 @@ impl TryInto<i64> for CelValue {
             return Ok(*val);
         }
 
-        return Err(CelError::with_msg("Convertion Error"));
+        return Err(CelError::misc("Convertion Error"));
     }
 }
 
@@ -546,7 +546,7 @@ impl TryInto<u64> for CelValue {
             return Ok(*val);
         }
 
-        return Err(CelError::with_msg("Convertion Error"));
+        return Err(CelError::misc("Convertion Error"));
     }
 }
 
@@ -564,7 +564,7 @@ impl TryInto<f64> for CelValue {
             return Ok(*val);
         }
 
-        return Err(CelError::with_msg("Convertion Error"));
+        return Err(CelError::misc("Convertion Error"));
     }
 }
 
@@ -582,7 +582,7 @@ impl TryInto<bool> for CelValue {
             return Ok(*val);
         }
 
-        return Err(CelError::with_msg("Convertion Error"));
+        return Err(CelError::misc("Convertion Error"));
     }
 }
 
@@ -606,7 +606,7 @@ impl TryInto<String> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::with_msg("Convertion Error"));
+        return Err(CelError::misc("Convertion Error"));
     }
 }
 
@@ -630,7 +630,7 @@ impl TryInto<Vec<u8>> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::with_msg("Convertion Error"));
+        return Err(CelError::misc("Convertion Error"));
     }
 }
 
@@ -654,7 +654,7 @@ impl TryInto<Vec<CelValue>> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::with_msg("Convertion Error"));
+        return Err(CelError::misc("Convertion Error"));
     }
 }
 
@@ -672,7 +672,7 @@ impl TryInto<HashMap<String, CelValue>> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::with_msg("Convertion Error"));
+        return Err(CelError::misc("Convertion Error"));
     }
 }
 
@@ -696,7 +696,7 @@ impl TryInto<DateTime<Utc>> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::with_msg("Convertion Error"));
+        return Err(CelError::misc("Convertion Error"));
     }
 }
 
@@ -714,7 +714,7 @@ impl TryInto<Duration> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::with_msg("Convertion Error"));
+        return Err(CelError::misc("Convertion Error"));
     }
 }
 
@@ -732,7 +732,7 @@ impl TryInto<Vec<ByteCode>> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::with_msg("Convertion Error"));
+        return Err(CelError::misc("Convertion Error"));
     }
 }
 
@@ -795,7 +795,7 @@ impl Add for CelValue {
             _ => {}
         }
 
-        Err(CelError::with_msg(&format!(
+        Err(CelError::misc(&format!(
             "Invalid op '+' between {:?} and {:?}",
             type1, type2
         )))
@@ -840,7 +840,7 @@ impl Sub for CelValue {
             _ => {}
         }
 
-        Err(CelError::with_msg(&format!(
+        Err(CelError::misc(&format!(
             "Invalid op '-' between {:?} and {:?}",
             type1, type2
         )))
@@ -873,7 +873,7 @@ impl Mul for CelValue {
             _ => {}
         }
 
-        Err(CelError::with_msg(&format!(
+        Err(CelError::misc(&format!(
             "Invalid op '*' between {:?} and {:?}",
             type1, type2
         )))
@@ -906,7 +906,7 @@ impl Div for CelValue {
             _ => {}
         }
 
-        Err(CelError::with_msg(&format!(
+        Err(CelError::misc(&format!(
             "Invalid op '/' between {:?} and {:?}",
             type1, type2
         )))
@@ -934,7 +934,7 @@ impl Rem for CelValue {
             _ => {}
         }
 
-        Err(CelError::with_msg(&format!(
+        Err(CelError::misc(&format!(
             "Invalid op '/' between {:?} and {:?}",
             type1, type2
         )))
@@ -957,10 +957,7 @@ impl Neg for CelValue {
             _ => {}
         }
 
-        Err(CelError::with_msg(&format!(
-            "Invalid op '-' on {:?}",
-            type1
-        )))
+        Err(CelError::misc(&format!("Invalid op '-' on {:?}", type1)))
     }
 }
 
@@ -977,10 +974,7 @@ impl Not for CelValue {
             _ => {}
         }
 
-        Err(CelError::with_msg(&format!(
-            "Invalid op '-' on {:?}",
-            type1
-        )))
+        Err(CelError::misc(&format!("Invalid op '-' on {:?}", type1)))
     }
 }
 

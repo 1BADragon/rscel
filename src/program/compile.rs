@@ -7,8 +7,7 @@ use crate::{
         MemberPrime, MultOp, Multiplication, NegList, NotList, Primary, Relation, Relop, Unary,
     },
     interp::{ByteCode, JmpWhen},
-    value_cell::CelValue,
-    CelError, CelResult, Program,
+    CelError, CelResult, CelValue, Program,
 };
 
 pub struct ProgramCompiler {
@@ -35,7 +34,7 @@ impl ProgramCompiler {
             Ok(expr) => expr,
             Err(err) => {
                 let span = err.span();
-                return Err(CelError::with_msg(&format!(
+                return Err(CelError::misc(&format!(
                     "Error on {}:{} ending at {}:{}",
                     span.start().line,
                     span.start().column,
@@ -318,7 +317,7 @@ impl ProgramCompiler {
                         Lit::Bool(val) => CelValue::from_bool(val.into_inner()),
                         Lit::Str(val) => CelValue::from_string(val.value()),
                         Lit::ByteStr(val) => CelValue::from_bytes(val.to_vec()),
-                        _ => return Err(CelError::with_msg("Byte and Char literal not allowed")),
+                        _ => return Err(CelError::misc("Byte and Char literal not allowed")),
                     },
                 })];
                 Ok(bytecode)

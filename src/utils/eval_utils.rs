@@ -6,6 +6,6 @@ pub fn eval_ident(prog: &[ByteCode]) -> CelResult<String> {
     if let CelValueInner::Ident(ident) = interp.run_raw(prog)?.into_inner() {
         Ok(ident)
     } else {
-        Err(CelError::with_msg("ident required"))
+        Err(CelError::misc("ident required"))
     }
 }
