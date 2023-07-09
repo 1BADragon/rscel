@@ -26,6 +26,7 @@
 //! assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
 //! ```
 mod ast;
+mod cel_error;
 mod context;
 mod interp;
 mod program;
@@ -33,10 +34,11 @@ mod value_cell;
 
 // Export some public interface
 pub mod utils;
+pub use cel_error::{CelError, CelResult};
 pub use context::{BindContext, CelContext, ExecError, ExecResult, RsCelFunction, RsCelMacro};
 pub use interp::ByteCode;
-pub use program::{Program, ProgramError};
-pub use value_cell::{ValueCell, ValueCellError, ValueCellInner, ValueCellResult};
+pub use program::Program;
+pub use value_cell::{CelValue, CelValueInner};
 
 // If any of the binding featurs are enabled, export them
 #[cfg(any(feature = "python", feature = "wasm"))]
@@ -54,7 +56,7 @@ pub use bindings::wasm::*;
 
 #[cfg(test)]
 mod test {
-    use crate::{BindContext, CelContext, Program, ValueCell};
+    use crate::{BindContext, CelContext, CelValue, Program};
     use chrono::DateTime;
     use std::{assert, assert_eq, collections::HashMap};
     use test_case::test_case;
@@ -86,20 +88,20 @@ mod test {
     #[test_case("4u + 3u", 7u64.into(); "add unsigned")]
     #[test_case("7 % 2", 1.into(); "test mod")]
     #[test_case("(4+2) * (6-5)", 6.into(); "test parens")]
-    #[test_case("[1, 2, 3].map(x, x+2)", ValueCell::from_list(vec![3.into(), 4.into(), 5.into()]); "test map")]
+    #[test_case("[1, 2, 3].map(x, x+2)", CelValue::from_list(vec![3.into(), 4.into(), 5.into()]); "test map")]
     #[test_case("[1,2,3][1]", 2.into(); "array index")]
     #[test_case("{\"foo\": 3}.foo", 3.into(); "obj dot access")]
     #[test_case("size([1,2,3,4])", 4u64.into(); "test list size")]
     #[test_case("true || false", true.into(); "or")]
     #[test_case("false && true", false.into(); "and falsy")]
     #[test_case("true && true", true.into(); "and true")]
-    #[test_case("[1,2].map(x, x+1).map(x, x*2)", ValueCell::from_list(vec![4.into(), 6.into()]); "double map")]
+    #[test_case("[1,2].map(x, x+1).map(x, x*2)", CelValue::from_list(vec![4.into(), 6.into()]); "double map")]
     #[test_case("\"hello world\".contains(\"hello\")", true.into(); "test contains")]
     #[test_case("\"hello world\".endsWith(\"world\")", true.into(); "test endsWith")]
     #[test_case("\"hello world\".startsWith(\"hello\")", true.into(); "test startsWith")]
     #[test_case("\"abc123\".matches(\"[a-z]{3}[0-9]{3}\")", true.into(); "test matches")]
     #[test_case("string(1)", "1".into(); "test string")]
-    #[test_case("type(1)", ValueCell::from_type("int"); "test type")]
+    #[test_case("type(1)", CelValue::from_type("int"); "test type")]
     #[test_case("4 > 5", false.into(); "test gt")]
     #[test_case("4 < 5", true.into(); "test lt")]
     #[test_case("4 >= 4", true.into(); "test ge")]
@@ -114,8 +116,8 @@ mod test {
     #[test_case("[1,2,3,4].exists(x, x == 5)", false.into(); "test exists false")]
     #[test_case("[1,2,3,4].exists_one(x, x == 4)", true.into(); "test exists one true")]
     #[test_case("[1,2,3,4].exists_one(x, x == 5)", false.into(); "test exists one false")]
-    #[test_case("[1,2,3,4].filter(x, x % 2 == 0)", ValueCell::from_list(vec![2.into(), 4.into()]); "test filter")]
-    fn test_equation(prog: &str, res: ValueCell) {
+    #[test_case("[1,2,3,4].filter(x, x % 2 == 0)", CelValue::from_list(vec![2.into(), 4.into()]); "test filter")]
+    fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
 
@@ -173,7 +175,7 @@ mod test {
         ctx.add_program_str("func1", "foo.bar + 4").unwrap();
         ctx.add_program_str("func2", "foo.bar % 4").unwrap();
 
-        let mut foo: HashMap<String, ValueCell> = HashMap::new();
+        let mut foo: HashMap<String, CelValue> = HashMap::new();
         foo.insert("bar".to_owned(), 7.into());
         exec_ctx.bind_param("foo", foo.into());
 

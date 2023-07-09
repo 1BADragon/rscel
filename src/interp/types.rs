@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::ValueCell;
+use crate::CelValue;
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -11,7 +11,7 @@ pub enum JmpWhen {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum ByteCode {
-    Push(ValueCell),
+    Push(CelValue),
     Or,
     And,
     Not,
