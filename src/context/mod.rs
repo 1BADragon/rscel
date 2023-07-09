@@ -7,7 +7,7 @@ use crate::{
     cel_error::CelResult,
     interp::Interpreter,
     program::{Program, ProgramDetails},
-    value_cell::CelValue,
+    CelValue,
 };
 pub use bind_context::{BindContext, RsCallable, RsCelFunction, RsCelMacro};
 
@@ -17,39 +17,6 @@ pub use bind_context::{BindContext, RsCallable, RsCelFunction, RsCelMacro};
 pub struct CelContext {
     progs: HashMap<String, Program>,
 }
-
-/// ExecError is the error type returned by CelContext operations.
-#[derive(Debug)]
-pub struct ExecError {
-    msg: String,
-}
-
-impl ExecError {
-    /// Constructs a new ExecError with a given message.
-    pub fn new(msg: &str) -> ExecError {
-        ExecError {
-            msg: msg.to_owned(),
-        }
-    }
-
-    /// No-copy construction of ExecError
-    pub fn from_str(msg: String) -> ExecError {
-        ExecError { msg }
-    }
-
-    /// Error message contained in the ExecError
-    pub fn str<'a>(&'a self) -> &'a str {
-        &self.msg
-    }
-
-    /// Drop the error returning the underlying error message
-    pub fn into_str(self) -> String {
-        self.msg
-    }
-}
-
-/// Result wrapper with ExecError as the error type
-pub type ExecResult<T> = Result<T, ExecError>;
 
 impl CelContext {
     /// Constructs a new empty CelContext
@@ -91,13 +58,10 @@ impl CelContext {
     /// can be run multiple times with different ExecContext's. The return of this function is
     /// a Result with either a ValueCell representing the final solution of the Program or an Error
     /// that is discovered during execution, such as mismatch of types
-    pub fn exec<'l>(&'l mut self, name: &str, bindings: &'l BindContext) -> ExecResult<CelValue> {
+    pub fn exec<'l>(&'l mut self, name: &str, bindings: &'l BindContext) -> CelResult<CelValue> {
         let interp = Interpreter::new(&self, bindings);
 
-        match interp.run_program(name) {
-            Ok(good) => Ok(good),
-            Err(err) => Err(ExecError::from_str(err.into_string())),
-        }
+        interp.run_program(name)
     }
 
     // pub(crate) fn eval_expr(

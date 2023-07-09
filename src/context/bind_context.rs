@@ -5,8 +5,7 @@ use serde_json::Value;
 use crate::{
     cel_error::CelResult,
     interp::{ByteCode, Interpreter},
-    value_cell::CelValue,
-    ExecError,
+    CelError, CelValue,
 };
 
 use super::default_funcs::load_default_funcs;
@@ -27,13 +26,13 @@ use super::default_macros::load_default_macros;
 ///
 /// fn keys_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 ///     if args.len() == 0 {
-///         return Err(CelError::with_msg("keys() expects 0 arguments"));    
+///         return Err(CelError::misc("keys() expects 0 arguments"));    
 ///     }
 ///     
 ///     if let CelValueInner::Map(map) = this.into_inner() {
 ///         Ok(CelValue::from_list(map.keys().map(|x| x.as_str().into()).collect()))
 ///     } else {
-///        Err(CelError::with_msg("keys() only supported for map type"))
+///        Err(CelError::misc("keys() only supported for map type"))
 ///     }
 /// }
 /// ```
@@ -110,11 +109,11 @@ impl BindContext {
     }
 
     /// Cheater function to bind the keys of an JSON object with its values
-    pub fn bind_params_from_json_obj(&mut self, values: Value) -> Result<(), ExecError> {
+    pub fn bind_params_from_json_obj(&mut self, values: Value) -> CelResult<()> {
         let obj = if let Value::Object(o) = values {
             o
         } else {
-            return Err(ExecError::new("Binding must be an object"));
+            return Err(CelError::misc("Binding must be an object"));
         };
 
         for (key, value) in obj.into_iter() {

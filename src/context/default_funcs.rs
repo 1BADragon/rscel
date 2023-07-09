@@ -1,8 +1,7 @@
 use super::bind_context::RsCelFunction;
 use crate::{
     cel_error::{CelError, CelResult},
-    value_cell::{CelValue, CelValueInner},
-    BindContext,
+    BindContext, CelValue, CelValueInner,
 };
 use chrono::{DateTime, Utc};
 use regex::Regex;
@@ -33,7 +32,7 @@ fn int_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     use CelValueInner::*;
 
     if args.len() != 1 {
-        return Err(CelError::with_msg("int() expects exactly one argument"));
+        return Err(CelError::misc("int() expects exactly one argument"));
     }
 
     match args[0].inner() {
@@ -42,13 +41,13 @@ fn int_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         Float(val) => Ok(CelValue::from_int(*val as i64)),
         String(val) => match val.parse::<i64>() {
             Ok(res) => Ok(CelValue::from_int(res)),
-            Err(_err) => Err(CelError::with_msg(&format!(
+            Err(_err) => Err(CelError::misc(&format!(
                 "int conversion invalid for \"{}\"",
                 val
             ))),
         },
         TimeStamp(val) => Ok(CelValue::from_int(val.timestamp())),
-        other => Err(CelError::with_msg(&format!(
+        other => Err(CelError::misc(&format!(
             "int conversion invalid for {:?}",
             other
         ))),
@@ -59,7 +58,7 @@ fn uint_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     use CelValueInner::*;
 
     if args.len() != 1 {
-        return Err(CelError::with_msg("uint() expects exactly one argument"));
+        return Err(CelError::misc("uint() expects exactly one argument"));
     }
 
     match args[0].inner() {
@@ -68,12 +67,12 @@ fn uint_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         Float(val) => Ok(CelValue::from_uint(*val as u64)),
         String(val) => match val.parse::<u64>() {
             Ok(res) => Ok(CelValue::from_uint(res)),
-            Err(_err) => Err(CelError::with_msg(&format!(
+            Err(_err) => Err(CelError::misc(&format!(
                 "int conversion invalid for \"{}\"",
                 val
             ))),
         },
-        other => Err(CelError::with_msg(&format!(
+        other => Err(CelError::misc(&format!(
             "int conversion invalid for {:?}",
             other
         ))),
@@ -84,7 +83,7 @@ fn double_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     use CelValueInner::*;
 
     if args.len() != 1 {
-        return Err(CelError::with_msg("double() expects exactly one argument"));
+        return Err(CelError::misc("double() expects exactly one argument"));
     }
 
     match args[0].inner() {
@@ -93,12 +92,12 @@ fn double_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         Float(val) => Ok(CelValue::from_float(*val)),
         String(val) => match val.parse::<f64>() {
             Ok(res) => Ok(CelValue::from_float(res)),
-            Err(_err) => Err(CelError::with_msg(&format!(
+            Err(_err) => Err(CelError::misc(&format!(
                 "int conversion invalid for \"{}\"",
                 val
             ))),
         },
-        other => Err(CelError::with_msg(&format!(
+        other => Err(CelError::misc(&format!(
             "int conversion invalid for {:?}",
             other
         ))),
@@ -108,12 +107,12 @@ fn double_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 fn bytes_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     use CelValueInner::*;
     if args.len() != 1 {
-        return Err(CelError::with_msg("bytes() expects exactly one argument"));
+        return Err(CelError::misc("bytes() expects exactly one argument"));
     }
 
     match &args[0].inner() {
         String(val) => Ok(CelValue::from_bytes(val.as_bytes().to_vec())),
-        other => Err(CelError::with_msg(&format!(
+        other => Err(CelError::misc(&format!(
             "int conversion invalid for {:?}",
             other
         ))),
@@ -124,7 +123,7 @@ fn string_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     use CelValueInner::*;
 
     if args.len() != 1 {
-        return Err(CelError::with_msg("string() expects exactly one argument"));
+        return Err(CelError::misc("string() expects exactly one argument"));
     }
 
     let arg_type = args[0].as_type();
@@ -136,12 +135,12 @@ fn string_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         String(s) => s.clone().into(),
         Bytes(b) => match std::string::String::from_utf8(b.clone()) {
             Ok(s) => s.into(),
-            Err(_) => return Err(CelError::with_msg("Bad bytes in utf8 convertion")),
+            Err(_) => return Err(CelError::misc("Bad bytes in utf8 convertion")),
         },
         TimeStamp(ts) => ts.to_rfc3339().into(),
         Duration(d) => d.to_string().into(),
         _ => {
-            return Err(CelError::with_msg(&format!(
+            return Err(CelError::misc(&format!(
                 "string() invalid for {:?}",
                 arg_type
             )))
@@ -151,25 +150,23 @@ fn string_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 
 fn contains_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     if args.len() != 1 {
-        return Err(CelError::with_msg(
-            "contains() expects exactly one argument",
-        ));
+        return Err(CelError::misc("contains() expects exactly one argument"));
     }
 
     if let CelValueInner::String(this_str) = this.into_inner() {
         if let CelValueInner::String(rhs) = args[0].inner() {
             Ok(CelValue::from_bool(this_str.contains(rhs)))
         } else {
-            Err(CelError::with_msg("contains() arg must be string"))
+            Err(CelError::misc("contains() arg must be string"))
         }
     } else {
-        Err(CelError::with_msg("contains() can only operate on string"))
+        Err(CelError::misc("contains() can only operate on string"))
     }
 }
 
 fn size_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     if args.len() != 1 {
-        return Err(CelError::with_msg("size() expects exactly one argument"));
+        return Err(CelError::misc("size() expects exactly one argument"));
     }
 
     Ok(CelValue::from_uint(match args[0].inner() {
@@ -178,7 +175,7 @@ fn size_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         CelValueInner::List(l) => l.len() as u64,
         CelValueInner::Map(m) => m.len() as u64,
         _ => {
-            return Err(CelError::with_msg(
+            return Err(CelError::misc(
                 "size() only available for types {string, bytes, list, map}",
             ))
         }
@@ -187,9 +184,7 @@ fn size_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 
 fn starts_with_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     if args.len() != 1 {
-        return Err(CelError::with_msg(
-            "endsWith() expects exactly one argument",
-        ));
+        return Err(CelError::misc("endsWith() expects exactly one argument"));
     }
 
     if let CelValueInner::String(lhs) = this.inner() {
@@ -198,14 +193,12 @@ fn starts_with_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         }
     }
 
-    Err(CelError::with_msg("endsWith must be form string.(string)"))
+    Err(CelError::misc("endsWith must be form string.(string)"))
 }
 
 fn ends_with_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     if args.len() != 1 {
-        return Err(CelError::with_msg(
-            "endsWith() expects exactly one argument",
-        ));
+        return Err(CelError::misc("endsWith() expects exactly one argument"));
     }
 
     if let CelValueInner::String(lhs) = this.inner() {
@@ -214,18 +207,18 @@ fn ends_with_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         }
     }
 
-    Err(CelError::with_msg("endsWith must be form string.(string)"))
+    Err(CelError::misc("endsWith must be form string.(string)"))
 }
 
 fn matches_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     let (vc_lhs, vc_rhs) = if let CelValueInner::Null = this.inner() {
         if args.len() != 2 {
-            return Err(CelError::with_msg("matches() expects exactly two argument"));
+            return Err(CelError::misc("matches() expects exactly two argument"));
         }
         (&args[0], &args[1])
     } else {
         if args.len() != 1 {
-            return Err(CelError::with_msg("matches() expects exactly one argument"));
+            return Err(CelError::misc("matches() expects exactly one argument"));
         }
         (&this, &args[0])
     };
@@ -235,7 +228,7 @@ fn matches_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
             match Regex::new(rhs) {
                 Ok(re) => return Ok(re.is_match(lhs).into()),
                 Err(err) => {
-                    return Err(CelError::with_msg(&format!(
+                    return Err(CelError::misc(&format!(
                         "Invalid regular expression: {}",
                         err
                     )))
@@ -244,14 +237,14 @@ fn matches_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         }
     }
 
-    Err(CelError::with_msg(
+    Err(CelError::misc(
         "matches has the forms string.(string) or (string, string)",
     ))
 }
 
 fn type_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     if args.len() != 1 {
-        return Err(CelError::with_msg("type() expects one argument"));
+        return Err(CelError::misc("type() expects one argument"));
     }
 
     Ok(args[0].as_type())
@@ -259,30 +252,30 @@ fn type_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 
 fn timestamp_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     if args.len() != 1 {
-        return Err(CelError::with_msg("timestamp() expect one argument"));
+        return Err(CelError::misc("timestamp() expect one argument"));
     }
 
     if let CelValueInner::String(str_val) = args[0].inner() {
         match (&str_val).parse::<DateTime<Utc>>() {
             Ok(val) => Ok(CelValue::from_timestamp(&val)),
-            Err(_) => Err(CelError::with_msg("Invalid timestamp format")),
+            Err(_) => Err(CelError::misc("Invalid timestamp format")),
         }
     } else {
-        Err(CelError::with_msg("timestamp() expects a string argument"))
+        Err(CelError::misc("timestamp() expects a string argument"))
     }
 }
 
 fn duration_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     if args.len() != 1 {
-        return Err(CelError::with_msg("duration() expects on argument"));
+        return Err(CelError::misc("duration() expects on argument"));
     }
 
     if let CelValueInner::String(str_val) = args[0].inner() {
         match duration_str::parse_chrono(str_val) {
             Ok(val) => Ok(CelValue::from_duration(&val)),
-            Err(_) => Err(CelError::with_msg("Invalid duration format")),
+            Err(_) => Err(CelError::misc("Invalid duration format")),
         }
     } else {
-        Err(CelError::with_msg("duration() expects a string argument"))
+        Err(CelError::misc("duration() expects a string argument"))
     }
 }
