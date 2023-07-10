@@ -34,13 +34,7 @@ impl ProgramCompiler {
             Ok(expr) => expr,
             Err(err) => {
                 let span = err.span();
-                return Err(CelError::misc(&format!(
-                    "Error on {}:{} ending at {}:{}",
-                    span.start().line,
-                    span.start().column,
-                    span.end().line,
-                    span.end().column
-                )));
+                return Err(CelError::syntax(&span));
             }
         };
 

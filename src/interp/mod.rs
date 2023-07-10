@@ -38,19 +38,19 @@ impl<'a> InterpStack<'a> {
                         }
                     }
 
-                    return Err(CelError::misc(&format!("Ident {} is not bound", name)));
+                    return Err(CelError::binding(&name));
                 } else {
                     Ok(val)
                 }
             }
-            None => Err(CelError::misc("No value on stack!")),
+            None => Err(CelError::runtime("No value on stack!")),
         }
     }
 
     fn pop_noresolve(&mut self) -> CelResult<CelValue> {
         match self.stack.pop() {
             Some(val) => Ok(val),
-            None => Err(CelError::misc("No value on stack!")),
+            None => Err(CelError::runtime("No value on stack!")),
         }
     }
 
@@ -67,7 +67,7 @@ impl<'a> InterpStack<'a> {
                     Ok(val)
                 }
             }
-            None => Err(CelError::misc("No value on stack!")),
+            None => Err(CelError::runtime("No value on stack!")),
         }
     }
 }
@@ -117,9 +117,9 @@ impl<'a> Interpreter<'a> {
         match self.cel {
             Some(cel) => match cel.get_program(name) {
                 Some(prog) => self.run_raw(prog.bytecode()),
-                None => Err(CelError::misc(&format!("No program named {} bound", name))),
+                None => Err(CelError::binding(&name)),
             },
-            None => Err(CelError::misc("No CEL context bound to interpreter")),
+            None => Err(CelError::internal("No CEL context bound to interpreter")),
         }
     }
 
@@ -130,7 +130,7 @@ impl<'a> Interpreter<'a> {
         let count = self.depth.inc();
 
         if count.count() > 32 {
-            return Err(CelError::misc("Max call depth excceded"));
+            return Err(CelError::runtime("Max call depth excceded"));
         }
 
         while pc < prog.len() {
@@ -204,7 +204,7 @@ impl<'a> Interpreter<'a> {
                                     pc += *dist as usize
                                 }
                             } else {
-                                return Err(CelError::misc(&format!(
+                                return Err(CelError::invalid_op(&format!(
                                     "JMP TRUE invalid on type {:?}",
                                     v1.as_type()
                                 )));
@@ -216,7 +216,7 @@ impl<'a> Interpreter<'a> {
                                     pc += *dist as usize
                                 }
                             } else {
-                                return Err(CelError::misc(&format!(
+                                return Err(CelError::invalid_op(&format!(
                                     "JMP FALSE invalid on type {:?}",
                                     v1.as_type()
                                 )));
@@ -285,14 +285,14 @@ impl<'a> Interpreter<'a> {
                             if let CelValueInner::String(r) = lhs.inner() {
                                 stack.push(CelValue::from_bool(m.contains_key(r)));
                             } else {
-                                return Err(CelError::misc(&format!(
+                                return Err(CelError::invalid_op(&format!(
                                     "Op 'in' invalid between {:?} and {:?}",
                                     lhs_type, rhs_type
                                 )));
                             }
                         }
                         _ => {
-                            return Err(CelError::misc(&format!(
+                            return Err(CelError::invalid_op(&format!(
                                 "Op 'in' invalid between {:?} and {:?}",
                                 lhs_type, rhs_type
                             )));
@@ -316,7 +316,7 @@ impl<'a> Interpreter<'a> {
                         let key = if let CelValueInner::String(key) = stack.pop()?.into_inner() {
                             key
                         } else {
-                            return Err(CelError::misc("Only strings can be used as Object keys"));
+                            return Err(CelError::value("Only strings can be used as Object keys"));
                         };
 
                         map.insert(key, stack.pop()?);
@@ -333,15 +333,15 @@ impl<'a> Interpreter<'a> {
                             *index as usize
                         } else if let CelValueInner::Int(index) = index.inner() {
                             if *index < 0 {
-                                return Err(CelError::misc("Negative index is not allowed"));
+                                return Err(CelError::value("Negative index is not allowed"));
                             }
                             *index as usize
                         } else {
-                            return Err(CelError::misc("List index can only be int or uint"));
+                            return Err(CelError::value("List index can only be int or uint"));
                         };
 
                         if index >= list.len() {
-                            return Err(CelError::misc("List access out of bounds"));
+                            return Err(CelError::value("List access out of bounds"));
                         }
 
                         stack.push(list[index].clone());
@@ -350,7 +350,7 @@ impl<'a> Interpreter<'a> {
                             match map.get(index) {
                                 Some(val) => stack.push(val.clone()),
                                 None => {
-                                    return Err(CelError::misc(&format!(
+                                    return Err(CelError::value(&format!(
                                         "Object does not contain key \"{}\"",
                                         index
                                     )))
@@ -358,7 +358,7 @@ impl<'a> Interpreter<'a> {
                             }
                         }
                     } else {
-                        return Err(CelError::misc(&format!(
+                        return Err(CelError::value(&format!(
                             "Index operator invalide between {:?} and {:?}",
                             index.as_type(),
                             obj.as_type()
@@ -387,7 +387,7 @@ impl<'a> Interpreter<'a> {
                             ));
                         }
                     } else {
-                        return Err(CelError::misc(&format!(
+                        return Err(CelError::value(&format!(
                             "Index operator invalid between {:?} and {:?}",
                             index.as_type(),
                             obj.as_type()
@@ -413,7 +413,7 @@ impl<'a> Interpreter<'a> {
                                     macro_,
                                 )?);
                             } else {
-                                return Err(CelError::misc(&format!(
+                                return Err(CelError::runtime(&format!(
                                     "{} is not callable",
                                     func_name
                                 )));
@@ -428,7 +428,7 @@ impl<'a> Interpreter<'a> {
                                 stack.push(self.call_macro(&value, &args, macro_)?);
                             }
                         },
-                        _ => return Err(CelError::misc("only idents are callable")),
+                        _ => return Err(CelError::runtime("only idents are callable")),
                     };
                 }
             };
@@ -448,7 +448,7 @@ impl<'a> Interpreter<'a> {
             if let CelValueInner::ByteCode(bc) = arg.inner() {
                 v.push(bc.as_slice());
             } else {
-                return Err(CelError::misc("macro args must be bytecode"));
+                return Err(CelError::internal("macro args must be bytecode"));
             }
         }
         let res = macro_(self, this.clone(), &v)?;
@@ -485,7 +485,7 @@ impl<'a> Interpreter<'a> {
         } else if let Some(macro_) = self.get_macro_by_name(name) {
             Ok(RsCallable::Macro(macro_))
         } else {
-            Err(CelError::misc(&format!("{} is not callable", name)))
+            Err(CelError::value(&format!("{} is not callable", name)))
         }
     }
 }
