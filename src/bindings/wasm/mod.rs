@@ -83,10 +83,17 @@ pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
 #[wasm_bindgen]
 pub fn cel_details(source: &str) -> JsValue {
     match Program::from_source(source) {
-        Ok(prog) => serde_wasm_bindgen::to_value(&EvalResult::from_value(
-            serde_json::to_value(&prog.details()).unwrap(),
-        ))
-        .unwrap(),
+        Ok(prog) => {
+            let mut details = prog.details().clone();
+            let default_bindings = BindContext::new();
+
+            details.filter_from_bindings(&default_bindings);
+
+            serde_wasm_bindgen::to_value(&EvalResult::from_value(
+                serde_json::to_value(&details).unwrap(),
+            ))
+            .unwrap()
+        }
         Err(err) => serde_wasm_bindgen::to_value(&EvalResult::from_error(err)).unwrap(),
     }
 }
