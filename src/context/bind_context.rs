@@ -146,4 +146,10 @@ impl BindContext {
     pub fn get_macro(&self, name: &str) -> Option<RsCelMacro> {
         Some(self.macros.get(name)?.clone())
     }
+
+    pub fn is_bound(&self, name: &str) -> bool {
+        self.params.contains_key(name)
+            || self.funcs.contains_key(name)
+            || self.macros.contains_key(name)
+    }
 }

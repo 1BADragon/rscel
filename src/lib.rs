@@ -221,4 +221,20 @@ mod test {
 
         assert!(ctx.exec("entry", &exec).is_err());
     }
+
+    #[test]
+    fn test_binding_filter() {
+        let prog = Program::from_source("foo + int(3)").unwrap();
+
+        let mut dets = prog.details().clone();
+        let bindings = BindContext::new();
+
+        assert!(dets.params().contains(&"int"));
+        assert!(dets.params().contains(&"int"));
+
+        dets.filter_from_bindings(&bindings);
+
+        assert!(!dets.params().contains(&"int"));
+        assert!(dets.params().contains(&"foo"));
+    }
 }
