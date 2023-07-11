@@ -4,9 +4,10 @@ mod bind_context;
 mod default_funcs;
 mod default_macros;
 use crate::{
+    cel_error::CelResult,
     interp::Interpreter,
-    program::{Program, ProgramDetails, ProgramResult},
-    value_cell::ValueCell,
+    program::{Program, ProgramDetails},
+    CelValue,
 };
 pub use bind_context::{BindContext, RsCallable, RsCelFunction, RsCelMacro};
 
@@ -16,39 +17,6 @@ pub use bind_context::{BindContext, RsCallable, RsCelFunction, RsCelMacro};
 pub struct CelContext {
     progs: HashMap<String, Program>,
 }
-
-/// ExecError is the error type returned by CelContext operations.
-#[derive(Debug)]
-pub struct ExecError {
-    msg: String,
-}
-
-impl ExecError {
-    /// Constructs a new ExecError with a given message.
-    pub fn new(msg: &str) -> ExecError {
-        ExecError {
-            msg: msg.to_owned(),
-        }
-    }
-
-    /// No-copy construction of ExecError
-    pub fn from_str(msg: String) -> ExecError {
-        ExecError { msg }
-    }
-
-    /// Error message contained in the ExecError
-    pub fn str<'a>(&'a self) -> &'a str {
-        &self.msg
-    }
-
-    /// Drop the error returning the underlying error message
-    pub fn into_str(self) -> String {
-        self.msg
-    }
-}
-
-/// Result wrapper with ExecError as the error type
-pub type ExecResult<T> = Result<T, ExecError>;
 
 impl CelContext {
     /// Constructs a new empty CelContext
@@ -68,7 +36,7 @@ impl CelContext {
     /// Add a Program to the context with the given name and source string. Return of this
     /// function indicates parseing result of the constructed Program. This method will not
     /// allow for a Program to be shared. Will override an existing program with same name.
-    pub fn add_program_str(&mut self, name: &str, prog_str: &str) -> ProgramResult<()> {
+    pub fn add_program_str(&mut self, name: &str, prog_str: &str) -> CelResult<()> {
         let prog = Program::from_source(prog_str)?;
 
         self.add_program(name, prog);
@@ -90,13 +58,10 @@ impl CelContext {
     /// can be run multiple times with different ExecContext's. The return of this function is
     /// a Result with either a ValueCell representing the final solution of the Program or an Error
     /// that is discovered during execution, such as mismatch of types
-    pub fn exec<'l>(&'l mut self, name: &str, bindings: &'l BindContext) -> ExecResult<ValueCell> {
+    pub fn exec<'l>(&'l mut self, name: &str, bindings: &'l BindContext) -> CelResult<CelValue> {
         let interp = Interpreter::new(&self, bindings);
 
-        match interp.run_program(name) {
-            Ok(good) => Ok(good),
-            Err(err) => Err(ExecError::from_str(err.into_string())),
-        }
+        interp.run_program(name)
     }
 
     // pub(crate) fn eval_expr(

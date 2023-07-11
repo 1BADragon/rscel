@@ -1,14 +1,13 @@
 use parsel::ast::Lit;
 
-use super::{ProgramDetails, ProgramResult};
+use super::ProgramDetails;
 use crate::{
     ast::grammar::{
         AddOp, Addition, ConditionalAnd, ConditionalOr, Expr, ExprList, Literal, Member,
         MemberPrime, MultOp, Multiplication, NegList, NotList, Primary, Relation, Relop, Unary,
     },
     interp::{ByteCode, JmpWhen},
-    value_cell::ValueCell,
-    Program, ProgramError,
+    CelError, CelResult, CelValue, Program,
 };
 
 pub struct ProgramCompiler {
@@ -30,18 +29,12 @@ impl ProgramCompiler {
         self
     }
 
-    pub fn build(mut self) -> ProgramResult<Program> {
+    pub fn build(mut self) -> CelResult<Program> {
         let ast: Expr = match parsel::parse_str(&self.source) {
             Ok(expr) => expr,
             Err(err) => {
                 let span = err.span();
-                return Err(ProgramError::new(&format!(
-                    "Error on {}:{} ending at {}:{}",
-                    span.start().line,
-                    span.start().column,
-                    span.end().line,
-                    span.end().column
-                )));
+                return Err(CelError::syntax(&span));
             }
         };
 
@@ -54,7 +47,7 @@ impl ProgramCompiler {
         })
     }
 
-    fn build_expr(&mut self, ast: &Expr) -> ProgramResult<Vec<ByteCode>> {
+    fn build_expr(&mut self, ast: &Expr) -> CelResult<Vec<ByteCode>> {
         let mut bytecode = self.build_or(&ast.cond_or)?;
 
         if let Some(ternary) = ast.ternary.as_prefix() {
@@ -74,7 +67,7 @@ impl ProgramCompiler {
         Ok(bytecode)
     }
 
-    fn build_or(&mut self, ast: &ConditionalOr) -> ProgramResult<Vec<ByteCode>> {
+    fn build_or(&mut self, ast: &ConditionalOr) -> CelResult<Vec<ByteCode>> {
         match ast {
             ConditionalOr::Binary { lhs, op: _, rhs } => {
                 let mut bytecode = self.build_or(lhs)?;
@@ -94,7 +87,7 @@ impl ProgramCompiler {
         }
     }
 
-    fn build_and(&mut self, ast: &ConditionalAnd) -> ProgramResult<Vec<ByteCode>> {
+    fn build_and(&mut self, ast: &ConditionalAnd) -> CelResult<Vec<ByteCode>> {
         match ast {
             ConditionalAnd::Binary { lhs, op: _, rhs } => {
                 let mut bytecode = self.build_and(lhs)?;
@@ -113,7 +106,7 @@ impl ProgramCompiler {
             ConditionalAnd::Rhs(child) => self.build_relation(child),
         }
     }
-    fn build_relation(&mut self, ast: &Relation) -> ProgramResult<Vec<ByteCode>> {
+    fn build_relation(&mut self, ast: &Relation) -> CelResult<Vec<ByteCode>> {
         match ast {
             Relation::Binary { lhs, op, rhs } => {
                 let mut bytecode = self.build_relation(lhs)?;
@@ -134,7 +127,7 @@ impl ProgramCompiler {
             Relation::Rhs(child) => self.build_addition(child),
         }
     }
-    fn build_addition(&mut self, ast: &Addition) -> ProgramResult<Vec<ByteCode>> {
+    fn build_addition(&mut self, ast: &Addition) -> CelResult<Vec<ByteCode>> {
         match ast {
             Addition::Binary { lhs, op, rhs } => {
                 let mut bytecode = self.build_addition(lhs)?;
@@ -150,7 +143,7 @@ impl ProgramCompiler {
             Addition::Rhs(child) => self.build_multiplication(child),
         }
     }
-    fn build_multiplication(&mut self, ast: &Multiplication) -> ProgramResult<Vec<ByteCode>> {
+    fn build_multiplication(&mut self, ast: &Multiplication) -> CelResult<Vec<ByteCode>> {
         match ast {
             Multiplication::Binary { lhs, op, rhs } => {
                 let mut bytecode = self.build_multiplication(lhs)?;
@@ -167,7 +160,7 @@ impl ProgramCompiler {
             Multiplication::Rhs(child) => self.build_unary(child),
         }
     }
-    fn build_unary(&mut self, ast: &Unary) -> ProgramResult<Vec<ByteCode>> {
+    fn build_unary(&mut self, ast: &Unary) -> CelResult<Vec<ByteCode>> {
         match ast {
             Unary::Member(child) => self.build_member(child),
             Unary::NotMember { nots, member } => {
@@ -185,7 +178,7 @@ impl ProgramCompiler {
         }
     }
 
-    fn build_not(&mut self, ast: &NotList) -> ProgramResult<Vec<ByteCode>> {
+    fn build_not(&mut self, ast: &NotList) -> CelResult<Vec<ByteCode>> {
         match ast {
             NotList::List { not: _, tail } => {
                 let mut bytecode = vec![ByteCode::Not];
@@ -197,7 +190,7 @@ impl ProgramCompiler {
         }
     }
 
-    fn build_neg(&mut self, ast: &NegList) -> ProgramResult<Vec<ByteCode>> {
+    fn build_neg(&mut self, ast: &NegList) -> CelResult<Vec<ByteCode>> {
         match ast {
             NegList::List { not: _, tail } => {
                 let mut bytecode = vec![ByteCode::Neg];
@@ -209,14 +202,14 @@ impl ProgramCompiler {
         }
     }
 
-    fn build_member(&mut self, ast: &Member) -> ProgramResult<Vec<ByteCode>> {
+    fn build_member(&mut self, ast: &Member) -> CelResult<Vec<ByteCode>> {
         let mut bytecode = self.build_primary(&ast.primary)?;
 
         bytecode.append(&mut self.build_member_prime(&ast.member)?);
         Ok(bytecode)
     }
 
-    fn build_member_prime(&mut self, ast: &MemberPrime) -> ProgramResult<Vec<ByteCode>> {
+    fn build_member_prime(&mut self, ast: &MemberPrime) -> CelResult<Vec<ByteCode>> {
         match ast {
             MemberPrime::MemberAccess {
                 dot: _,
@@ -224,7 +217,7 @@ impl ProgramCompiler {
                 tail,
             } => {
                 let mut bytecode = vec![
-                    ByteCode::Push(ValueCell::from_ident(&ident.to_string())),
+                    ByteCode::Push(CelValue::from_ident(&ident.to_string())),
                     ByteCode::Access,
                 ];
 
@@ -259,12 +252,12 @@ impl ProgramCompiler {
         }
     }
 
-    fn build_primary(&mut self, ast: &Primary) -> ProgramResult<Vec<ByteCode>> {
+    fn build_primary(&mut self, ast: &Primary) -> CelResult<Vec<ByteCode>> {
         match ast {
-            Primary::Type(_) => Ok(vec![ByteCode::Push(ValueCell::from_ident("type"))]),
+            Primary::Type(_) => Ok(vec![ByteCode::Push(CelValue::from_ident("type"))]),
             Primary::Ident(child) => {
                 self.details.add_param(&child.to_string());
-                Ok(vec![ByteCode::Push(ValueCell::from_ident(
+                Ok(vec![ByteCode::Push(CelValue::from_ident(
                     &child.to_string(),
                 ))])
             }
@@ -283,7 +276,7 @@ impl ProgramCompiler {
                     bytecode.push(ByteCode::MkList(n_frags as u32));
                     Ok(bytecode)
                 }
-                None => Ok(vec![ByteCode::Push(ValueCell::from_list(vec![]))]),
+                None => Ok(vec![ByteCode::Push(CelValue::from_list(vec![]))]),
             },
             Primary::ObjectInit(child) => {
                 let mut count = 0;
@@ -302,23 +295,23 @@ impl ProgramCompiler {
             }
             Primary::Literal(literal) => {
                 let bytecode = vec![ByteCode::Push(match literal {
-                    Literal::Null(_) => ValueCell::from_null(),
+                    Literal::Null(_) => CelValue::from_null(),
                     Literal::Lit(lit) => match lit {
-                        Lit::Int(val) => ValueCell::from_int(val.into_inner()),
+                        Lit::Int(val) => CelValue::from_int(val.into_inner()),
                         Lit::Uint(val) => {
                             let source = val.span().source_text().unwrap();
 
                             if source.ends_with("u") {
-                                ValueCell::from_uint(val.into_inner())
+                                CelValue::from_uint(val.into_inner())
                             } else {
-                                ValueCell::from_int(val.into_inner() as i64)
+                                CelValue::from_int(val.into_inner() as i64)
                             }
                         }
-                        Lit::Float(val) => ValueCell::from_float(*val.into_inner()),
-                        Lit::Bool(val) => ValueCell::from_bool(val.into_inner()),
-                        Lit::Str(val) => ValueCell::from_string(val.value()),
-                        Lit::ByteStr(val) => ValueCell::from_bytes(val.to_vec()),
-                        _ => return Err(ProgramError::new("Byte and Char literal not allowed")),
+                        Lit::Float(val) => CelValue::from_float(*val.into_inner()),
+                        Lit::Bool(val) => CelValue::from_bool(val.into_inner()),
+                        Lit::Str(val) => CelValue::from_string(val.value()),
+                        Lit::ByteStr(val) => CelValue::from_bytes(val.to_vec()),
+                        _ => return Err(CelError::misc("Byte and Char literal not allowed")),
                     },
                 })];
                 Ok(bytecode)
@@ -326,7 +319,7 @@ impl ProgramCompiler {
         }
     }
 
-    fn build_expr_list(&mut self, ast: &ExprList) -> ProgramResult<Vec<Vec<ByteCode>>> {
+    fn build_expr_list(&mut self, ast: &ExprList) -> CelResult<Vec<Vec<ByteCode>>> {
         let mut fragments = Vec::new();
 
         fragments.push(self.build_expr(&ast.expr)?);

@@ -3,12 +3,12 @@ use std::{collections::HashMap, fmt};
 pub use types::{ByteCode, JmpWhen};
 
 use crate::{
-    context::RsCallable, utils::ScopedCounter, BindContext, CelContext, RsCelFunction, RsCelMacro,
-    ValueCell, ValueCellError, ValueCellInner, ValueCellResult,
+    context::RsCallable, utils::ScopedCounter, BindContext, CelContext, CelError, CelResult,
+    CelValue, CelValueInner, RsCelFunction, RsCelMacro,
 };
 
 struct InterpStack<'a> {
-    stack: Vec<ValueCell>,
+    stack: Vec<CelValue>,
 
     ctx: &'a Interpreter<'a>,
 }
@@ -21,14 +21,14 @@ impl<'a> InterpStack<'a> {
         }
     }
 
-    fn push(&mut self, val: ValueCell) {
+    fn push(&mut self, val: CelValue) {
         self.stack.push(val)
     }
 
-    fn pop(&mut self) -> ValueCellResult<ValueCell> {
+    fn pop(&mut self) -> CelResult<CelValue> {
         match self.stack.pop() {
             Some(val) => {
-                if let ValueCellInner::Ident(name) = val.inner() {
+                if let CelValueInner::Ident(name) = val.inner() {
                     if let Some(val) = self.ctx.get_param_by_name(name) {
                         return Ok(val.clone());
                     } else if let Some(ctx) = self.ctx.cel {
@@ -38,29 +38,26 @@ impl<'a> InterpStack<'a> {
                         }
                     }
 
-                    return Err(ValueCellError::with_msg(&format!(
-                        "Ident {} is not bound",
-                        name
-                    )));
+                    return Err(CelError::binding(&name));
                 } else {
                     Ok(val)
                 }
             }
-            None => Err(ValueCellError::with_msg("No value on stack!")),
+            None => Err(CelError::runtime("No value on stack!")),
         }
     }
 
-    fn pop_noresolve(&mut self) -> ValueCellResult<ValueCell> {
+    fn pop_noresolve(&mut self) -> CelResult<CelValue> {
         match self.stack.pop() {
             Some(val) => Ok(val),
-            None => Err(ValueCellError::with_msg("No value on stack!")),
+            None => Err(CelError::runtime("No value on stack!")),
         }
     }
 
-    fn pop_tryresolve(&mut self) -> ValueCellResult<ValueCell> {
+    fn pop_tryresolve(&mut self) -> CelResult<CelValue> {
         match self.stack.pop() {
             Some(val) => {
-                if let ValueCellInner::Ident(name) = val.inner() {
+                if let CelValueInner::Ident(name) = val.inner() {
                     if let Some(val) = self.ctx.get_param_by_name(name) {
                         Ok(val.clone())
                     } else {
@@ -70,7 +67,7 @@ impl<'a> InterpStack<'a> {
                     Ok(val)
                 }
             }
-            None => Err(ValueCellError::with_msg("No value on stack!")),
+            None => Err(CelError::runtime("No value on stack!")),
         }
     }
 }
@@ -116,29 +113,24 @@ impl<'a> Interpreter<'a> {
         self.bindings.cloned()
     }
 
-    pub fn run_program(&self, name: &str) -> ValueCellResult<ValueCell> {
+    pub fn run_program(&self, name: &str) -> CelResult<CelValue> {
         match self.cel {
             Some(cel) => match cel.get_program(name) {
                 Some(prog) => self.run_raw(prog.bytecode()),
-                None => Err(ValueCellError::with_msg(&format!(
-                    "No program named {} bound",
-                    name
-                ))),
+                None => Err(CelError::binding(&name)),
             },
-            None => Err(ValueCellError::with_msg(
-                "No CEL context bound to interpreter",
-            )),
+            None => Err(CelError::internal("No CEL context bound to interpreter")),
         }
     }
 
-    pub fn run_raw(&self, prog: &[ByteCode]) -> ValueCellResult<ValueCell> {
+    pub fn run_raw(&self, prog: &[ByteCode]) -> CelResult<CelValue> {
         let mut pc: usize = 0;
         let mut stack = InterpStack::new(self);
 
         let count = self.depth.inc();
 
         if count.count() > 32 {
-            return Err(ValueCellError::with_msg("Max call depth excceded"));
+            return Err(CelError::runtime("Max call depth excceded"));
         }
 
         while pc < prog.len() {
@@ -207,24 +199,24 @@ impl<'a> Interpreter<'a> {
                     let v1 = stack.pop()?;
                     match when {
                         JmpWhen::True => {
-                            if let ValueCellInner::Bool(v) = v1.inner() {
+                            if let CelValueInner::Bool(v) = v1.inner() {
                                 if *v {
                                     pc += *dist as usize
                                 }
                             } else {
-                                return Err(ValueCellError::with_msg(&format!(
+                                return Err(CelError::invalid_op(&format!(
                                     "JMP TRUE invalid on type {:?}",
                                     v1.as_type()
                                 )));
                             }
                         }
                         JmpWhen::False => {
-                            if let ValueCellInner::Bool(v) = v1.inner() {
+                            if let CelValueInner::Bool(v) = v1.inner() {
                                 if !v {
                                     pc += *dist as usize
                                 }
                             } else {
-                                return Err(ValueCellError::with_msg(&format!(
+                                return Err(CelError::invalid_op(&format!(
                                     "JMP FALSE invalid on type {:?}",
                                     v1.as_type()
                                 )));
@@ -279,7 +271,7 @@ impl<'a> Interpreter<'a> {
                     let lhs_type = lhs.as_type();
 
                     match rhs.inner() {
-                        ValueCellInner::List(l) => 'outer: {
+                        CelValueInner::List(l) => 'outer: {
                             for value in l.iter() {
                                 if lhs == *value {
                                     stack.push(true.into());
@@ -289,18 +281,18 @@ impl<'a> Interpreter<'a> {
 
                             stack.push(false.into());
                         }
-                        ValueCellInner::Map(m) => {
-                            if let ValueCellInner::String(r) = lhs.inner() {
-                                stack.push(ValueCell::from_bool(m.contains_key(r)));
+                        CelValueInner::Map(m) => {
+                            if let CelValueInner::String(r) = lhs.inner() {
+                                stack.push(CelValue::from_bool(m.contains_key(r)));
                             } else {
-                                return Err(ValueCellError::with_msg(&format!(
+                                return Err(CelError::invalid_op(&format!(
                                     "Op 'in' invalid between {:?} and {:?}",
                                     lhs_type, rhs_type
                                 )));
                             }
                         }
                         _ => {
-                            return Err(ValueCellError::with_msg(&format!(
+                            return Err(CelError::invalid_op(&format!(
                                 "Op 'in' invalid between {:?} and {:?}",
                                 lhs_type, rhs_type
                             )));
@@ -321,12 +313,10 @@ impl<'a> Interpreter<'a> {
                     let mut map = HashMap::new();
 
                     for _ in 0..*size {
-                        let key = if let ValueCellInner::String(key) = stack.pop()?.into_inner() {
+                        let key = if let CelValueInner::String(key) = stack.pop()?.into_inner() {
                             key
                         } else {
-                            return Err(ValueCellError::with_msg(
-                                "Only strings can be used as Object keys",
-                            ));
+                            return Err(CelError::value("Only strings can be used as Object keys"));
                         };
 
                         map.insert(key, stack.pop()?);
@@ -338,33 +328,29 @@ impl<'a> Interpreter<'a> {
                     let index = stack.pop()?;
                     let obj = stack.pop()?;
 
-                    if let ValueCellInner::List(list) = obj.inner() {
-                        let index = if let ValueCellInner::UInt(index) = index.inner() {
+                    if let CelValueInner::List(list) = obj.inner() {
+                        let index = if let CelValueInner::UInt(index) = index.inner() {
                             *index as usize
-                        } else if let ValueCellInner::Int(index) = index.inner() {
+                        } else if let CelValueInner::Int(index) = index.inner() {
                             if *index < 0 {
-                                return Err(ValueCellError::with_msg(
-                                    "Negative index is not allowed",
-                                ));
+                                return Err(CelError::value("Negative index is not allowed"));
                             }
                             *index as usize
                         } else {
-                            return Err(ValueCellError::with_msg(
-                                "List index can only be int or uint",
-                            ));
+                            return Err(CelError::value("List index can only be int or uint"));
                         };
 
                         if index >= list.len() {
-                            return Err(ValueCellError::with_msg("List access out of bounds"));
+                            return Err(CelError::value("List access out of bounds"));
                         }
 
                         stack.push(list[index].clone());
-                    } else if let ValueCellInner::Map(map) = obj.inner() {
-                        if let ValueCellInner::String(index) = index.inner() {
+                    } else if let CelValueInner::Map(map) = obj.inner() {
+                        if let CelValueInner::String(index) = index.inner() {
                             match map.get(index) {
                                 Some(val) => stack.push(val.clone()),
                                 None => {
-                                    return Err(ValueCellError::with_msg(&format!(
+                                    return Err(CelError::value(&format!(
                                         "Object does not contain key \"{}\"",
                                         index
                                     )))
@@ -372,7 +358,7 @@ impl<'a> Interpreter<'a> {
                             }
                         }
                     } else {
-                        return Err(ValueCellError::with_msg(&format!(
+                        return Err(CelError::value(&format!(
                             "Index operator invalide between {:?} and {:?}",
                             index.as_type(),
                             obj.as_type()
@@ -383,25 +369,25 @@ impl<'a> Interpreter<'a> {
                     let index = stack.pop_noresolve()?;
                     let obj = stack.pop()?;
 
-                    if let ValueCellInner::Ident(ident) = index.inner() {
-                        if let ValueCellInner::Map(map) = obj.inner() {
+                    if let CelValueInner::Ident(ident) = index.inner() {
+                        if let CelValueInner::Map(map) = obj.inner() {
                             match map.get(ident.as_str()) {
                                 Some(val) => stack.push(val.clone()),
                                 None => {
-                                    stack.push(ValueCell::from_binding(
+                                    stack.push(CelValue::from_binding(
                                         self.callable_by_name(ident.as_str())?,
                                         &obj,
                                     ));
                                 }
                             }
                         } else {
-                            stack.push(ValueCell::from_binding(
+                            stack.push(CelValue::from_binding(
                                 self.callable_by_name(ident.as_str())?,
                                 &obj,
                             ));
                         }
                     } else {
-                        return Err(ValueCellError::with_msg(&format!(
+                        return Err(CelError::value(&format!(
                             "Index operator invalid between {:?} and {:?}",
                             index.as_type(),
                             obj.as_type()
@@ -416,24 +402,24 @@ impl<'a> Interpreter<'a> {
                     }
 
                     match stack.pop_noresolve()?.into_inner() {
-                        ValueCellInner::Ident(func_name) => {
+                        CelValueInner::Ident(func_name) => {
                             if let Some(func) = self.get_func_by_name(&func_name) {
                                 let arg_values = self.resolve_args(args)?;
-                                stack.push(func(ValueCell::from_null(), &arg_values)?);
+                                stack.push(func(CelValue::from_null(), &arg_values)?);
                             } else if let Some(macro_) = self.get_macro_by_name(&func_name) {
                                 stack.push(self.call_macro(
-                                    &ValueCell::from_null(),
+                                    &CelValue::from_null(),
                                     &args,
                                     macro_,
                                 )?);
                             } else {
-                                return Err(ValueCellError::with_msg(&format!(
+                                return Err(CelError::runtime(&format!(
                                     "{} is not callable",
                                     func_name
                                 )));
                             }
                         }
-                        ValueCellInner::BoundCall { callable, value } => match callable {
+                        CelValueInner::BoundCall { callable, value } => match callable {
                             RsCallable::Function(func) => {
                                 let arg_values = self.resolve_args(args)?;
                                 stack.push(func(value, &arg_values)?);
@@ -442,7 +428,7 @@ impl<'a> Interpreter<'a> {
                                 stack.push(self.call_macro(&value, &args, macro_)?);
                             }
                         },
-                        _ => return Err(ValueCellError::with_msg("only idents are callable")),
+                        _ => return Err(CelError::runtime("only idents are callable")),
                     };
                 }
             };
@@ -453,26 +439,26 @@ impl<'a> Interpreter<'a> {
 
     fn call_macro(
         &self,
-        this: &ValueCell,
-        args: &Vec<ValueCell>,
-        macro_: fn(&Interpreter, ValueCell, &[&[ByteCode]]) -> Result<ValueCell, ValueCellError>,
-    ) -> Result<ValueCell, ValueCellError> {
+        this: &CelValue,
+        args: &Vec<CelValue>,
+        macro_: fn(&Interpreter, CelValue, &[&[ByteCode]]) -> Result<CelValue, CelError>,
+    ) -> Result<CelValue, CelError> {
         let mut v = Vec::new();
         for arg in args.iter() {
-            if let ValueCellInner::ByteCode(bc) = arg.inner() {
+            if let CelValueInner::ByteCode(bc) = arg.inner() {
                 v.push(bc.as_slice());
             } else {
-                return Err(ValueCellError::with_msg("macro args must be bytecode"));
+                return Err(CelError::internal("macro args must be bytecode"));
             }
         }
         let res = macro_(self, this.clone(), &v)?;
         Ok(res)
     }
 
-    fn resolve_args(&self, args: Vec<ValueCell>) -> Result<Vec<ValueCell>, ValueCellError> {
+    fn resolve_args(&self, args: Vec<CelValue>) -> Result<Vec<CelValue>, CelError> {
         let mut arg_values = Vec::new();
         for arg in args.into_iter() {
-            if let ValueCellInner::ByteCode(bc) = arg.inner() {
+            if let CelValueInner::ByteCode(bc) = arg.inner() {
                 arg_values.push(self.run_raw(&bc)?);
             } else {
                 arg_values.push(arg)
@@ -481,7 +467,7 @@ impl<'a> Interpreter<'a> {
         Ok(arg_values)
     }
 
-    fn get_param_by_name<'l>(&'l self, name: &str) -> Option<&'l ValueCell> {
+    fn get_param_by_name<'l>(&'l self, name: &str) -> Option<&'l CelValue> {
         self.bindings?.get_param(name)
     }
 
@@ -493,23 +479,20 @@ impl<'a> Interpreter<'a> {
         self.bindings?.get_macro(name)
     }
 
-    fn callable_by_name(&self, name: &str) -> ValueCellResult<RsCallable> {
+    fn callable_by_name(&self, name: &str) -> CelResult<RsCallable> {
         if let Some(func) = self.get_func_by_name(name) {
             Ok(RsCallable::Function(func))
         } else if let Some(macro_) = self.get_macro_by_name(name) {
             Ok(RsCallable::Macro(macro_))
         } else {
-            Err(ValueCellError::with_msg(&format!(
-                "{} is not callable",
-                name
-            )))
+            Err(CelError::value(&format!("{} is not callable", name)))
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::ValueCell;
+    use crate::CelValue;
 
     use super::{types::ByteCode, Interpreter};
     use test_case::test_case;
@@ -525,7 +508,7 @@ mod test {
     #[test_case(ByteCode::Ne, true.into())]
     #[test_case(ByteCode::Ge, true.into())]
     #[test_case(ByteCode::Gt, true.into())]
-    fn test_interp_ops(op: ByteCode, expected: ValueCell) {
+    fn test_interp_ops(op: ByteCode, expected: CelValue) {
         let mut prog = vec![ByteCode::Push(4.into()), ByteCode::Push(3.into())];
         prog.push(op);
         let interp = Interpreter::empty();

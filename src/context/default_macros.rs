@@ -1,8 +1,8 @@
 use crate::{
+    cel_error::{CelError, CelResult},
     interp::Interpreter,
     utils::eval_ident,
-    value_cell::{ValueCell, ValueCellError, ValueCellResult},
-    BindContext, ByteCode, CelContext, ValueCellInner,
+    BindContext, ByteCode, CelContext, CelValue, CelValueInner,
 };
 
 use super::bind_context::RsCelMacro;
@@ -22,42 +22,32 @@ pub fn load_default_macros(exec_ctx: &mut BindContext) {
     }
 }
 
-fn has_impl(
-    ctx: &Interpreter,
-    _this: ValueCell,
-    exprlist: &[&[ByteCode]],
-) -> ValueCellResult<ValueCell> {
+fn has_impl(ctx: &Interpreter, _this: CelValue, exprlist: &[&[ByteCode]]) -> CelResult<CelValue> {
     if exprlist.len() != 1 {
-        return Err(ValueCellError::with_msg(
-            "has() macro expects exactly 1 argument",
-        ));
+        return Err(CelError::argument("has() macro expects exactly 1 argument"));
     }
 
     match ctx.run_raw(&exprlist[0]) {
-        Ok(_) => Ok(ValueCell::from_bool(true)),
-        Err(_) => Ok(ValueCell::from_bool(false)),
+        Ok(_) => Ok(CelValue::from_bool(true)),
+        Err(_) => Ok(CelValue::from_bool(false)),
     }
 }
 
-fn all_impl(
-    ctx: &Interpreter,
-    this: ValueCell,
-    bytecode: &[&[ByteCode]],
-) -> ValueCellResult<ValueCell> {
+fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
     if bytecode.len() != 2 {
-        return Err(ValueCellError::with_msg(
+        return Err(CelError::argument(
             "all() macro expects exactly 2 arguments",
         ));
     }
 
     let ident_prog = ctx.run_raw(bytecode[0])?;
-    let ident_name = if let ValueCellInner::Ident(ident) = ident_prog.inner() {
+    let ident_name = if let CelValueInner::Ident(ident) = ident_prog.inner() {
         ident
     } else {
-        return Err(ValueCellError::with_msg("all() predicate must be ident"));
+        return Err(CelError::argument("all() predicate must be ident"));
     };
 
-    if let ValueCellInner::List(list) = this.inner() {
+    if let CelValueInner::List(list) = this.inner() {
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
         let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
 
@@ -68,7 +58,7 @@ fn all_impl(
 
             let res = interp.run_raw(bytecode[1])?;
 
-            if let ValueCellInner::Bool(b) = res.into_inner() {
+            if let CelValueInner::Bool(b) = res.into_inner() {
                 if !b {
                     return Ok(false.into());
                 }
@@ -77,24 +67,20 @@ fn all_impl(
 
         return Ok(true.into());
     } else {
-        Err(ValueCellError::with_msg("all() only available on list"))
+        Err(CelError::value("all() only available on list"))
     }
 }
 
-fn exists_impl(
-    ctx: &Interpreter,
-    this: ValueCell,
-    bytecode: &[&[ByteCode]],
-) -> ValueCellResult<ValueCell> {
+fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
     if bytecode.len() != 2 {
-        return Err(ValueCellError::with_msg(
+        return Err(CelError::argument(
             "exists() macro expects exactly 2 arguments",
         ));
     }
 
     let ident_name = eval_ident(bytecode[0])?;
 
-    if let ValueCellInner::List(list) = this.inner() {
+    if let CelValueInner::List(list) = this.inner() {
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
         let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
 
@@ -104,7 +90,7 @@ fn exists_impl(
 
             let res = interp.run_raw(bytecode[1])?;
 
-            if let ValueCellInner::Bool(b) = res.into_inner() {
+            if let CelValueInner::Bool(b) = res.into_inner() {
                 if b {
                     return Ok(true.into());
                 }
@@ -113,24 +99,24 @@ fn exists_impl(
 
         return Ok(false.into());
     } else {
-        Err(ValueCellError::with_msg("exists() only available on list"))
+        Err(CelError::value("exists() only available on list"))
     }
 }
 
 fn exists_one_impl(
     ctx: &Interpreter,
-    this: ValueCell,
+    this: CelValue,
     bytecode: &[&[ByteCode]],
-) -> ValueCellResult<ValueCell> {
+) -> CelResult<CelValue> {
     if bytecode.len() != 2 {
-        return Err(ValueCellError::with_msg(
+        return Err(CelError::argument(
             "exists_one() macro expects exactly 2 arguments",
         ));
     }
 
     let ident_name = eval_ident(bytecode[0])?;
 
-    if let ValueCellInner::List(list) = this.inner() {
+    if let CelValueInner::List(list) = this.inner() {
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
         let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
 
@@ -141,7 +127,7 @@ fn exists_one_impl(
 
             let res = interp.run_raw(bytecode[1])?;
 
-            if let ValueCellInner::Bool(b) = res.into_inner() {
+            if let CelValueInner::Bool(b) = res.into_inner() {
                 if b {
                     count += 1;
 
@@ -154,27 +140,21 @@ fn exists_one_impl(
 
         return Ok((count == 1).into());
     } else {
-        Err(ValueCellError::with_msg(
-            "exists_one() only available on list",
-        ))
+        Err(CelError::value("exists_one() only available on list"))
     }
 }
 
-fn filter_impl(
-    ctx: &Interpreter,
-    this: ValueCell,
-    bytecode: &[&[ByteCode]],
-) -> ValueCellResult<ValueCell> {
+fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
     if bytecode.len() != 2 {
-        return Err(ValueCellError::with_msg(
+        return Err(CelError::argument(
             "filter() macro expects exactly 2 arguments",
         ));
     }
 
     let ident_name = eval_ident(bytecode[0])?;
 
-    if let ValueCellInner::List(list) = this.inner() {
-        let mut filtered_list: Vec<ValueCell> = Vec::new();
+    if let CelValueInner::List(list) = this.inner() {
+        let mut filtered_list: Vec<CelValue> = Vec::new();
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
         let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
 
@@ -183,7 +163,7 @@ fn filter_impl(
             bindings.bind_param(&ident_name, v.clone());
             let interp = Interpreter::new(&cel, &bindings);
 
-            if let ValueCellInner::Bool(b) = interp.run_raw(bytecode[1])?.into_inner() {
+            if let CelValueInner::Bool(b) = interp.run_raw(bytecode[1])?.into_inner() {
                 if b {
                     filtered_list.push(v.clone());
                 }
@@ -191,25 +171,21 @@ fn filter_impl(
         }
         Ok(filtered_list.into())
     } else {
-        Err(ValueCellError::with_msg("filter() only available on list"))
+        Err(CelError::value("filter() only available on list"))
     }
 }
 
-fn map_impl(
-    ctx: &Interpreter,
-    this: ValueCell,
-    bytecode: &[&[ByteCode]],
-) -> ValueCellResult<ValueCell> {
+fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
     if bytecode.len() != 2 {
-        return Err(ValueCellError::with_msg(
+        return Err(CelError::argument(
             "map() macro expects exactly 2 arguments",
         ));
     }
 
     let ident_name = eval_ident(bytecode[0])?;
 
-    if let ValueCellInner::List(list) = this.inner() {
-        let mut mapped_list: Vec<ValueCell> = Vec::new();
+    if let CelValueInner::List(list) = this.inner() {
+        let mut mapped_list: Vec<CelValue> = Vec::new();
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
         let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
 
@@ -222,6 +198,6 @@ fn map_impl(
         }
         Ok(mapped_list.into())
     } else {
-        Err(ValueCellError::with_msg("map() only available on list"))
+        Err(CelError::value("map() only available on list"))
     }
 }

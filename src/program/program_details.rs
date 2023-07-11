@@ -1,6 +1,10 @@
-use crate::ast::grammar::{
-    Addition, ConditionalAnd, ConditionalOr, Expr, ExprList, ExprListTail, Member, MemberPrime,
-    Multiplication, Primary, Relation, Unary,
+use crate::{
+    ast::grammar::{
+        Addition, ConditionalAnd, ConditionalOr, Expr, ExprList, ExprListTail, Member, MemberPrime,
+        Multiplication, Primary, Relation, Unary,
+    },
+    utils::IdentFilterIter,
+    BindContext,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -32,6 +36,11 @@ impl ProgramDetails {
 
     pub fn params<'a>(&'a self) -> Vec<&'a str> {
         self.params.iter().map(|x| x.as_str()).collect()
+    }
+
+    pub fn filter_from_bindings(&mut self, bindings: &BindContext) {
+        self.params =
+            IdentFilterIter::new(bindings, &mut self.params.iter().map(|x| x.as_str())).collect();
     }
 
     fn parse_expr(&mut self, ast: &Expr) {

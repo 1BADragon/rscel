@@ -1,6 +1,6 @@
 mod utils;
 
-use crate::{BindContext, CelContext, Program};
+use crate::{BindContext, CelContext, CelError, Program};
 use serde::Serialize;
 use serde_json::Value;
 use wasm_bindgen::prelude::*;
@@ -20,18 +20,29 @@ pub fn greet() {
 }
 
 #[derive(Serialize)]
+pub struct EvalError {
+    kind: String,
+    msg: String,
+    err: CelError,
+}
+
+#[derive(Serialize)]
 pub struct EvalResult {
     success: bool,
     result: Option<Value>,
-    error: Option<Value>,
+    error: Option<EvalError>,
 }
 
 impl EvalResult {
-    pub fn from_error<T: std::fmt::Debug>(err: T) -> EvalResult {
+    pub fn from_error(err: CelError) -> EvalResult {
         EvalResult {
             success: false,
             result: None,
-            error: Some(Value::from(format!("{:?}", err))),
+            error: Some(EvalError {
+                kind: err.type_string().to_owned(),
+                msg: err.to_string(),
+                err,
+            }),
         }
     }
 
@@ -72,10 +83,17 @@ pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
 #[wasm_bindgen]
 pub fn cel_details(source: &str) -> JsValue {
     match Program::from_source(source) {
-        Ok(prog) => serde_wasm_bindgen::to_value(&EvalResult::from_value(
-            serde_json::to_value(&prog.details()).unwrap(),
-        ))
-        .unwrap(),
+        Ok(prog) => {
+            let mut details = prog.details().clone();
+            let default_bindings = BindContext::new();
+
+            details.filter_from_bindings(&default_bindings);
+
+            serde_wasm_bindgen::to_value(&EvalResult::from_value(
+                serde_json::to_value(&details).unwrap(),
+            ))
+            .unwrap()
+        }
         Err(err) => serde_wasm_bindgen::to_value(&EvalResult::from_error(err)).unwrap(),
     }
 }

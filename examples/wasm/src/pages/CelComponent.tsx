@@ -65,7 +65,7 @@ export default function CelComponent() {
               setParams(details.result.get("params"));
               setErrorMessage("");
             } else {
-              setErrorMessage(details.error);
+              setErrorMessage(`${details.error.kind}: ${details.error.msg}`);
             }
           }}
         >
@@ -80,7 +80,7 @@ export default function CelComponent() {
             if (result.success) {
               setErrorMessage(`Result: ${result.result.toString()}`);
             } else {
-              setErrorMessage(result.error);
+              setErrorMessage(`${result.error.kind}: ${result.error.msg}`);
             }
           }}
         >

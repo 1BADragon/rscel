@@ -1,4 +1,4 @@
-use crate::{BindContext, CelContext, ValueCell};
+use crate::{BindContext, CelContext, CelValue};
 
 use chrono::{DateTime, Duration, Utc};
 use pyo3::{
@@ -25,7 +25,7 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &PyDict) -> PyResult<PyObjec
 
     match res {
         Ok(res) => Ok(res.to_object(py)),
-        Err(err) => Err(PyRuntimeError::new_err(err.str().to_owned())),
+        Err(err) => Err(PyRuntimeError::new_err(err.to_string())),
     }
 }
 
@@ -45,7 +45,7 @@ impl PyCelContext {
 
     pub fn add_program_str(mut slf: PyRefMut<'_, Self>, name: &str, prog: &str) -> PyResult<()> {
         if let Err(err) = slf.ctx.add_program_str(name, prog) {
-            Err(PyValueError::new_err(err.into_str()))
+            Err(PyValueError::new_err(err.to_string()))
         } else {
             Ok(())
         }
@@ -58,7 +58,7 @@ impl PyCelContext {
     ) -> PyResult<PyObject> {
         match slf.ctx.exec(name, &bindings.ctx) {
             Ok(val) => Ok(val.to_object(slf.py())),
-            Err(err) => Err(PyValueError::new_err(err.into_str())),
+            Err(err) => Err(PyValueError::new_err(err.to_string())),
         }
     }
 }
@@ -77,7 +77,7 @@ impl PyBindContext {
         }
     }
 
-    pub fn bind(mut slf: PyRefMut<'_, Self>, name: &str, val: ValueCell) {
+    pub fn bind(mut slf: PyRefMut<'_, Self>, name: &str, val: CelValue) {
         slf.ctx.bind_param(name, val);
     }
 }
@@ -91,7 +91,7 @@ fn rscel(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
-impl<'source> FromPyObject<'source> for ValueCell {
+impl<'source> FromPyObject<'source> for CelValue {
     fn extract(ob: &'source PyAny) -> PyResult<Self> {
         match ob.get_type().name() {
             Ok(type_name) => match type_name {
@@ -101,7 +101,7 @@ impl<'source> FromPyObject<'source> for ValueCell {
                 "str" => Ok(ob.downcast::<PyString>()?.extract::<String>()?.into()),
                 "bytes" => Ok(ob.downcast::<PyBytes>()?.extract::<Vec<u8>>()?.into()),
                 "list" => {
-                    let mut vec: Vec<ValueCell> = Vec::new();
+                    let mut vec: Vec<CelValue> = Vec::new();
 
                     for val in ob.downcast::<PyList>()?.iter() {
                         vec.push(val.extract()?)
@@ -110,7 +110,7 @@ impl<'source> FromPyObject<'source> for ValueCell {
                     Ok(vec.into())
                 }
                 "dict" => {
-                    let mut map: HashMap<String, ValueCell> = HashMap::new();
+                    let mut map: HashMap<String, CelValue> = HashMap::new();
 
                     let mapobj = ob.downcast::<PyDict>()?;
                     for keyobj in mapobj.keys().iter() {
@@ -126,7 +126,7 @@ impl<'source> FromPyObject<'source> for ValueCell {
                     .extract::<DateTime<Utc>>()?
                     .into()),
                 "datetime.timedelta" => Ok(ob.downcast::<PyDelta>()?.extract::<Duration>()?.into()),
-                "NoneType" => Ok(ValueCell::from_null()),
+                "NoneType" => Ok(CelValue::from_null()),
                 other => Err(PyValueError::new_err(format!(
                     "{} is not a compatable rscel type",
                     other
@@ -141,9 +141,9 @@ impl<'source> FromPyObject<'source> for ValueCell {
 }
 
 /* private functions */
-impl ToPyObject for ValueCell {
+impl ToPyObject for CelValue {
     fn to_object(&self, py: Python<'_>) -> PyObject {
-        use crate::ValueCellInner::*;
+        use crate::CelValueInner::*;
 
         match self.inner() {
             Int(i) => i.to_object(py),
