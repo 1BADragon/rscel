@@ -1,8 +1,9 @@
 use std::fmt;
 
 use parsel::Span;
+use serde::Serialize;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum CelError {
     Misc(String),
     Syntax {
