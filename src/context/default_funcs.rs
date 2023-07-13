@@ -6,23 +6,25 @@ use crate::{
 use chrono::{DateTime, Utc};
 use regex::Regex;
 
-const DEFAULT_FUNCS: &[(&str, RsCelFunction)] = &[
-    ("int", int_impl),
-    ("uint", uint_impl),
-    ("double", double_impl),
-    ("bytes", bytes_impl),
-    ("string", string_impl),
-    ("contains", contains_impl),
-    ("size", size_impl),
-    ("startsWith", starts_with_impl),
-    ("endsWith", ends_with_impl),
-    ("matches", matches_impl),
-    ("type", type_impl),
-    ("timestamp", timestamp_impl),
-    ("duration", duration_impl),
-    ("abs", abs_impl),
-    ("sqrt", sqrt_impl),
-    ("pow", pow_impl),
+const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
+    ("int", &int_impl),
+    ("uint", &uint_impl),
+    ("double", &double_impl),
+    ("bytes", &bytes_impl),
+    ("string", &string_impl),
+    ("contains", &contains_impl),
+    ("size", &size_impl),
+    ("startsWith", &starts_with_impl),
+    ("endsWith", &ends_with_impl),
+    ("matches", &matches_impl),
+    ("type", &type_impl),
+    ("timestamp", &timestamp_impl),
+    ("duration", &duration_impl),
+    ("abs", &abs_impl),
+    ("sqrt", &sqrt_impl),
+    ("pow", &pow_impl),
+    ("log", &log_impl),
+    ("ceil", &ceil_impl),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
@@ -338,5 +340,31 @@ fn pow_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
             )),
         },
         _ => Err(CelError::value("abs() expect numerical argument")),
+    }
+}
+
+fn log_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("log() expects one argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => Ok(i.ilog10().into()),
+        CelValueInner::UInt(u) => Ok(u.ilog10().into()),
+        CelValueInner::Float(f) => Ok(f.log10().into()),
+        _ => Err(CelError::value("log() expects numerical argument")),
+    }
+}
+
+fn ceil_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("ceil() expects on argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => Ok((*i).into()),
+        CelValueInner::UInt(u) => Ok((*u).into()),
+        CelValueInner::Float(f) => Ok(f.ceil().into()),
+        _ => Err(CelError::argument("ceil() expects numeric type")),
     }
 }

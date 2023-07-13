@@ -12,7 +12,7 @@ use std::{
 
 use serde_json::{value::Value, Map};
 
-use crate::{context::RsCallable, interp::ByteCode, CelError, CelResult};
+use crate::{interp::ByteCode, CelError, CelResult};
 
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -33,11 +33,6 @@ pub enum CelValueInner {
     #[serde(skip_serializing, skip_deserializing)]
     Duration(Duration),
     ByteCode(Vec<ByteCode>),
-    #[serde(skip_serializing, skip_deserializing)]
-    BoundCall {
-        callable: RsCallable,
-        value: CelValue,
-    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -128,14 +123,6 @@ impl CelValue {
 
     pub(crate) fn from_bytecode(val: &[ByteCode]) -> CelValue {
         CelValueInner::ByteCode(val.to_owned()).into()
-    }
-
-    pub(crate) fn from_binding(callable: RsCallable, value: &CelValue) -> CelValue {
-        CelValueInner::BoundCall {
-            callable,
-            value: value.clone(),
-        }
-        .into()
     }
 
     pub fn into_inner(self) -> CelValueInner {
@@ -402,10 +389,6 @@ impl CelValue {
             CelValueInner::TimeStamp(_) => CelValue::from_type("timestamp"),
             CelValueInner::Duration(_) => CelValue::from_type("duration"),
             CelValueInner::ByteCode(_) => CelValue::from_type("bytecode"),
-            CelValueInner::BoundCall {
-                callable: _,
-                value: _,
-            } => CelValue::from_type("bound call"),
         }
     }
 }

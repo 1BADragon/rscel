@@ -7,13 +7,13 @@ use crate::{
 
 use super::bind_context::RsCelMacro;
 
-const DEFAULT_MACROS: &[(&str, RsCelMacro)] = &[
-    ("has", has_impl),
-    ("all", all_impl),
-    ("exists", exists_impl),
-    ("exists_one", exists_one_impl),
-    ("filter", filter_impl),
-    ("map", map_impl),
+const DEFAULT_MACROS: &[(&str, &'static RsCelMacro)] = &[
+    ("has", &has_impl),
+    ("all", &all_impl),
+    ("exists", &exists_impl),
+    ("exists_one", &exists_one_impl),
+    ("filter", &filter_impl),
+    ("map", &map_impl),
 ];
 
 pub fn load_default_macros(exec_ctx: &mut BindContext) {
