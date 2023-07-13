@@ -20,6 +20,9 @@ const DEFAULT_FUNCS: &[(&str, RsCelFunction)] = &[
     ("type", type_impl),
     ("timestamp", timestamp_impl),
     ("duration", duration_impl),
+    ("abs", abs_impl),
+    ("sqrt", sqrt_impl),
+    ("pow", pow_impl),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
@@ -273,7 +276,7 @@ fn timestamp_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 
 fn duration_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     if args.len() != 1 {
-        return Err(CelError::argument("duration() expects on argument"));
+        return Err(CelError::argument("duration() expects one argument"));
     }
 
     if let CelValueInner::String(str_val) = args[0].inner() {
@@ -283,5 +286,57 @@ fn duration_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         }
     } else {
         Err(CelError::value("duration() expects a string argument"))
+    }
+}
+
+fn abs_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("abs() expects one argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => Ok(i.abs().into()),
+        CelValueInner::UInt(u) => Ok((*u).into()),
+        CelValueInner::Float(f) => Ok(f.abs().into()),
+        _ => Err(CelError::value("abs() expect numerical argument")),
+    }
+}
+
+fn sqrt_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("sqrt() expects one argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Float(f) => Ok(f.sqrt().into()),
+        _ => Err(CelError::value("abs() expect double argument")),
+    }
+}
+
+fn pow_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 2 {
+        return Err(CelError::argument("pow() expects two argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => match args[1].inner() {
+            CelValueInner::Int(e) => Ok(i.pow(*e as u32).into()),
+            CelValueInner::UInt(e) => Ok(i.pow(*e as u32).into()),
+            _ => Err(CelError::argument("pow() expects integer exponent")),
+        },
+        CelValueInner::UInt(u) => match args[1].inner() {
+            CelValueInner::Int(e) => Ok(u.pow(*e as u32).into()),
+            CelValueInner::UInt(e) => Ok(u.pow(*e as u32).into()),
+            _ => Err(CelError::argument("pow() expects integer exponent")),
+        },
+        CelValueInner::Float(f) => match args[1].inner() {
+            CelValueInner::Int(e) => Ok(f.powi(*e as i32).into()),
+            CelValueInner::UInt(e) => Ok(f.powi(*e as i32).into()),
+            CelValueInner::Float(e) => Ok(f.powf(*e).into()),
+            _ => Err(CelError::argument(
+                "pow() expect integer or float for exponent",
+            )),
+        },
+        _ => Err(CelError::value("abs() expect numerical argument")),
     }
 }
