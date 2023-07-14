@@ -452,7 +452,6 @@ impl<'a> Interpreter<'a> {
         }
 
         let val = stack.pop_tryresolve();
-        println!("val: {:?}", val);
         match val {
             Ok(val) => val.try_into(),
             Err(err) => Err(err),

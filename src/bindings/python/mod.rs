@@ -8,6 +8,20 @@ use pyo3::{
 };
 use std::collections::HashMap;
 
+struct CelPyCallable {
+    func: Py<PyAny>,
+}
+
+impl CelPyCallable {
+    fn new(func: Py<PyAny>) -> CelPyCallable {
+        CelPyCallable { func }
+    }
+}
+
+impl Fn<(CelValue, &[CelValue])> for CelPyCallable {
+    extern "rust-call" fn call(&self, args: (CelValue, &[CelValue])) -> Self::Output {}
+}
+
 /* Eval entry point */
 #[pyfunction]
 fn eval(py: Python<'_>, prog_str: String, bindings: &PyDict) -> PyResult<PyObject> {
@@ -16,9 +30,19 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &PyDict) -> PyResult<PyObjec
 
     ctx.add_program_str("entry", &prog_str).unwrap();
 
+    let mut callables = Vec::new();
+
     for keyobj in bindings.keys().iter() {
         let key = keyobj.downcast::<PyString>()?;
-        exec_ctx.bind_param(key.to_str()?, bindings.get_item(keyobj).unwrap().extract()?)
+
+        let val = bindings.get_item(keyobj).unwrap();
+
+        if val.is_callable() {
+            callables.push(CelPyCallable::new(val.into()));
+            exec_ctx.bind_func(key.to_str()?, callables.last().unwrap());
+        } else {
+            exec_ctx.bind_param(key.to_str()?, val.extract()?)
+        }
     }
 
     let res = ctx.exec("entry", &exec_ctx);
@@ -56,7 +80,13 @@ impl PyCelContext {
         name: &str,
         bindings: &PyBindContext,
     ) -> PyResult<PyObject> {
-        match slf.ctx.exec(name, &bindings.ctx) {
+        let mut bindctx = BindContext::new();
+
+        for key in bindings.bindings.keys() {
+            bindctx.bind_param(&key, bindings.bindings[key].clone());
+        }
+
+        match slf.ctx.exec(name, &bindctx) {
             Ok(val) => Ok(val.to_object(slf.py())),
             Err(err) => Err(PyValueError::new_err(err.to_string())),
         }
@@ -65,7 +95,7 @@ impl PyCelContext {
 
 #[pyclass(name = "BindContext")]
 struct PyBindContext {
-    ctx: BindContext,
+    bindings: HashMap<String, CelValue>,
 }
 
 #[pymethods]
@@ -73,12 +103,12 @@ impl PyBindContext {
     #[new]
     pub fn new() -> PyBindContext {
         PyBindContext {
-            ctx: BindContext::new(),
+            bindings: HashMap::new(),
         }
     }
 
     pub fn bind(mut slf: PyRefMut<'_, Self>, name: &str, val: CelValue) {
-        slf.ctx.bind_param(name, val);
+        slf.bindings.insert(name.to_owned(), val);
     }
 }
 
