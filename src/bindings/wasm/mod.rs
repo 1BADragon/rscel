@@ -5,20 +5,6 @@ use serde::Serialize;
 use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
-    // Use `js_namespace` here to bind `console.log(..)` instead of just
-    // `log(..)`
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
-
-#[wasm_bindgen]
-pub fn greet() {
-    alert("Hello, rscel-wasm!");
-}
-
 #[derive(Serialize)]
 pub struct EvalError {
     kind: String,
@@ -71,7 +57,6 @@ pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
     }
 
     let res = ctx.exec("entry", &exec_ctx);
-    log(&format!("{:?}", res));
 
     serde_wasm_bindgen::to_value(&match res {
         Ok(ok) => EvalResult::from_value(ok.into_json_value()),
