@@ -136,6 +136,14 @@ impl CelValue {
         &self.inner
     }
 
+    pub fn is_true(&self) -> bool {
+        if let CelValueInner::Bool(val) = self.inner() {
+            *val
+        } else {
+            false
+        }
+    }
+
     pub fn eq(&self, rhs: &CelValue) -> CelResult<CelValue> {
         let type1 = rhs.as_type();
         let type2 = rhs.as_type();

@@ -25,6 +25,10 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("pow", &pow_impl),
     ("log", &log_impl),
     ("ceil", &ceil_impl),
+    ("floor", &floor_impl),
+    ("round", &round_impl),
+    ("min", &min_impl),
+    ("max", &max_impl),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
@@ -364,7 +368,75 @@ fn ceil_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     match args[0].inner() {
         CelValueInner::Int(i) => Ok((*i).into()),
         CelValueInner::UInt(u) => Ok((*u).into()),
-        CelValueInner::Float(f) => Ok(f.ceil().into()),
+        CelValueInner::Float(f) => Ok((f.ceil() as i64).into()),
         _ => Err(CelError::argument("ceil() expects numeric type")),
     }
+}
+
+fn floor_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("floor() expects on argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => Ok((*i).into()),
+        CelValueInner::UInt(u) => Ok((*u).into()),
+        CelValueInner::Float(f) => Ok((f.floor() as i64).into()),
+        _ => Err(CelError::argument("floor() expects numeric type")),
+    }
+}
+
+fn round_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("round() expects on argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => Ok((*i).into()),
+        CelValueInner::UInt(u) => Ok((*u).into()),
+        CelValueInner::Float(f) => Ok((f.round() as i64).into()),
+        _ => Err(CelError::argument("round() expects numeric type")),
+    }
+}
+
+fn min_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() == 0 {
+        return Err(CelError::argument("min() requires at lease one argument"));
+    }
+
+    let mut curr_min = None;
+
+    for val in args.into_iter() {
+        match curr_min {
+            Some(curr) => {
+                if val.lt(curr)?.is_true() {
+                    curr_min = Some(val);
+                }
+            }
+            None => curr_min = Some(val),
+        }
+    }
+
+    return Ok(curr_min.unwrap().clone());
+}
+
+fn max_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() == 0 {
+        return Err(CelError::argument("max() requires at lease one argument"));
+    }
+
+    let mut curr_min = None;
+
+    for val in args.into_iter() {
+        match curr_min {
+            Some(curr) => {
+                if val.gt(curr)?.is_true() {
+                    curr_min = Some(val);
+                }
+            }
+            None => curr_min = Some(val),
+        }
+    }
+
+    return Ok(curr_min.unwrap().clone());
 }
