@@ -128,6 +128,7 @@ mod test {
     #[test_case("round(2.5)", 3.into(); "round up")]
     #[test_case("min(1,2,3)", 1.into(); "min")]
     #[test_case("max(1,2,3)", 3.into(); "max")]
+    #[test_case("[1,2,3].reduce(curr, next, curr + next, 0)", 6.into(); "reduce")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
