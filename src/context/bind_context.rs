@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt};
+use std::collections::HashMap;
 
 use serde_json::Value;
 
@@ -36,7 +36,7 @@ use super::default_macros::load_default_macros;
 ///     }
 /// }
 /// ```
-pub type RsCelFunction = fn(this: CelValue, args: &[CelValue]) -> CelResult<CelValue>;
+pub type RsCelFunction = dyn Fn(CelValue, &[CelValue]) -> CelResult<CelValue>;
 
 /// Prototype for a macro binding.
 ///
@@ -46,34 +46,8 @@ pub type RsCelFunction = fn(this: CelValue, args: &[CelValue]) -> CelResult<CelV
 /// argument is the resolved value the macro is being run on (i.e `my_list.map()`) however
 /// all arguents passed to the macro are left unresolved bytecode. An additional argument,
 /// the Interpreter context, is provided to the macro for bytecode resolution.
-pub type RsCelMacro = for<'a> fn(
-    ctx: &'a Interpreter<'a>,
-    this: CelValue,
-    inner: &'a [&'a [ByteCode]],
-) -> CelResult<CelValue>;
-
-/// Wrapper enum that contains either an RsCelCallable or an RsCelFunction. Used
-/// as a ValueCell value.
-#[derive(Clone)]
-pub enum RsCallable {
-    Function(RsCelFunction),
-    Macro(RsCelMacro),
-}
-
-impl fmt::Debug for RsCallable {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Function(_) => write!(f, "Function"),
-            Self::Macro(_) => write!(f, "Macro"),
-        }
-    }
-}
-
-impl PartialEq for RsCallable {
-    fn eq(&self, _other: &Self) -> bool {
-        false
-    }
-}
+pub type RsCelMacro =
+    dyn for<'a, 'b> Fn(&'a Interpreter<'a>, CelValue, &'b [&'b [ByteCode]]) -> CelResult<CelValue>;
 
 /// Bindings context for a cel evaluation.
 ///
@@ -83,15 +57,15 @@ impl PartialEq for RsCallable {
 /// for multiple runs with different bound values on the same programs without the need
 /// to maintain multiple copies of the programs.
 #[derive(Clone)]
-pub struct BindContext {
+pub struct BindContext<'a> {
     params: HashMap<String, CelValue>,
-    funcs: HashMap<String, RsCelFunction>,
-    macros: HashMap<String, RsCelMacro>,
+    funcs: HashMap<String, &'a RsCelFunction>,
+    macros: HashMap<String, &'a RsCelMacro>,
 }
 
-impl BindContext {
+impl<'a> BindContext<'a> {
     /// Create a new bind context contain default functions and macros.
-    pub fn new() -> BindContext {
+    pub fn new() -> BindContext<'a> {
         let mut ctx = BindContext {
             params: HashMap::new(),
             funcs: HashMap::new(),
@@ -123,28 +97,28 @@ impl BindContext {
     }
 
     /// Bind a function to the bind context, can be new or overwrite an existing (including default)
-    pub fn bind_func(&mut self, name: &str, func: RsCelFunction) {
+    pub fn bind_func(&mut self, name: &str, func: &'a RsCelFunction) {
         self.funcs.insert(name.to_owned(), func);
     }
 
     /// Bind a macro to the bind context.
-    pub fn bind_macro(&mut self, name: &str, macro_: RsCelMacro) {
+    pub fn bind_macro(&mut self, name: &str, macro_: &'a RsCelMacro) {
         self.macros.insert(name.to_owned(), macro_);
     }
 
     /// Get a param by name.
-    pub fn get_param<'a>(&'a self, name: &str) -> Option<&'a CelValue> {
+    pub fn get_param<'l>(&'l self, name: &str) -> Option<&'l CelValue> {
         Some(self.params.get(name)?)
     }
 
     /// Get a function by name.
-    pub fn get_func(&self, name: &str) -> Option<RsCelFunction> {
-        Some(self.funcs.get(name)?.clone())
+    pub fn get_func(&self, name: &str) -> Option<&'a RsCelFunction> {
+        Some((*self.funcs.get(name)?).clone())
     }
 
     /// Get a macro by name.
-    pub fn get_macro(&self, name: &str) -> Option<RsCelMacro> {
-        Some(self.macros.get(name)?.clone())
+    pub fn get_macro(&self, name: &str) -> Option<&'a RsCelMacro> {
+        Some((*self.macros.get(name)?).clone())
     }
 
     pub fn is_bound(&self, name: &str) -> bool {

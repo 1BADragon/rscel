@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::CelValue;
+use crate::{CelError, CelResult, CelValue, CelValueInner, RsCelFunction, RsCelMacro};
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -74,6 +74,92 @@ impl fmt::Debug for ByteCode {
             Index => write!(f, "INDEX"),
             Access => write!(f, "ACCESS"),
             Call(size) => write!(f, "CALL {}", size),
+        }
+    }
+}
+
+/// Wrapper enum that contains either an RsCelCallable or an RsCelFunction. Used
+/// as a ValueCell value.
+#[derive(Clone)]
+pub enum RsCallable<'a> {
+    Function(&'a RsCelFunction),
+    Macro(&'a RsCelMacro),
+}
+
+impl<'a> fmt::Debug for RsCallable<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Function(_) => write!(f, "Function"),
+            Self::Macro(_) => write!(f, "Macro"),
+        }
+    }
+}
+
+impl<'a> PartialEq for RsCallable<'a> {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum CelStackValue<'a> {
+    Value(CelValue),
+    BoundCall {
+        callable: RsCallable<'a>,
+        value: CelValue,
+    },
+}
+
+impl<'a> CelStackValue<'a> {
+    pub fn into_inner(self) -> CelResult<CelValueInner> {
+        match self {
+            CelStackValue::Value(val) => Ok(val.into_inner()),
+            _ => Err(CelError::internal("Expected value")),
+        }
+    }
+
+    pub fn as_inner(&'a self) -> CelResult<&'a CelValueInner> {
+        match self {
+            CelStackValue::Value(val) => Ok(val.inner()),
+            _ => Err(CelError::internal("Expected value")),
+        }
+    }
+
+    pub fn into_value(self) -> CelResult<CelValue> {
+        match self {
+            CelStackValue::Value(val) => Ok(val),
+            _ => Err(CelError::internal("Expected value")),
+        }
+    }
+
+    pub fn as_value(&'a self) -> CelResult<&'a CelValue> {
+        match self {
+            CelStackValue::Value(val) => Ok(val),
+            _ => Err(CelError::internal("Expected value")),
+        }
+    }
+
+    pub fn as_bound_call(&'a self) -> Option<(&'a RsCallable<'a>, &'a CelValue)> {
+        match self {
+            CelStackValue::BoundCall { callable, value } => Some((callable, value)),
+            _ => None,
+        }
+    }
+}
+
+impl<'a> Into<CelStackValue<'a>> for CelValue {
+    fn into(self) -> CelStackValue<'a> {
+        CelStackValue::Value(self)
+    }
+}
+
+impl<'a> TryInto<CelValue> for CelStackValue<'a> {
+    type Error = CelError;
+    fn try_into(self) -> Result<CelValue, Self::Error> {
+        if let CelStackValue::Value(val) = self {
+            Ok(val)
+        } else {
+            Err(CelError::internal("Expected value"))
         }
     }
 }

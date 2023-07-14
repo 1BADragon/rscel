@@ -117,6 +117,17 @@ mod test {
     #[test_case("[1,2,3,4].exists_one(x, x == 4)", true.into(); "test exists one true")]
     #[test_case("[1,2,3,4].exists_one(x, x == 5)", false.into(); "test exists one false")]
     #[test_case("[1,2,3,4].filter(x, x % 2 == 0)", CelValue::from_list(vec![2.into(), 4.into()]); "test filter")]
+    #[test_case("abs(-9)", 9.into(); "abs")]
+    #[test_case("sqrt(9.0)", 3.0.into(); "sqrt")]
+    #[test_case("pow(2, 2)", 4.into(); "pow")]
+    #[test_case("pow(2.0, 2)", 4.0.into(); "pow2")]
+    #[test_case("log(1)", 0u64.into(); "log")]
+    #[test_case("ceil(2.3)", 3.into(); "ceil")]
+    #[test_case("floor(2.7)", 2.into(); "floor")]
+    #[test_case("round(2.2)", 2.into(); "round down")]
+    #[test_case("round(2.5)", 3.into(); "round up")]
+    #[test_case("min(1,2,3)", 1.into(); "min")]
+    #[test_case("max(1,2,3)", 3.into(); "max")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();

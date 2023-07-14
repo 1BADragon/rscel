@@ -1,7 +1,7 @@
 use crate::BindContext;
 
 pub struct IdentFilterIter<'a> {
-    bindings: &'a BindContext,
+    bindings: &'a BindContext<'a>,
     iter: &'a mut dyn Iterator<Item = &'a str>,
 }
 
