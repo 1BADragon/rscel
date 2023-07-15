@@ -1,7 +1,7 @@
 import * as React from "react";
 import "./CelComponent.css";
 
-import init, { cel_eval, cel_details } from "rscel";
+import init, { cel_eval, cel_details, CelFloat } from "rscel";
 import { useState } from "react";
 
 export default function CelComponent() {
@@ -30,7 +30,7 @@ export default function CelComponent() {
               setParamVals((old: any) => {
                 try {
                   let newObj = { ...old };
-                  newObj[val] = JSON.parse(event.target.value);
+                  newObj[val] = new CelFloat(Number(event.target.value));
                   setErrorMessage("");
                   return newObj;
                 } catch (e) {

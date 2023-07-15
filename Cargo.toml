@@ -7,12 +7,15 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["program_cache"]
+default = ["program_cache", "wasm"]
 ast_ser = []
 program_cache = []
 python = ["dep:pyo3"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
-wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "console_error_panic_hook", "chrono/wasmbind"]
+wasm = [
+  "dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:js-sys", 
+  "dep:wasm-bindgen-downcast", "console_error_panic_hook", "chrono/wasmbind"
+]
 
 
 [dependencies]
@@ -33,3 +36,5 @@ pyo3 = { version = "0.19.1", optional = true, features = ["extension-module", "c
 wasm-bindgen = { version = "0.2.87", optional = true}
 console_error_panic_hook = { version = "0.1.7", optional = true }
 serde-wasm-bindgen = { version = "0.5.0", optional = true }
+js-sys = { version = "0.3.64", optional = true }
+wasm-bindgen-downcast = { version = "0.1.1", optional = true }
