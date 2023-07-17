@@ -8,7 +8,6 @@ use object_iter::ObjectIterator;
 use serde::Serialize;
 use serde_json::Value;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_downcast::DowncastJS;
 
 use self::utils::generic_of_js;
 
@@ -64,7 +63,6 @@ impl EvalResult {
 }
 
 #[wasm_bindgen]
-#[derive(DowncastJS)]
 pub struct CelFloat {
     cel_floatval: f64,
 }
