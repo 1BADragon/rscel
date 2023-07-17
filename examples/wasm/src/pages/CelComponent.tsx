@@ -30,7 +30,7 @@ export default function CelComponent() {
               setParamVals((old: any) => {
                 try {
                   let newObj = { ...old };
-                  newObj[val] = new CelFloat(Number(event.target.value));
+                  newObj[val] = Number(event.target.value);
                   setErrorMessage("");
                   return newObj;
                 } catch (e) {
@@ -59,7 +59,6 @@ export default function CelComponent() {
         <button
           onClick={() => {
             const details = cel_details(prog);
-            console.log(details);
 
             if (details.success) {
               setParams(details.result.get("params"));
@@ -73,9 +72,7 @@ export default function CelComponent() {
         </button>
         <button
           onClick={() => {
-            console.log(paramVals);
             const result = cel_eval(prog, paramVals);
-            console.log(result);
 
             if (result.success) {
               setErrorMessage(`Result: ${result.result.toString()}`);

@@ -10,6 +10,8 @@ use serde_json::Value;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_downcast::DowncastJS;
 
+use self::utils::generic_of_js;
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
@@ -70,11 +72,8 @@ pub struct CelFloat {
 #[wasm_bindgen]
 impl CelFloat {
     #[wasm_bindgen(constructor)]
-    pub fn new(val: JsValue) -> Option<CelFloat> {
-        match val.as_f64() {
-            Some(val) => Some(CelFloat { cel_floatval: val }),
-            None => None,
-        }
+    pub fn new(val: f64) -> Option<CelFloat> {
+        Some(CelFloat { cel_floatval: val })
     }
 }
 
@@ -103,6 +102,11 @@ pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
     .unwrap()
 }
 
+#[wasm_bindgen(js_name = floatVal)]
+pub fn float_val(val: f64) -> Option<CelFloat> {
+    CelFloat::new(val)
+}
+
 #[wasm_bindgen]
 pub fn cel_details(source: &str) -> JsValue {
     match Program::from_source(source) {
@@ -125,13 +129,9 @@ impl TryFrom<JsValue> for CelValue {
     type Error = CelError;
     fn try_from(value: JsValue) -> Result<Self, Self::Error> {
         if value.is_object() {
-            match CelFloat::downcast_js_ref(&value) {
-                Some(cel_float) => {
-                    log("is CelFloat");
-                    Ok(CelValue::from_float(cel_float.cel_floatval))
-                }
-                None => {
-                    log("is object");
+            match generic_of_js::<CelFloat>(value.clone(), "CelFloat") {
+                Ok(cel_float) => Ok(CelValue::from_float(cel_float.cel_floatval)),
+                Err(_) => {
                     let mut map = HashMap::new();
 
                     for (key, value) in ObjectIterator::new(value) {
@@ -141,9 +141,15 @@ impl TryFrom<JsValue> for CelValue {
                     Ok(CelValue::from_map(map))
                 }
             }
-        } else if value.is_bigint() {
-            let value: Value = serde_wasm_bindgen::from_value(value).unwrap();
-            Ok(CelValue::from(value))
+        } else if let Some(numval) = value.dyn_ref::<js_sys::Number>() {
+            if numval
+                .to_string(10)
+                .is_ok_and(|x| x.as_string().is_some_and(|s| s.contains('.')))
+            {
+                Ok(CelValue::from_float(numval.value_of()))
+            } else {
+                Ok(CelValue::from_int(numval.value_of() as i64))
+            }
         } else if value.is_string() {
             Ok(CelValue::from_string(value.as_string().unwrap()))
         } else if value.is_array() {
