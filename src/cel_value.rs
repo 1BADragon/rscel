@@ -144,6 +144,14 @@ impl CelValue {
         }
     }
 
+    pub fn is_null(&self) -> bool {
+        if let CelValueInner::Null = self.inner() {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn eq(&self, rhs: &CelValue) -> CelResult<CelValue> {
         let type1 = rhs.as_type();
         let type2 = rhs.as_type();

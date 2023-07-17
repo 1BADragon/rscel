@@ -25,6 +25,9 @@
 //! let res = ctx.exec("main", &exec_ctx).unwrap(); // ValueCell::Int(6)
 //! assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
 //! ```
+
+#![cfg_attr(feature = "python", feature(fn_traits))]
+#![cfg_attr(feature = "python", feature(unboxed_closures))]
 mod ast;
 mod cel_error;
 mod cel_value;

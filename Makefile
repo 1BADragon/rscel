@@ -27,3 +27,6 @@ python-binding-release: .env
 
 wasm-example: wasm-binding
 	cd examples/wasm && npm start
+
+.PHONY: all
+all: wasm-binding python-binding
