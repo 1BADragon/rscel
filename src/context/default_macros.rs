@@ -7,13 +7,14 @@ use crate::{
 
 use super::bind_context::RsCelMacro;
 
-const DEFAULT_MACROS: &[(&str, RsCelMacro)] = &[
-    ("has", has_impl),
-    ("all", all_impl),
-    ("exists", exists_impl),
-    ("exists_one", exists_one_impl),
-    ("filter", filter_impl),
-    ("map", map_impl),
+const DEFAULT_MACROS: &[(&str, &'static RsCelMacro)] = &[
+    ("has", &has_impl),
+    ("all", &all_impl),
+    ("exists", &exists_impl),
+    ("exists_one", &exists_one_impl),
+    ("filter", &filter_impl),
+    ("map", &map_impl),
+    ("reduce", &reduce_impl),
 ];
 
 pub fn load_default_macros(exec_ctx: &mut BindContext) {
@@ -199,5 +200,33 @@ fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelR
         Ok(mapped_list.into())
     } else {
         Err(CelError::value("map() only available on list"))
+    }
+}
+
+// reduce [].reduce(curr, next, expression, starting)
+fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
+    if bytecode.len() != 4 {
+        return Err(CelError::argument("reduce() macro expects 4 arguments"));
+    }
+
+    let curr_name = eval_ident(bytecode[0])?;
+    let next_name = eval_ident(bytecode[1])?;
+    let mut cur_value = ctx.run_raw(bytecode[3])?;
+    let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
+    let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
+
+    if let CelValueInner::List(list) = this.into_inner() {
+        for next in list.into_iter() {
+            bindings.bind_param(&next_name, next);
+            bindings.bind_param(&curr_name, cur_value);
+
+            let interp = Interpreter::new(&cel, &bindings);
+
+            cur_value = interp.run_raw(bytecode[2])?;
+        }
+
+        Ok(cur_value)
+    } else {
+        Err(CelError::value("reduce() only availble on list"))
     }
 }

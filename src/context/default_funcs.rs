@@ -6,20 +6,29 @@ use crate::{
 use chrono::{DateTime, Utc};
 use regex::Regex;
 
-const DEFAULT_FUNCS: &[(&str, RsCelFunction)] = &[
-    ("int", int_impl),
-    ("uint", uint_impl),
-    ("double", double_impl),
-    ("bytes", bytes_impl),
-    ("string", string_impl),
-    ("contains", contains_impl),
-    ("size", size_impl),
-    ("startsWith", starts_with_impl),
-    ("endsWith", ends_with_impl),
-    ("matches", matches_impl),
-    ("type", type_impl),
-    ("timestamp", timestamp_impl),
-    ("duration", duration_impl),
+const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
+    ("int", &int_impl),
+    ("uint", &uint_impl),
+    ("double", &double_impl),
+    ("bytes", &bytes_impl),
+    ("string", &string_impl),
+    ("contains", &contains_impl),
+    ("size", &size_impl),
+    ("startsWith", &starts_with_impl),
+    ("endsWith", &ends_with_impl),
+    ("matches", &matches_impl),
+    ("type", &type_impl),
+    ("timestamp", &timestamp_impl),
+    ("duration", &duration_impl),
+    ("abs", &abs_impl),
+    ("sqrt", &sqrt_impl),
+    ("pow", &pow_impl),
+    ("log", &log_impl),
+    ("ceil", &ceil_impl),
+    ("floor", &floor_impl),
+    ("round", &round_impl),
+    ("min", &min_impl),
+    ("max", &max_impl),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
@@ -273,7 +282,7 @@ fn timestamp_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 
 fn duration_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     if args.len() != 1 {
-        return Err(CelError::argument("duration() expects on argument"));
+        return Err(CelError::argument("duration() expects one argument"));
     }
 
     if let CelValueInner::String(str_val) = args[0].inner() {
@@ -284,4 +293,150 @@ fn duration_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     } else {
         Err(CelError::value("duration() expects a string argument"))
     }
+}
+
+fn abs_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("abs() expects one argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => Ok(i.abs().into()),
+        CelValueInner::UInt(u) => Ok((*u).into()),
+        CelValueInner::Float(f) => Ok(f.abs().into()),
+        _ => Err(CelError::value("abs() expect numerical argument")),
+    }
+}
+
+fn sqrt_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("sqrt() expects one argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Float(f) => Ok(f.sqrt().into()),
+        _ => Err(CelError::value("abs() expect double argument")),
+    }
+}
+
+fn pow_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 2 {
+        return Err(CelError::argument("pow() expects two argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => match args[1].inner() {
+            CelValueInner::Int(e) => Ok(i.pow(*e as u32).into()),
+            CelValueInner::UInt(e) => Ok(i.pow(*e as u32).into()),
+            _ => Err(CelError::argument("pow() expects integer exponent")),
+        },
+        CelValueInner::UInt(u) => match args[1].inner() {
+            CelValueInner::Int(e) => Ok(u.pow(*e as u32).into()),
+            CelValueInner::UInt(e) => Ok(u.pow(*e as u32).into()),
+            _ => Err(CelError::argument("pow() expects integer exponent")),
+        },
+        CelValueInner::Float(f) => match args[1].inner() {
+            CelValueInner::Int(e) => Ok(f.powi(*e as i32).into()),
+            CelValueInner::UInt(e) => Ok(f.powi(*e as i32).into()),
+            CelValueInner::Float(e) => Ok(f.powf(*e).into()),
+            _ => Err(CelError::argument(
+                "pow() expect integer or float for exponent",
+            )),
+        },
+        _ => Err(CelError::value("abs() expect numerical argument")),
+    }
+}
+
+fn log_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("log() expects one argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => Ok(i.ilog10().into()),
+        CelValueInner::UInt(u) => Ok(u.ilog10().into()),
+        CelValueInner::Float(f) => Ok(f.log10().into()),
+        _ => Err(CelError::value("log() expects numerical argument")),
+    }
+}
+
+fn ceil_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("ceil() expects on argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => Ok((*i).into()),
+        CelValueInner::UInt(u) => Ok((*u).into()),
+        CelValueInner::Float(f) => Ok((f.ceil() as i64).into()),
+        _ => Err(CelError::argument("ceil() expects numeric type")),
+    }
+}
+
+fn floor_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("floor() expects on argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => Ok((*i).into()),
+        CelValueInner::UInt(u) => Ok((*u).into()),
+        CelValueInner::Float(f) => Ok((f.floor() as i64).into()),
+        _ => Err(CelError::argument("floor() expects numeric type")),
+    }
+}
+
+fn round_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() != 1 {
+        return Err(CelError::argument("round() expects on argument"));
+    }
+
+    match args[0].inner() {
+        CelValueInner::Int(i) => Ok((*i).into()),
+        CelValueInner::UInt(u) => Ok((*u).into()),
+        CelValueInner::Float(f) => Ok((f.round() as i64).into()),
+        _ => Err(CelError::argument("round() expects numeric type")),
+    }
+}
+
+fn min_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() == 0 {
+        return Err(CelError::argument("min() requires at lease one argument"));
+    }
+
+    let mut curr_min = None;
+
+    for val in args.into_iter() {
+        match curr_min {
+            Some(curr) => {
+                if val.lt(curr)?.is_true() {
+                    curr_min = Some(val);
+                }
+            }
+            None => curr_min = Some(val),
+        }
+    }
+
+    return Ok(curr_min.unwrap().clone());
+}
+
+fn max_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    if args.len() == 0 {
+        return Err(CelError::argument("max() requires at lease one argument"));
+    }
+
+    let mut curr_min = None;
+
+    for val in args.into_iter() {
+        match curr_min {
+            Some(curr) => {
+                if val.gt(curr)?.is_true() {
+                    curr_min = Some(val);
+                }
+            }
+            None => curr_min = Some(val),
+        }
+    }
+
+    return Ok(curr_min.unwrap().clone());
 }

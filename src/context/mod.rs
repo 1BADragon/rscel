@@ -9,7 +9,7 @@ use crate::{
     program::{Program, ProgramDetails},
     CelValue,
 };
-pub use bind_context::{BindContext, RsCallable, RsCelFunction, RsCelMacro};
+pub use bind_context::{BindContext, RsCelFunction, RsCelMacro};
 
 /// The CelContext is the core context in RsCel. This context contains
 /// Program information as well as the primary entry point for evaluating
