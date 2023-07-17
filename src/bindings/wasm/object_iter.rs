@@ -4,13 +4,10 @@ use wasm_bindgen::{prelude::*, JsValue};
 extern "C" {
     #[wasm_bindgen(js_namespace = Object)]
     fn keys(obj: &JsValue) -> js_sys::Array;
-
-    #[wasm_bindgen(js_namespace = Object)]
-    fn get(obj: &JsValue, key: &str) -> JsValue;
 }
 
 pub struct ObjectIterator {
-    object: JsValue,
+    object: js_sys::Object,
     keys: js_sys::Array,
     index: u32,
 }
@@ -19,7 +16,7 @@ impl ObjectIterator {
     pub fn new(obj: JsValue) -> ObjectIterator {
         let keys = keys(&obj);
         ObjectIterator {
-            object: obj,
+            object: obj.dyn_into::<js_sys::Object>().unwrap(),
             keys,
             index: 0,
         }
@@ -34,10 +31,10 @@ impl Iterator for ObjectIterator {
             return None;
         }
 
-        let key = self.keys.get(self.index).as_string().unwrap();
-        let val = get(&self.object, &key);
+        let key = self.keys.get(self.index);
+        let val = js_sys::Reflect::get(&self.object, &key).unwrap();
         self.index += 1;
 
-        Some((key, val))
+        Some((key.as_string().unwrap(), val))
     }
 }
