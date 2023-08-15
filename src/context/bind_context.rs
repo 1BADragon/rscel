@@ -113,12 +113,12 @@ impl<'a> BindContext<'a> {
 
     /// Get a function by name.
     pub fn get_func(&self, name: &str) -> Option<&'a RsCelFunction> {
-        Some((*self.funcs.get(name)?).clone())
+        Some(*self.funcs.get(name)?)
     }
 
     /// Get a macro by name.
     pub fn get_macro(&self, name: &str) -> Option<&'a RsCelMacro> {
-        Some((*self.macros.get(name)?).clone())
+        Some(*self.macros.get(name)?)
     }
 
     pub fn is_bound(&self, name: &str) -> bool {

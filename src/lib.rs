@@ -28,11 +28,11 @@
 
 #![cfg_attr(feature = "python", feature(fn_traits))]
 #![cfg_attr(feature = "python", feature(unboxed_closures))]
-mod ast;
 mod cel_error;
 mod cel_value;
 mod context;
 mod interp;
+mod parser;
 mod program;
 
 // Export some public interface
