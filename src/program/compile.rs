@@ -2,11 +2,11 @@ use parsel::ast::Lit;
 
 use super::ProgramDetails;
 use crate::{
-    ast::grammar::{
+    interp::{ByteCode, JmpWhen},
+    parser::grammar::{
         AddOp, Addition, ConditionalAnd, ConditionalOr, Expr, ExprList, Literal, Member,
         MemberPrime, MultOp, Multiplication, NegList, NotList, Primary, Relation, Relop, Unary,
     },
-    interp::{ByteCode, JmpWhen},
     CelError, CelResult, CelValue, Program,
 };
 

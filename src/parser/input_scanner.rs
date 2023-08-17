@@ -49,8 +49,8 @@ impl<'l> InputScanner<'l> {
                     '\n' => {
                         self.line += 1;
                         self.column = 0;
+                        return Some('\n');
                     }
-                    ' ' | '\t' | '\r' => { /* ignore whitespace */ }
                     val => return Some(val),
                 },
                 None => return None,

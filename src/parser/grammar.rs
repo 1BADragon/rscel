@@ -1,240 +1,157 @@
-use parsel::{
-    ast::{Any, Brace, Bracket, Empty, LeftAssoc, Lit, Maybe, Paren, Punctuated},
-    syn::{token::Type, Ident, Token},
-    Parse, ToTokens,
-};
-
-mod kw {
-    parsel::custom_keyword!(null);
+#[derive(Debug, PartialEq)]
+pub enum Expr {
+    Ternary {
+        condition: Box<ConditionalOr>,
+        true_clause: Box<ConditionalOr>,
+        false_clause: Box<Self>,
+    },
+    Unary(Box<ConditionalOr>),
 }
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
-pub struct Expr {
-    #[parsel(recursive)]
-    pub cond_or: ConditionalOr,
-    #[parsel(recursive)]
-    pub ternary: Maybe<Ternary>,
+#[derive(Debug, PartialEq)]
+pub enum ConditionalOr {
+    Binary { lhs: ConditionalAnd, rhs: Box<Self> },
+    Unary(ConditionalAnd),
 }
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
-pub struct Ternary {
-    #[parsel(recursive)]
-    pub question: Token![?],
-    #[parsel(recursive)]
-    pub true_clause: ConditionalOr,
-    #[parsel(recursive)]
-    pub colon: Token![:],
-    #[parsel(recursive)]
-    pub false_clause: Box<Expr>,
+#[derive(Debug, PartialEq)]
+pub enum ConditionalAnd {
+    Binary { lhs: Relation, rhs: Box<Self> },
+    Unary(Relation),
 }
 
-pub type ConditionalOr = LeftAssoc<Token![||], ConditionalAnd>;
-pub type ConditionalAnd = LeftAssoc<Token![&&], Relation>;
-pub type Relation = LeftAssoc<Relop, Addition>;
+#[derive(Debug, PartialEq)]
+pub enum Relation {
+    Binary {
+        lhs: Addition,
+        op: Relop,
+        rhs: Box<Self>,
+    },
+    Unary(Addition),
+}
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+#[derive(Debug, PartialEq)]
 pub enum Relop {
-    Le(Token![<=]),
-    Lt(Token![<]),
-    Ge(Token![>=]),
-    Gt(Token![>]),
-    Eq(Token![==]),
-    Ne(Token![!=]),
-    In(Token![in]),
+    Le,
+    Lt,
+    Ge,
+    Gt,
+    Eq,
+    Ne,
+    In,
 }
 
-pub type Addition = LeftAssoc<AddOp, Multiplication>;
+#[derive(Debug, PartialEq)]
+pub enum Addition {
+    Binary {
+        lhs: Multiplication,
+        op: AddOp,
+        rhs: Box<Self>,
+    },
+    Unary(Multiplication),
+}
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+#[derive(Debug, PartialEq)]
 pub enum AddOp {
-    Add(Token![+]),
-    Sub(Token![-]),
+    Add,
+    Sub,
 }
 
-pub type Multiplication = LeftAssoc<MultOp, Unary>;
+#[derive(Debug, PartialEq)]
+pub enum Multiplication {
+    Binary {
+        lhs: Unary,
+        op: MultOp,
+        rhs: Box<Self>,
+    },
+    Unary(Unary),
+}
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+#[derive(Debug, PartialEq)]
 pub enum MultOp {
-    Mult(Token![*]),
-    Div(Token![/]),
-    Mod(Token![%]),
+    Mult,
+    Div,
+    Mod,
 }
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+#[derive(Debug, PartialEq)]
 pub enum Unary {
-    #[parsel(recursive)]
-    Member(Box<Member>),
-    #[parsel(recursive)]
-    NotMember {
-        #[parsel(recursive)]
-        nots: NotList,
-        #[parsel(recursive)]
-        member: Box<Member>,
-    },
-    #[parsel(recursive)]
-    NegMember {
-        #[parsel(recursive)]
-        negs: NegList,
-        #[parsel(recursive)]
-        member: Box<Member>,
-    },
+    Member(Member),
+    NotMember { nots: NotList, member: Member },
+    NegMember { negs: NegList, member: Member },
 }
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+#[derive(Debug, PartialEq)]
 pub enum NotList {
-    List {
-        not: Token![!],
-        #[parsel(recursive)]
-        tail: Box<NotList>,
-    },
-    EmptyList(Empty),
+    List { tail: Box<Self> },
+    EmptyList,
 }
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+#[derive(Debug, PartialEq)]
 pub enum NegList {
-    List {
-        not: Token![-],
-        #[parsel(recursive)]
-        tail: Box<NegList>,
-    },
-    EmptyList(Empty),
+    List { tail: Box<Self> },
+    EmptyList,
 }
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+#[derive(Debug, PartialEq)]
 pub struct Member {
-    #[parsel(recursive)]
     pub primary: Primary,
-    #[parsel(recursive)]
     pub member: MemberPrime,
 }
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+#[derive(Debug, PartialEq)]
 pub enum MemberPrime {
-    #[parsel(recursive)]
     MemberAccess {
-        #[parsel(recursive)]
-        dot: Token![.],
         ident: Ident,
-        #[parsel(recursive)]
         tail: Box<MemberPrime>,
     },
-    #[parsel(recursive)]
     Call {
-        #[parsel(recursive)]
-        call: Paren<Maybe<ExprList>>,
-        #[parsel(recursive)]
+        call: Option<ExprList>,
         tail: Box<MemberPrime>,
     },
-    #[parsel(recursive)]
     ArrayAccess {
-        #[parsel(recursive)]
-        brackets: Bracket<Expr>,
-        #[parsel(recursive)]
+        access: Expr,
         tail: Box<MemberPrime>,
     },
-    Empty(Empty),
+    Empty,
 }
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+#[derive(Debug, PartialEq)]
+struct Ident(String);
+
+#[derive(Debug, PartialEq)]
 pub enum Primary {
-    #[parsel(recursive)]
-    Type(Type),
-    #[parsel(recursive)]
+    Type,
     Ident(Ident),
-    #[parsel(recursive)]
-    Parens(Paren<Expr>),
-    #[parsel(recursive)]
-    ListConstruction(Bracket<Maybe<ExprList>>),
-    #[parsel(recursive)]
-    ObjectInit(Brace<Maybe<MapInits>>),
-    #[parsel(recursive)]
+    Parens(Expr),
+    ListConstruction(Option<ExprList>),
+    ObjectInit(Option<MapInits>),
     Literal(Literal),
 }
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
-pub struct DotIdentList {
-    pub dot: Token![.],
-    pub ident: Ident,
-}
-
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+#[derive(Debug, PartialEq)]
 pub struct ExprList {
-    #[parsel(recursive)]
-    pub expr: Expr,
-    #[parsel(recursive)]
-    pub tail: Any<ExprListTail>,
+    pub expr: Vec<Expr>,
 }
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
-pub struct ExprListTail {
-    pub comma: Token![,],
-    #[parsel(recursive)]
-    pub expr: Expr,
-}
-
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
-pub struct FieldInit {
-    #[parsel(recursive)]
-    pub ident: Ident,
-    #[parsel(recursive)]
-    pub colon: Token![:],
-    #[parsel(recursive)]
-    pub expr: Expr,
-}
-// pub type FieldInits = Punctuated<FieldInit, Token![,]>;
-
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
+#[derive(Debug, PartialEq)]
 pub struct MapInit {
-    #[parsel(recursive)]
     pub key: Expr,
-    #[parsel(recursive)]
-    pub colon: Token![:],
-    #[parsel(recursive)]
     pub value: Expr,
 }
-pub type MapInits = Punctuated<MapInit, Token![,]>;
 
-#[derive(Debug, PartialEq, Eq, Parse, ToTokens)]
-pub enum Literal {
-    Null(kw::null),
-    Lit(Lit),
+#[derive(Debug, PartialEq)]
+pub struct MapInits {
+    inits: Vec<MapInit>,
 }
 
-#[cfg(test)]
-mod test {
-    use super::Expr;
+#[derive(Debug, PartialEq)]
+pub enum Literal {
+    Null,
 
-    use test_case::test_case;
-
-    #[test_case("3+1"; "addition")]
-    #[test_case("(1+foo) / 23"; "with literal")]
-    #[test_case("(true || false) + 23"; "with boolean")]
-    #[test_case("foo.bar"; "member access")]
-    #[test_case("foo[3]"; "list access")]
-    #[test_case("foo.bar()"; "member call")]
-    #[test_case("foo()"; "empty function call")]
-    #[test_case("foo(3)"; "function call")]
-    #[test_case("1"; "just 1")]
-    #[test_case("foo"; "an ident")]
-    #[test_case("foo.bar.baz"; "deep member access")]
-    #[test_case("--foo"; "double neg")]
-    #[test_case("foo || true"; "or")]
-    #[test_case("int(foo.bar && foo.baz) + 4 - (8 * 7)"; "complex")]
-    #[test_case("true ? 3 : 1"; "ternary")]
-    fn test_parser(input: &str) {
-        let expr: Result<Expr, parsel::Error> = parsel::parse_str(input);
-
-        match expr {
-            Ok(_) => {}
-            Err(err) => {
-                let span = err.span();
-
-                panic!(
-                    "Error from column {} to column {}",
-                    span.start().column,
-                    span.end().column
-                );
-            }
-        };
-    }
+    Integer(i64),
+    Unsigned(u64),
+    Floating(f64),
+    String(String),
+    Boolean(bool),
 }
