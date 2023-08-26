@@ -1,6 +1,6 @@
 use std::env;
 
-use rscel::Program;
+use rscel::CelCompiler;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -10,6 +10,6 @@ fn main() {
         return;
     }
 
-    let prog = Program::from_source(&args[1]).unwrap();
+    let prog = CelCompiler::with_input(&args[1]).compile().unwrap();
     println!("{}", serde_json::to_string_pretty(&prog).unwrap());
 }

@@ -4,6 +4,8 @@ pub struct Tokenizer<'l> {
     scanner: InputScanner<'l>,
 
     current: Option<Token>,
+
+    eof: bool,
 }
 
 impl<'l> Tokenizer<'l> {
@@ -11,6 +13,7 @@ impl<'l> Tokenizer<'l> {
         Tokenizer {
             scanner: InputScanner::from_input(input),
             current: None,
+            eof: false,
         }
     }
 
@@ -33,11 +36,32 @@ impl<'l> Tokenizer<'l> {
         }
     }
 
-    fn collect_next_token(&mut self) -> Result<Option<Token>, SyntaxError> {
-        let start_char = self.scanner.next();
-        let mut tmp = [0; 4];
+    pub fn location(&self) -> (usize, usize) {
+        self.scanner.location()
+    }
 
-        if let Some(input_char) = start_char {
+    pub fn eof(&self) -> bool {
+        self.eof
+    }
+
+    fn collect_next_token(&mut self) -> Result<Option<Token>, SyntaxError> {
+        let mut tmp = [0; 4];
+        let mut curr_char = self.scanner.next();
+
+        if self.eof {
+            return Ok(None);
+        }
+
+        'outer: loop {
+            match curr_char {
+                Some(' ') | Some('\t') | Some('\n') => {
+                    curr_char = self.scanner.next();
+                }
+                _ => break 'outer,
+            };
+        }
+
+        let res = if let Some(input_char) = curr_char {
             match input_char {
                 '?' => Ok(Some(Token::Question)),
                 ':' => Ok(Some(Token::Colon)),
@@ -47,10 +71,14 @@ impl<'l> Tokenizer<'l> {
                 '/' => Ok(Some(Token::Divide)),
                 '%' => Ok(Some(Token::Mod)),
                 '!' => match self.scanner.peek() {
-                    Some('=') => Ok(Some(Token::NotEqual)),
+                    Some('=') => {
+                        self.scanner.next();
+                        Ok(Some(Token::NotEqual))
+                    }
                     _ => Ok(Some(Token::Not)),
                 },
                 '.' => Ok(Some(Token::Dot)),
+                ',' => Ok(Some(Token::Comma)),
                 '[' => Ok(Some(Token::LBracket)),
                 ']' => Ok(Some(Token::RBracket)),
                 '{' => Ok(Some(Token::LBrace)),
@@ -76,10 +104,24 @@ impl<'l> Tokenizer<'l> {
                         self.scanner.next();
                         Ok(Some(Token::EqualEqual))
                     }
-                    _ => {
-                        let (line, column) = self.scanner.location();
-                        Err(SyntaxError { line, column })
+                    _ => Err(SyntaxError::from_location(self.scanner.location())
+                        .with_message("Token = is not supported".to_string())),
+                },
+                '|' => match self.scanner.peek() {
+                    Some('|') => {
+                        self.scanner.next();
+                        Ok(Some(Token::OrOr))
                     }
+                    _ => Err(SyntaxError::from_location(self.scanner.location())
+                        .with_message("Token | is not supported".to_string())),
+                },
+                '&' => match self.scanner.peek() {
+                    Some('&') => {
+                        self.scanner.next();
+                        Ok(Some(Token::AndAnd))
+                    }
+                    _ => Err(SyntaxError::from_location(self.scanner.location())
+                        .with_message("Token & is not supported".to_string())),
                 },
                 'i' => self.parse_keywords_or_ident("i", &[("in", Token::In)]),
                 't' => self.parse_keywords_or_ident(
@@ -96,15 +138,28 @@ impl<'l> Tokenizer<'l> {
                 '_' | 'A'..='Z' | 'a'..='z' => {
                     return self.parse_keywords_or_ident(&input_char.to_string(), &[]);
                 }
-                _ => {
-                    let (line, column) = self.scanner.location();
-
-                    return Err(SyntaxError { line, column });
+                other => {
+                    return Err(SyntaxError::from_location(self.scanner.location())
+                        .with_message(format!("Unexpected symbol: '{}'", other)));
                 }
             }
         } else {
+            self.eof = true;
             Ok(None)
+        };
+
+        #[cfg(feature = "debug_output")]
+        {
+            if let Ok(Some(ref val)) = res {
+                println!("[tokenizer]: collect {:?}", val);
+            } else if let Ok(None) = res {
+                println!("[tokenizer]: EOF");
+            } else if let Err(ref err) = res {
+                println!("[tokenizer]: {:?}", err);
+            }
         }
+
+        res
     }
 
     fn parse_string_literal(&mut self, starting: char) -> Result<Option<Token>, SyntaxError> {
@@ -114,8 +169,7 @@ impl<'l> Tokenizer<'l> {
             let curr = if let Some(curr) = self.scanner.next() {
                 curr
             } else {
-                let (line, column) = self.scanner.location();
-                return Err(SyntaxError { line, column });
+                return Err(SyntaxError::from_location(self.scanner.location()));
             };
 
             if curr == starting {
@@ -125,7 +179,7 @@ impl<'l> Tokenizer<'l> {
                     curr
                 } else {
                     let (line, column) = self.scanner.location();
-                    return Err(SyntaxError { line, column });
+                    return Err(SyntaxError::from_location(self.scanner.location()));
                 };
 
                 match escaped {
@@ -182,17 +236,6 @@ impl<'l> Tokenizer<'l> {
         let mut is_float = false;
         let mut is_unsigned = false;
 
-        // a digit always follows a + or -
-        if let Some(next) = self.scanner.peek() {
-            match next {
-                '0'..='9' => {
-                    working.push(next);
-                    self.scanner.next();
-                }
-                _ => return Ok(Some(starting_token)),
-            };
-        }
-
         'outer: loop {
             if let Some(next) = self.scanner.peek() {
                 match next {
@@ -226,26 +269,20 @@ impl<'l> Tokenizer<'l> {
         if is_unsigned {
             match working.parse::<u64>() {
                 Ok(value) => Ok(Some(Token::UIntLit(value))),
-                Err(_) => {
-                    let (line, column) = self.scanner.location();
-                    Err(SyntaxError { line, column })
-                }
+                Err(_) => Err(SyntaxError::from_location(self.scanner.location())
+                    .with_message(format!("Failed to parse unsigned value: {}", working))),
             }
         } else if is_float {
             match working.parse::<f64>() {
                 Ok(value) => Ok(Some(Token::FloatLit(value))),
-                Err(_) => {
-                    let (line, column) = self.scanner.location();
-                    Err(SyntaxError { line, column })
-                }
+                Err(_) => Err(SyntaxError::from_location(self.scanner.location())
+                    .with_message(format!("Failed to parse floating point value: {}", working))),
             }
         } else {
             match working.parse::<i64>() {
                 Ok(value) => Ok(Some(Token::IntLit(value))),
-                Err(_) => {
-                    let (line, column) = self.scanner.location();
-                    Err(SyntaxError { line, column })
-                }
+                Err(_) => Err(SyntaxError::from_location(self.scanner.location())
+                    .with_message(format!("Failed to parse integer: {}", working))),
             }
         }
     }
@@ -254,7 +291,7 @@ impl<'l> Tokenizer<'l> {
 #[cfg(test)]
 mod test {
     use super::{SyntaxError, Tokenizer};
-    use crate::parser::tokens::Token;
+    use crate::compiler::tokens::Token;
     use test_case::test_case;
 
     fn _tokenize(input: &str) -> Result<Vec<Token>, SyntaxError> {

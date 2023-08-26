@@ -242,7 +242,7 @@ impl ProgramCompiler {
 
                 Ok(bytecode)
             }
-            MemberPrime::ArrayAccess { brackets, tail } => {
+            MemberPrime::ArrayAccess { access, tail } => {
                 let mut bytecode = self.build_expr(brackets)?;
                 bytecode.push(ByteCode::Index);
                 bytecode.append(&mut self.build_member_prime(tail)?);

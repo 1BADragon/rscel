@@ -1,30 +1,27 @@
-mod compile;
-mod program_cache;
+//mod compile;
+//mod program_cache;
 mod program_details;
 
 use crate::{cel_error::CelResult, interp::ByteCode};
-use compile::ProgramCompiler;
+//use compile::ProgramCompiler;
 pub use program_details::ProgramDetails;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Program {
     source: String,
-    details: program_details::ProgramDetails,
+    details: ProgramDetails,
 
     bytecode: Vec<ByteCode>,
 }
 
 impl Program {
-    pub fn from_source(source: &str) -> CelResult<Program> {
-        match program_cache::check_cache(source) {
-            Some(prog) => prog,
-            None => Program::from_source_nocache(source),
+    pub fn new(source: String, details: ProgramDetails, bytecode: Vec<ByteCode>) -> Program {
+        Program {
+            source,
+            details,
+            bytecode,
         }
-    }
-
-    pub fn from_source_nocache(source: &str) -> CelResult<Program> {
-        ProgramCompiler::new().with_source(source).build()
     }
 
     pub fn params<'a>(&'a self) -> Vec<&'a str> {
@@ -61,25 +58,5 @@ impl Clone for Program {
             details: self.details.clone(),
             bytecode: self.bytecode.clone(),
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::Program;
-
-    #[test]
-    fn test_basic_prog() {
-        let prog = Program::from_source("foo + 3").unwrap();
-
-        assert!(prog.params().len() == 1);
-        assert!(prog.params()[0] == "foo");
-    }
-
-    #[test]
-    fn test_complex_prog() {
-        let prog = Program::from_source("((foo.bar + 2) * foo.baz) / bam").unwrap();
-
-        assert!(prog.params().len() == 2);
     }
 }

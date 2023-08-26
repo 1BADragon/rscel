@@ -117,7 +117,7 @@ pub enum MemberPrime {
 }
 
 #[derive(Debug, PartialEq)]
-struct Ident(String);
+pub struct Ident(String);
 
 #[derive(Debug, PartialEq)]
 pub enum Primary {
@@ -125,7 +125,7 @@ pub enum Primary {
     Ident(Ident),
     Parens(Expr),
     ListConstruction(Option<ExprList>),
-    ObjectInit(Option<MapInits>),
+    ObjectInit(Option<ObjInits>),
     Literal(Literal),
 }
 
@@ -135,14 +135,14 @@ pub struct ExprList {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MapInit {
+pub struct ObjInit {
     pub key: Expr,
     pub value: Expr,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MapInits {
-    inits: Vec<MapInit>,
+pub struct ObjInits {
+    inits: Vec<ObjInit>,
 }
 
 #[derive(Debug, PartialEq)]

@@ -9,6 +9,7 @@ pub enum Token {
     Mod,                    // %
     Not,                    // !
     Dot,                    // .
+    Comma,                  // ,
     LBracket,               // [
     RBracket,               // ]
     LBrace,                 // {

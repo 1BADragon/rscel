@@ -5,6 +5,7 @@ mod default_funcs;
 mod default_macros;
 use crate::{
     cel_error::CelResult,
+    compiler::compiler::CelCompiler,
     interp::Interpreter,
     program::{Program, ProgramDetails},
     CelValue,
@@ -37,7 +38,7 @@ impl CelContext {
     /// function indicates parseing result of the constructed Program. This method will not
     /// allow for a Program to be shared. Will override an existing program with same name.
     pub fn add_program_str(&mut self, name: &str, prog_str: &str) -> CelResult<()> {
-        let prog = Program::from_source(prog_str)?;
+        let prog = CelCompiler::with_input(prog_str).compile()?;
 
         self.add_program(name, prog);
         Ok(())
