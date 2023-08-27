@@ -5,3 +5,5 @@ pub mod parse_result;
 pub mod syntax_error;
 pub mod tokenizer;
 pub mod tokens;
+
+pub use compiler::CelCompiler;

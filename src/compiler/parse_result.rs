@@ -1,5 +1,7 @@
 use crate::{interp::JmpWhen, program::ProgramDetails, ByteCode, Program};
 
+use super::grammar::Expr;
+
 pub struct ParseResult {
     bytecode: Vec<ByteCode>,
     details: ProgramDetails,
@@ -20,8 +22,8 @@ impl ParseResult {
         }
     }
 
-    pub fn into_program(self, source: String) -> Program {
-        Program::new(source, self.details, self.bytecode)
+    pub fn into_program(self, source: String, ast: Expr) -> Program {
+        Program::new(source, self.details, self.bytecode, ast)
     }
 
     pub fn add_ident(mut self, ident: &str) -> ParseResult {

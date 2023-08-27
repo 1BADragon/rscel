@@ -3,7 +3,7 @@ mod utils;
 
 use std::collections::HashMap;
 
-use crate::{BindContext, CelContext, CelError, CelValue, Program};
+use crate::{BindContext, CelCompiler, CelContext, CelError, CelValue, Program};
 use object_iter::ObjectIterator;
 use serde::Serialize;
 use serde_json::Value;
@@ -107,7 +107,7 @@ pub fn float_val(val: f64) -> Option<CelFloat> {
 
 #[wasm_bindgen]
 pub fn cel_details(source: &str) -> JsValue {
-    match Program::from_source(source) {
+    match CelCompiler::with_input(source).compile() {
         Ok(prog) => {
             let mut details = prog.details().clone();
             let default_bindings = BindContext::new();

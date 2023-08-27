@@ -1,4 +1,6 @@
-#[derive(Debug, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Expr {
     Ternary {
         condition: Box<ConditionalOr>,
@@ -8,19 +10,19 @@ pub enum Expr {
     Unary(Box<ConditionalOr>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConditionalOr {
     Binary { lhs: ConditionalAnd, rhs: Box<Self> },
     Unary(ConditionalAnd),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConditionalAnd {
     Binary { lhs: Relation, rhs: Box<Self> },
     Unary(Relation),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Relation {
     Binary {
         lhs: Addition,
@@ -30,7 +32,7 @@ pub enum Relation {
     Unary(Addition),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Relop {
     Le,
     Lt,
@@ -41,7 +43,7 @@ pub enum Relop {
     In,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Addition {
     Binary {
         lhs: Multiplication,
@@ -51,13 +53,13 @@ pub enum Addition {
     Unary(Multiplication),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AddOp {
     Add,
     Sub,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Multiplication {
     Binary {
         lhs: Unary,
@@ -67,46 +69,46 @@ pub enum Multiplication {
     Unary(Unary),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MultOp {
     Mult,
     Div,
     Mod,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Unary {
     Member(Member),
     NotMember { nots: NotList, member: Member },
     NegMember { negs: NegList, member: Member },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum NotList {
     List { tail: Box<Self> },
     EmptyList,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum NegList {
     List { tail: Box<Self> },
     EmptyList,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Member {
     pub primary: Primary,
     pub member: MemberPrime,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MemberPrime {
     MemberAccess {
         ident: Ident,
         tail: Box<MemberPrime>,
     },
     Call {
-        call: Option<ExprList>,
+        call: ExprList,
         tail: Box<MemberPrime>,
     },
     ArrayAccess {
@@ -116,36 +118,36 @@ pub enum MemberPrime {
     Empty,
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Ident(String);
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Ident(pub String);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Primary {
     Type,
     Ident(Ident),
     Parens(Expr),
-    ListConstruction(Option<ExprList>),
-    ObjectInit(Option<ObjInits>),
+    ListConstruction(ExprList),
+    ObjectInit(ObjInits),
     Literal(Literal),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExprList {
-    pub expr: Vec<Expr>,
+    pub exprs: Vec<Expr>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObjInit {
     pub key: Expr,
     pub value: Expr,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObjInits {
-    inits: Vec<ObjInit>,
+    pub inits: Vec<ObjInit>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Literal {
     Null,
 
@@ -153,5 +155,6 @@ pub enum Literal {
     Unsigned(u64),
     Floating(f64),
     String(String),
+    ByteString(Vec<u8>),
     Boolean(bool),
 }

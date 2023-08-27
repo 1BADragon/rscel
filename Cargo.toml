@@ -7,9 +7,8 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["program_cache"]
+default = []
 ast_ser = []
-program_cache = []
 debug_output = []
 python = ["dep:pyo3"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
