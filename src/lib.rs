@@ -39,7 +39,9 @@ mod program;
 pub mod utils;
 pub use cel_error::{CelError, CelResult};
 pub use cel_value::{CelValue, CelValueInner};
-pub use compiler::compiler::CelCompiler;
+pub use compiler::{
+    compiler::CelCompiler, string_tokenizer::StringTokenizer, tokenizer::Tokenizer,
+};
 pub use context::{BindContext, CelContext, RsCelFunction, RsCelMacro};
 pub use interp::ByteCode;
 pub use program::Program;
@@ -60,7 +62,10 @@ pub use bindings::wasm::*;
 
 #[cfg(test)]
 mod test {
-    use crate::{compiler::compiler::CelCompiler, BindContext, CelContext, CelValue, Program};
+    use crate::{
+        compiler::{compiler::CelCompiler, string_tokenizer::StringTokenizer},
+        BindContext, CelContext, CelValue, Program,
+    };
     use chrono::DateTime;
     use std::{assert, assert_eq, collections::HashMap};
     use test_case::test_case;
@@ -206,7 +211,10 @@ mod test {
     #[test]
     fn test_serialization() {
         let json_str = {
-            let prog = CelCompiler::with_input("4+7*2").compile().unwrap();
+            let mut tokenizer = StringTokenizer::with_input("4+7*2");
+            let prog = CelCompiler::with_tokenizer(&mut tokenizer)
+                .compile()
+                .unwrap();
             serde_json::to_string(&prog).unwrap()
         };
 
@@ -244,7 +252,10 @@ mod test {
 
     #[test]
     fn test_binding_filter() {
-        let prog = CelCompiler::with_input("foo + int(3)").compile().unwrap();
+        let mut tokenizer = StringTokenizer::with_input("foo + int(3)");
+        let prog = CelCompiler::with_tokenizer(&mut tokenizer)
+            .compile()
+            .unwrap();
 
         let mut dets = prog.details().clone();
         let bindings = BindContext::new();

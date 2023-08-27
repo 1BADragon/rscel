@@ -5,16 +5,12 @@ use super::{
 use crate::{interp::JmpWhen, ByteCode, CelResult, CelValue, Program};
 
 pub struct CelCompiler<'l> {
-    tokenizer: Tokenizer<'l>,
-    source: String,
+    tokenizer: &'l mut dyn Tokenizer,
 }
 
 impl<'l> CelCompiler<'l> {
-    pub fn with_input(input_str: &'l str) -> CelCompiler<'l> {
-        CelCompiler {
-            tokenizer: Tokenizer::with_input(input_str),
-            source: input_str.to_string(),
-        }
+    pub fn with_tokenizer(tokenizer: &'l mut dyn Tokenizer) -> CelCompiler<'l> {
+        CelCompiler { tokenizer }
     }
 
     pub fn compile(mut self) -> CelResult<Program> {
@@ -26,7 +22,7 @@ impl<'l> CelCompiler<'l> {
                 .into());
         }
 
-        let prog = res.into_program(self.source, ast);
+        let prog = res.into_program(self.tokenizer.source().to_string(), ast);
 
         #[cfg(feature = "debug_output")]
         {
@@ -657,6 +653,8 @@ impl<'l> CelCompiler<'l> {
 mod test {
     use test_case::test_case;
 
+    use crate::compiler::string_tokenizer::StringTokenizer;
+
     use super::CelCompiler;
 
     #[test_case("3+1"; "addition")]
@@ -676,6 +674,9 @@ mod test {
     #[test_case("true ? 3 : 1"; "ternary")]
     #[test_case("[1, 2, 3 + 3, 4 * 2, \"fish\"]"; "list construction")]
     fn test_parser(input: &str) {
-        CelCompiler::with_input(input).compile().unwrap();
+        let mut tokenizer = StringTokenizer::with_input(input);
+        CelCompiler::with_tokenizer(&mut tokenizer)
+            .compile()
+            .unwrap();
     }
 }
