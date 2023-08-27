@@ -3,7 +3,7 @@ mod utils;
 
 use std::collections::HashMap;
 
-use crate::{BindContext, CelCompiler, CelContext, CelError, CelValue, Program};
+use crate::{BindContext, CelCompiler, CelContext, CelError, CelValue};
 use object_iter::ObjectIterator;
 use serde::Serialize;
 use serde_json::Value;
