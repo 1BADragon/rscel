@@ -40,10 +40,6 @@ impl<'l> Tokenizer<'l> {
         self.scanner.location()
     }
 
-    pub fn eof(&self) -> bool {
-        self.eof
-    }
-
     fn collect_next_token(&mut self) -> Result<Option<Token>, SyntaxError> {
         let mut tmp = [0; 4];
         let mut curr_char = self.scanner.next();
@@ -178,7 +174,7 @@ impl<'l> Tokenizer<'l> {
                 let escaped = if let Some(curr) = self.scanner.next() {
                     curr
                 } else {
-                    let (line, column) = self.scanner.location();
+                    let (_line, _column) = self.scanner.location();
                     return Err(SyntaxError::from_location(self.scanner.location()));
                 };
 
@@ -230,7 +226,7 @@ impl<'l> Tokenizer<'l> {
     fn parse_number_or_token(
         &mut self,
         starting: &str,
-        starting_token: Token,
+        _starting_token: Token,
     ) -> Result<Option<Token>, SyntaxError> {
         let mut working = starting.to_owned();
         let mut is_float = false;

@@ -2,7 +2,6 @@ use std::str::Chars;
 
 pub struct InputScanner<'l> {
     iterator: Chars<'l>,
-    input: &'l str,
     current: Option<char>,
     line: usize,
     column: usize,
@@ -12,7 +11,6 @@ impl<'l> InputScanner<'l> {
     pub fn from_input(input: &'l str) -> InputScanner<'l> {
         InputScanner {
             iterator: input.chars(),
-            input,
             current: None,
             line: 0,
             column: 0,

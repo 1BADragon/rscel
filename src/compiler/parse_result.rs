@@ -31,12 +31,6 @@ impl ParseResult {
         self
     }
 
-    pub fn append_bytecode(mut self, bytecode: Vec<ByteCode>) -> ParseResult {
-        self.bytecode.extend(bytecode.into_iter());
-
-        self
-    }
-
     pub fn append_result(mut self, other: ParseResult) -> ParseResult {
         self.bytecode.extend(other.bytecode.into_iter());
         self.details.union_from(other.details);

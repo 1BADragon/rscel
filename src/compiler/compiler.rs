@@ -2,7 +2,7 @@ use super::{
     grammar::*, parse_result::ParseResult, syntax_error::SyntaxError, tokenizer::Tokenizer,
     tokens::Token,
 };
-use crate::{interp::JmpWhen, ByteCode, CelError, CelResult, CelValue, Program};
+use crate::{interp::JmpWhen, ByteCode, CelResult, CelValue, Program};
 
 pub struct CelCompiler<'l> {
     tokenizer: Tokenizer<'l>,
@@ -343,7 +343,7 @@ impl<'l> CelCompiler<'l> {
     }
 
     fn parse_not_list(&mut self) -> CelResult<(ParseResult, NotList)> {
-        let mut res = ParseResult::new();
+        let _res = ParseResult::new();
 
         match self.tokenizer.peek()? {
             Some(Token::Not) => {
@@ -361,7 +361,7 @@ impl<'l> CelCompiler<'l> {
     }
 
     fn parse_neg_list(&mut self) -> CelResult<(ParseResult, NegList)> {
-        let mut res = ParseResult::new();
+        let _res = ParseResult::new();
 
         match self.tokenizer.peek()? {
             Some(Token::Minus) => {

@@ -2,7 +2,7 @@
 //mod program_cache;
 mod program_details;
 
-use crate::{cel_error::CelResult, compiler::grammar::Expr, interp::ByteCode};
+use crate::{compiler::grammar::Expr, interp::ByteCode};
 //use compile::ProgramCompiler;
 pub use program_details::ProgramDetails;
 use serde::{Deserialize, Serialize};
