@@ -418,7 +418,7 @@ impl<'l> CelCompiler<'l> {
             Some(Token::LParen) => {
                 self.tokenizer.next()?;
 
-                let (args, args_ast) = self.parse_expression_list()?;
+                let (args, args_ast) = self.parse_expression_list(Token::RParen)?;
 
                 let token = self.tokenizer.next()?;
                 if token != Some(Token::RParen) {
@@ -503,7 +503,7 @@ impl<'l> CelCompiler<'l> {
             }
             Some(Token::LBracket) => {
                 self.tokenizer.next()?;
-                let (children, expr_list_ast) = self.parse_expression_list()?;
+                let (children, expr_list_ast) = self.parse_expression_list(Token::RBracket)?;
 
                 if let Some(Token::RBracket) = self.tokenizer.peek()? {
                     self.tokenizer.next()?;
@@ -588,13 +588,18 @@ impl<'l> CelCompiler<'l> {
         }
     }
 
-    fn parse_expression_list(&mut self) -> CelResult<(Vec<ParseResult>, ExprList)> {
+    fn parse_expression_list(&mut self, ending: Token) -> CelResult<(Vec<ParseResult>, ExprList)> {
         let mut vec = Vec::new();
         let mut ast = Vec::new();
 
         'outer: loop {
-            if self.tokenizer.peek()? == Some(Token::RParen) {
-                break 'outer;
+            match self.tokenizer.peek()? {
+                Some(val) => {
+                    if val == ending {
+                        break 'outer;
+                    }
+                }
+                None => {}
             }
 
             let (expr_res, expr_ast) = self.parse_expression()?;
@@ -618,6 +623,10 @@ impl<'l> CelCompiler<'l> {
         let mut ast = Vec::new();
 
         'outer: loop {
+            if self.tokenizer.peek()? == Some(Token::RBrace) {
+                break 'outer;
+            }
+
             let (key_res, key_ast) = self.parse_expression()?;
 
             let next_token = self.tokenizer.next()?;

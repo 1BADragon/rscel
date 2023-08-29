@@ -38,7 +38,7 @@ mod program;
 // Export some public interface
 pub mod utils;
 pub use cel_error::{CelError, CelResult};
-pub use cel_value::{CelValue, CelValueInner};
+pub use cel_value::CelValue;
 pub use compiler::{
     compiler::CelCompiler, string_tokenizer::StringTokenizer, tokenizer::Tokenizer,
 };
@@ -142,6 +142,8 @@ mod test {
     #[test_case("min(1,2,3)", 1.into(); "min")]
     #[test_case("max(1,2,3)", 3.into(); "max")]
     #[test_case("[1,2,3].reduce(curr, next, curr + next, 0)", 6.into(); "reduce")]
+    #[test_case("{}", CelValue::from_map(HashMap::new()); "empty object")]
+    #[test_case("[]", CelValue::from_list(Vec::new()); "empy list")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
@@ -199,6 +201,7 @@ mod test {
 
         ctx.add_program_str("func1", "foo.bar + 4").unwrap();
         ctx.add_program_str("func2", "foo.bar % 4").unwrap();
+        ctx.add_program_str("func3", "foo.bar").unwrap();
 
         let mut foo: HashMap<String, CelValue> = HashMap::new();
         foo.insert("bar".to_owned(), 7.into());
@@ -206,6 +209,7 @@ mod test {
 
         assert_eq!(ctx.exec("func1", &exec_ctx).unwrap(), 11.into());
         assert_eq!(ctx.exec("func2", &exec_ctx).unwrap(), 3.into());
+        assert_eq!(ctx.exec("func3", &exec_ctx).unwrap(), 7.into());
     }
 
     #[test]

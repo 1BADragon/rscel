@@ -29,7 +29,7 @@ use super::default_macros::load_default_macros;
 ///         return Err(CelError::misc("keys() expects 0 arguments"));    
 ///     }
 ///     
-///     if let CelValueInner::Map(map) = this.into_inner() {
+///     if let CelValue::Map(map) = this {
 ///         Ok(CelValue::from_list(map.keys().map(|x| x.as_str().into()).collect()))
 ///     } else {
 ///        Err(CelError::misc("keys() only supported for map type"))

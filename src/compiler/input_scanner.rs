@@ -1,6 +1,6 @@
 use std::str::Chars;
 
-pub struct InputScanner<'l> {
+pub struct StringScanner<'l> {
     input: &'l str,
     iterator: Chars<'l>,
     current: Option<char>,
@@ -8,9 +8,9 @@ pub struct InputScanner<'l> {
     column: usize,
 }
 
-impl<'l> InputScanner<'l> {
-    pub fn from_input(input: &'l str) -> InputScanner<'l> {
-        InputScanner {
+impl<'l> StringScanner<'l> {
+    pub fn from_input(input: &'l str) -> StringScanner<'l> {
+        StringScanner {
             input,
             iterator: input.chars(),
             current: None,

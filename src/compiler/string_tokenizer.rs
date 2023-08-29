@@ -1,9 +1,9 @@
 use super::{
-    input_scanner::InputScanner, syntax_error::SyntaxError, tokenizer::Tokenizer, tokens::Token,
+    input_scanner::StringScanner, syntax_error::SyntaxError, tokenizer::Tokenizer, tokens::Token,
 };
 
 pub struct StringTokenizer<'l> {
-    scanner: InputScanner<'l>,
+    scanner: StringScanner<'l>,
 
     current: Option<Token>,
 
@@ -13,7 +13,7 @@ pub struct StringTokenizer<'l> {
 impl<'l> StringTokenizer<'l> {
     pub fn with_input(input: &'l str) -> StringTokenizer<'l> {
         StringTokenizer {
-            scanner: InputScanner::from_input(input),
+            scanner: StringScanner::from_input(input),
             current: None,
             eof: false,
         }

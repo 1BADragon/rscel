@@ -43,6 +43,10 @@ impl Program {
         &self.details
     }
 
+    pub fn details_mut<'a>(&'a mut self) -> &'a mut ProgramDetails {
+        &mut self.details
+    }
+
     pub fn bytecode<'a>(&'a self) -> &'a [ByteCode] {
         &self.bytecode
     }

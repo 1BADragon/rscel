@@ -14,5 +14,6 @@ fn main() {
     let prog = CelCompiler::with_tokenizer(&mut tokenizer)
         .compile()
         .unwrap();
+
     println!("{}", serde_json::to_string_pretty(&prog).unwrap());
 }

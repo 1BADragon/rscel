@@ -2,7 +2,7 @@ import * as React from "react";
 import "./CelComponent.css";
 
 import init, { cel_eval, cel_details, CelFloat } from "rscel";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function CelComponent() {
   const [isInit, setIsInit] = useState<boolean>(false);
@@ -11,9 +11,11 @@ export default function CelComponent() {
   const [params, setParams] = useState<string[]>([]);
   const [paramVals, setParamVals] = useState<any>({});
 
-  init().then((_res: any) => {
-    setIsInit(true);
-  });
+  useEffect(() => {
+    init().then((_res: any) => {
+      setIsInit(true);
+    });
+  }, []);
 
   if (!isInit) {
     return <div>Loading...</div>;
@@ -31,7 +33,6 @@ export default function CelComponent() {
                 try {
                   let newObj = { ...old };
                   const floatval = new CelFloat(Number(event.target.value));
-                  console.log(floatval);
 
                   newObj[val] = floatval;
                   setErrorMessage("");
@@ -61,13 +62,15 @@ export default function CelComponent() {
       <div style={{ display: "flex", rowGap: "10px", justifyContent: "right" }}>
         <button
           onClick={() => {
-            const details = cel_details(prog);
+            const res = cel_details(prog);
 
-            if (details.success) {
-              setParams(details.result.get("params"));
+            if (res.success) {
+              console.log(res);
+              const details = res.result.get("details");
+              setParams(details.get("params"));
               setErrorMessage("");
             } else {
-              setErrorMessage(`${details.error.kind}: ${details.error.msg}`);
+              setErrorMessage(`${res.error.kind}: ${res.error.msg}`);
             }
           }}
         >
