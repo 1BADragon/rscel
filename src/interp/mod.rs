@@ -388,6 +388,7 @@ impl<'a> Interpreter<'a> {
                         if let CelValue::Map(ref map) = obj {
                             match map.get(ident.as_str()) {
                                 Some(val) => stack.push_val(val.clone()),
+                                // TODO: Determine if .foo is callable before making a bound call
                                 None => stack.push(CelStackValue::BoundCall {
                                     callable: self.callable_by_name(ident.as_str())?,
                                     value: obj,
