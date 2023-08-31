@@ -83,7 +83,7 @@ impl ParseResult {
     ) -> ParseResult {
         self.bytecode.push(ByteCode::JmpCond {
             when: JmpWhen::False,
-            dist: true_clause.bytecode().len() as u32,
+            dist: (true_clause.bytecode().len() as u32) + 1, // +1 to jmp over the next jump
             leave_val: false,
         });
 
@@ -91,6 +91,8 @@ impl ParseResult {
         self.details.union_from(false_clause.details);
 
         self.bytecode.extend(true_clause.bytecode.into_iter());
+        self.bytecode
+            .push(ByteCode::Jmp(false_clause.bytecode.len() as u32));
         self.bytecode.extend(false_clause.bytecode.into_iter());
 
         self

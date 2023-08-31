@@ -43,7 +43,7 @@ impl<'a, 'b> InterpStack<'a, 'b> {
                         } else if let Some(ctx) = self.ctx.cel {
                             // Allow for loaded programs to run as values
                             if let Some(prog) = ctx.get_program(&name) {
-                                return self.ctx.run_raw(prog.bytecode()).map(|x| x.into());
+                                return self.ctx.run_raw(prog.bytecode(), true).map(|x| x.into());
                             }
                         }
 
@@ -131,14 +131,14 @@ impl<'a> Interpreter<'a> {
     pub fn run_program(&self, name: &str) -> CelResult<CelValue> {
         match self.cel {
             Some(cel) => match cel.get_program(name) {
-                Some(prog) => self.run_raw(prog.bytecode()),
+                Some(prog) => self.run_raw(prog.bytecode(), true),
                 None => Err(CelError::binding(&name)),
             },
             None => Err(CelError::internal("No CEL context bound to interpreter")),
         }
     }
 
-    pub fn run_raw(&self, prog: &[ByteCode]) -> CelResult<CelValue> {
+    pub fn run_raw(&self, prog: &[ByteCode], resolve: bool) -> CelResult<CelValue> {
         let mut pc: usize = 0;
         let mut stack = InterpStack::new(self);
 
@@ -451,10 +451,16 @@ impl<'a> Interpreter<'a> {
             };
         }
 
-        let val = stack.pop_tryresolve();
-        match val {
-            Ok(val) => val.try_into(),
-            Err(err) => Err(err),
+        if resolve {
+            match stack.pop() {
+                Ok(val) => val.try_into(),
+                Err(err) => Err(err),
+            }
+        } else {
+            match stack.pop_tryresolve() {
+                Ok(val) => val.try_into(),
+                Err(err) => Err(err),
+            }
         }
     }
 
@@ -480,7 +486,7 @@ impl<'a> Interpreter<'a> {
         let mut arg_values = Vec::new();
         for arg in args.into_iter() {
             if let CelValue::ByteCode(bc) = arg {
-                arg_values.push(self.run_raw(&bc)?);
+                arg_values.push(self.run_raw(&bc, true)?);
             } else {
                 arg_values.push(arg)
             }
@@ -534,6 +540,6 @@ mod test {
         prog.push(op);
         let interp = Interpreter::empty();
 
-        assert!(interp.run_raw(&prog).unwrap() == expected);
+        assert!(interp.run_raw(&prog, true).unwrap() == expected);
     }
 }

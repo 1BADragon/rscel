@@ -144,6 +144,7 @@ mod test {
     #[test_case("[1,2,3].reduce(curr, next, curr + next, 0)", 6.into(); "reduce")]
     #[test_case("{}", CelValue::from_map(HashMap::new()); "empty object")]
     #[test_case("[]", CelValue::from_list(Vec::new()); "empy list")]
+    #[test_case("has(foo) && foo > 10", false.into(); "has works")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
@@ -271,5 +272,19 @@ mod test {
 
         assert!(!dets.params().contains(&"int"));
         assert!(dets.params().contains(&"foo"));
+    }
+
+    #[test]
+    fn test_has_through() {
+        let mut ctx = CelContext::new();
+        let mut exec = BindContext::new();
+
+        ctx.add_program_str("entry", "has(foo) ? foo + 3 : 42")
+            .unwrap();
+
+        assert_eq!(ctx.exec("entry", &exec).unwrap(), 42.into());
+
+        exec.bind_param("foo", 10.into());
+        assert_eq!(ctx.exec("entry", &exec).unwrap(), 13.into());
     }
 }
