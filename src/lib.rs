@@ -145,6 +145,8 @@ mod test {
     #[test_case("{}", CelValue::from_map(HashMap::new()); "empty object")]
     #[test_case("[]", CelValue::from_list(Vec::new()); "empy list")]
     #[test_case("has(foo) && foo > 10", false.into(); "has works")]
+    #[test_case("true ? 4 : 3", 4.into(); "ternary true")]
+    #[test_case("false ? 4 : 3", 3.into(); "ternary false")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
