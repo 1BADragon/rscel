@@ -3,7 +3,7 @@ mod utils;
 
 use std::collections::HashMap;
 
-use crate::{BindContext, CelContext, CelError, CelValue, Program};
+use crate::{BindContext, CelCompiler, CelContext, CelError, CelValue, StringTokenizer};
 use object_iter::ObjectIterator;
 use serde::Serialize;
 use serde_json::Value;
@@ -107,15 +107,15 @@ pub fn float_val(val: f64) -> Option<CelFloat> {
 
 #[wasm_bindgen]
 pub fn cel_details(source: &str) -> JsValue {
-    match Program::from_source(source) {
-        Ok(prog) => {
-            let mut details = prog.details().clone();
+    let mut tokenizer = StringTokenizer::with_input(source);
+    match CelCompiler::with_tokenizer(&mut tokenizer).compile() {
+        Ok(mut prog) => {
             let default_bindings = BindContext::new();
 
-            details.filter_from_bindings(&default_bindings);
+            prog.details_mut().filter_from_bindings(&default_bindings);
 
             serde_wasm_bindgen::to_value(&EvalResult::from_value(
-                serde_json::to_value(&details).unwrap(),
+                serde_json::to_value(&prog).unwrap(),
             ))
             .unwrap()
         }

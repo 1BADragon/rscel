@@ -1,7 +1,7 @@
 use super::bind_context::RsCelFunction;
 use crate::{
     cel_error::{CelError, CelResult},
-    BindContext, CelValue, CelValueInner,
+    BindContext, CelValue,
 };
 use chrono::{DateTime, Utc};
 use regex::Regex;
@@ -38,13 +38,13 @@ pub fn load_default_funcs(exec_ctx: &mut BindContext) {
 }
 
 fn int_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
-    use CelValueInner::*;
+    use CelValue::*;
 
     if args.len() != 1 {
         return Err(CelError::argument("int() expects exactly one argument"));
     }
 
-    match args[0].inner() {
+    match &args[0] {
         Int(val) => Ok(CelValue::from_int(*val)),
         UInt(val) => Ok(CelValue::from_int(*val as i64)),
         Float(val) => Ok(CelValue::from_int(*val as i64)),
@@ -64,13 +64,13 @@ fn int_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 }
 
 fn uint_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
-    use CelValueInner::*;
+    use CelValue::*;
 
     if args.len() != 1 {
         return Err(CelError::argument("uint() expects exactly one argument"));
     }
 
-    match args[0].inner() {
+    match &args[0] {
         Int(val) => Ok(CelValue::from_uint(*val as u64)),
         UInt(val) => Ok(CelValue::from_uint(*val)),
         Float(val) => Ok(CelValue::from_uint(*val as u64)),
@@ -89,13 +89,13 @@ fn uint_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 }
 
 fn double_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
-    use CelValueInner::*;
+    use CelValue::*;
 
     if args.len() != 1 {
         return Err(CelError::argument("double() expects exactly one argument"));
     }
 
-    match args[0].inner() {
+    match &args[0] {
         Int(val) => Ok(CelValue::from_float(*val as f64)),
         UInt(val) => Ok(CelValue::from_float(*val as f64)),
         Float(val) => Ok(CelValue::from_float(*val)),
@@ -114,12 +114,12 @@ fn double_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 }
 
 fn bytes_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
-    use CelValueInner::*;
+    use CelValue::*;
     if args.len() != 1 {
         return Err(CelError::argument("bytes() expects exactly one argument"));
     }
 
-    match &args[0].inner() {
+    match &args[0] {
         String(val) => Ok(CelValue::from_bytes(val.as_bytes().to_vec())),
         other => Err(CelError::value(&format!(
             "int conversion invalid for {:?}",
@@ -129,7 +129,7 @@ fn bytes_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 }
 
 fn string_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
-    use CelValueInner::*;
+    use CelValue::*;
 
     if args.len() != 1 {
         return Err(CelError::argument("string() expects exactly one argument"));
@@ -137,7 +137,7 @@ fn string_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 
     let arg_type = args[0].as_type();
 
-    Ok(match args[0].inner() {
+    Ok(match &args[0] {
         Int(i) => i.to_string().into(),
         UInt(i) => i.to_string().into(),
         Float(f) => f.to_string().into(),
@@ -164,8 +164,8 @@ fn contains_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         ));
     }
 
-    if let CelValueInner::String(this_str) = this.into_inner() {
-        if let CelValueInner::String(rhs) = args[0].inner() {
+    if let CelValue::String(this_str) = this {
+        if let CelValue::String(rhs) = &args[0] {
             Ok(CelValue::from_bool(this_str.contains(rhs)))
         } else {
             Err(CelError::value("contains() arg must be string"))
@@ -180,11 +180,11 @@ fn size_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         return Err(CelError::argument("size() expects exactly one argument"));
     }
 
-    Ok(CelValue::from_uint(match args[0].inner() {
-        CelValueInner::String(s) => s.len() as u64,
-        CelValueInner::Bytes(b) => b.len() as u64,
-        CelValueInner::List(l) => l.len() as u64,
-        CelValueInner::Map(m) => m.len() as u64,
+    Ok(CelValue::from_uint(match &args[0] {
+        CelValue::String(s) => s.len() as u64,
+        CelValue::Bytes(b) => b.len() as u64,
+        CelValue::List(l) => l.len() as u64,
+        CelValue::Map(m) => m.len() as u64,
         _ => {
             return Err(CelError::value(
                 "size() only available for types {string, bytes, list, map}",
@@ -200,8 +200,8 @@ fn starts_with_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         ));
     }
 
-    if let CelValueInner::String(lhs) = this.inner() {
-        if let CelValueInner::String(rhs) = args[0].inner() {
+    if let CelValue::String(lhs) = this {
+        if let CelValue::String(rhs) = &args[0] {
             return Ok(lhs.starts_with(rhs).into());
         }
     }
@@ -216,8 +216,8 @@ fn ends_with_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         ));
     }
 
-    if let CelValueInner::String(lhs) = this.inner() {
-        if let CelValueInner::String(rhs) = args[0].inner() {
+    if let CelValue::String(lhs) = this {
+        if let CelValue::String(rhs) = &args[0] {
             return Ok(lhs.ends_with(rhs).into());
         }
     }
@@ -226,7 +226,7 @@ fn ends_with_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 }
 
 fn matches_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
-    let (vc_lhs, vc_rhs) = if let CelValueInner::Null = this.inner() {
+    let (vc_lhs, vc_rhs) = if let CelValue::Null = this {
         if args.len() != 2 {
             return Err(CelError::argument("matches() expects exactly two argument"));
         }
@@ -238,8 +238,8 @@ fn matches_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         (&this, &args[0])
     };
 
-    if let CelValueInner::String(lhs) = vc_lhs.inner() {
-        if let CelValueInner::String(rhs) = vc_rhs.inner() {
+    if let CelValue::String(lhs) = vc_lhs {
+        if let CelValue::String(rhs) = vc_rhs {
             match Regex::new(rhs) {
                 Ok(re) => return Ok(re.is_match(lhs).into()),
                 Err(err) => {
@@ -270,7 +270,7 @@ fn timestamp_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         return Err(CelError::argument("timestamp() expect one argument"));
     }
 
-    if let CelValueInner::String(str_val) = args[0].inner() {
+    if let CelValue::String(str_val) = &args[0] {
         match (&str_val).parse::<DateTime<Utc>>() {
             Ok(val) => Ok(CelValue::from_timestamp(&val)),
             Err(_) => Err(CelError::value("Invalid timestamp format")),
@@ -285,7 +285,7 @@ fn duration_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         return Err(CelError::argument("duration() expects one argument"));
     }
 
-    if let CelValueInner::String(str_val) = args[0].inner() {
+    if let CelValue::String(str_val) = &args[0] {
         match duration_str::parse_chrono(str_val) {
             Ok(val) => Ok(CelValue::from_duration(&val)),
             Err(_) => Err(CelError::value("Invalid duration format")),
@@ -300,10 +300,10 @@ fn abs_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         return Err(CelError::argument("abs() expects one argument"));
     }
 
-    match args[0].inner() {
-        CelValueInner::Int(i) => Ok(i.abs().into()),
-        CelValueInner::UInt(u) => Ok((*u).into()),
-        CelValueInner::Float(f) => Ok(f.abs().into()),
+    match args[0] {
+        CelValue::Int(i) => Ok(i.abs().into()),
+        CelValue::UInt(u) => Ok((u).into()),
+        CelValue::Float(f) => Ok(f.abs().into()),
         _ => Err(CelError::value("abs() expect numerical argument")),
     }
 }
@@ -313,8 +313,8 @@ fn sqrt_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         return Err(CelError::argument("sqrt() expects one argument"));
     }
 
-    match args[0].inner() {
-        CelValueInner::Float(f) => Ok(f.sqrt().into()),
+    match args[0] {
+        CelValue::Float(f) => Ok(f.sqrt().into()),
         _ => Err(CelError::value("abs() expect double argument")),
     }
 }
@@ -324,21 +324,21 @@ fn pow_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         return Err(CelError::argument("pow() expects two argument"));
     }
 
-    match args[0].inner() {
-        CelValueInner::Int(i) => match args[1].inner() {
-            CelValueInner::Int(e) => Ok(i.pow(*e as u32).into()),
-            CelValueInner::UInt(e) => Ok(i.pow(*e as u32).into()),
+    match args[0] {
+        CelValue::Int(i) => match args[1] {
+            CelValue::Int(e) => Ok(i.pow(e as u32).into()),
+            CelValue::UInt(e) => Ok(i.pow(e as u32).into()),
             _ => Err(CelError::argument("pow() expects integer exponent")),
         },
-        CelValueInner::UInt(u) => match args[1].inner() {
-            CelValueInner::Int(e) => Ok(u.pow(*e as u32).into()),
-            CelValueInner::UInt(e) => Ok(u.pow(*e as u32).into()),
+        CelValue::UInt(u) => match args[1] {
+            CelValue::Int(e) => Ok(u.pow(e as u32).into()),
+            CelValue::UInt(e) => Ok(u.pow(e as u32).into()),
             _ => Err(CelError::argument("pow() expects integer exponent")),
         },
-        CelValueInner::Float(f) => match args[1].inner() {
-            CelValueInner::Int(e) => Ok(f.powi(*e as i32).into()),
-            CelValueInner::UInt(e) => Ok(f.powi(*e as i32).into()),
-            CelValueInner::Float(e) => Ok(f.powf(*e).into()),
+        CelValue::Float(f) => match args[1] {
+            CelValue::Int(e) => Ok(f.powi(e as i32).into()),
+            CelValue::UInt(e) => Ok(f.powi(e as i32).into()),
+            CelValue::Float(e) => Ok(f.powf(e).into()),
             _ => Err(CelError::argument(
                 "pow() expect integer or float for exponent",
             )),
@@ -352,10 +352,10 @@ fn log_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         return Err(CelError::argument("log() expects one argument"));
     }
 
-    match args[0].inner() {
-        CelValueInner::Int(i) => Ok(i.ilog10().into()),
-        CelValueInner::UInt(u) => Ok(u.ilog10().into()),
-        CelValueInner::Float(f) => Ok(f.log10().into()),
+    match args[0] {
+        CelValue::Int(i) => Ok(i.ilog10().into()),
+        CelValue::UInt(u) => Ok(u.ilog10().into()),
+        CelValue::Float(f) => Ok(f.log10().into()),
         _ => Err(CelError::value("log() expects numerical argument")),
     }
 }
@@ -365,10 +365,10 @@ fn ceil_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         return Err(CelError::argument("ceil() expects on argument"));
     }
 
-    match args[0].inner() {
-        CelValueInner::Int(i) => Ok((*i).into()),
-        CelValueInner::UInt(u) => Ok((*u).into()),
-        CelValueInner::Float(f) => Ok((f.ceil() as i64).into()),
+    match args[0] {
+        CelValue::Int(i) => Ok((i).into()),
+        CelValue::UInt(u) => Ok((u).into()),
+        CelValue::Float(f) => Ok((f.ceil() as i64).into()),
         _ => Err(CelError::argument("ceil() expects numeric type")),
     }
 }
@@ -378,10 +378,10 @@ fn floor_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         return Err(CelError::argument("floor() expects on argument"));
     }
 
-    match args[0].inner() {
-        CelValueInner::Int(i) => Ok((*i).into()),
-        CelValueInner::UInt(u) => Ok((*u).into()),
-        CelValueInner::Float(f) => Ok((f.floor() as i64).into()),
+    match args[0] {
+        CelValue::Int(i) => Ok((i).into()),
+        CelValue::UInt(u) => Ok((u).into()),
+        CelValue::Float(f) => Ok((f.floor() as i64).into()),
         _ => Err(CelError::argument("floor() expects numeric type")),
     }
 }
@@ -391,10 +391,10 @@ fn round_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         return Err(CelError::argument("round() expects on argument"));
     }
 
-    match args[0].inner() {
-        CelValueInner::Int(i) => Ok((*i).into()),
-        CelValueInner::UInt(u) => Ok((*u).into()),
-        CelValueInner::Float(f) => Ok((f.round() as i64).into()),
+    match args[0] {
+        CelValue::Int(i) => Ok((i).into()),
+        CelValue::UInt(u) => Ok((u).into()),
+        CelValue::Float(f) => Ok((f.round() as i64).into()),
         _ => Err(CelError::argument("round() expects numeric type")),
     }
 }

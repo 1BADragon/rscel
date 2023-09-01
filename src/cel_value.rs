@@ -7,7 +7,6 @@ use std::{
     fmt,
     iter::zip,
     ops::{Add, Div, Mul, Neg, Not, Rem, Sub},
-    sync::Arc,
 };
 
 use serde_json::{value::Value, Map};
@@ -15,8 +14,8 @@ use serde_json::{value::Value, Map};
 use crate::{interp::ByteCode, CelError, CelResult};
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum CelValueInner {
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
+pub enum CelValue {
     Int(i64),
     UInt(u64),
     Float(f64),
@@ -35,109 +34,65 @@ pub enum CelValueInner {
     ByteCode(Vec<ByteCode>),
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct CelValue {
-    inner: Arc<CelValueInner>,
-}
-
-impl From<CelValueInner> for CelValue {
-    fn from(inner: CelValueInner) -> CelValue {
-        return CelValue {
-            inner: Arc::new(inner),
-        };
-    }
-}
-
-impl Clone for CelValue {
-    fn clone(&self) -> CelValue {
-        CelValue {
-            inner: self.inner.clone(),
-        }
-    }
-}
-
-impl PartialEq for CelValue {
-    fn eq(&self, rhs: &CelValue) -> bool {
-        self.inner().eq(rhs.inner())
-    }
-}
-
-impl AsRef<CelValueInner> for CelValue {
-    fn as_ref(&self) -> &CelValueInner {
-        self.inner()
-    }
-}
-
 impl CelValue {
     pub fn from_int(val: i64) -> CelValue {
-        CelValueInner::Int(val).into()
+        CelValue::Int(val)
     }
 
     pub fn from_uint(val: u64) -> CelValue {
-        CelValueInner::UInt(val).into()
+        CelValue::UInt(val)
     }
 
     pub fn from_float(val: f64) -> CelValue {
-        CelValueInner::Float(val).into()
+        CelValue::Float(val)
     }
 
     pub fn from_bool(val: bool) -> CelValue {
-        CelValueInner::Bool(val).into()
+        CelValue::Bool(val)
     }
 
     pub fn from_string(val: String) -> CelValue {
-        CelValueInner::String(val).into()
+        CelValue::String(val)
     }
 
     pub fn from_bytes(val: Vec<u8>) -> CelValue {
-        CelValueInner::Bytes(val).into()
+        CelValue::Bytes(val)
     }
 
     pub fn from_list(val: Vec<CelValue>) -> CelValue {
-        CelValueInner::List(val.to_vec()).into()
+        CelValue::List(val)
     }
 
     pub fn from_map(val: HashMap<String, CelValue>) -> CelValue {
-        CelValueInner::Map(val.clone()).into()
+        CelValue::Map(val)
     }
 
     pub fn from_null() -> CelValue {
-        CelValueInner::Null.into()
+        CelValue::Null
     }
 
     pub fn from_ident(val: &str) -> CelValue {
-        CelValueInner::Ident(val.to_owned()).into()
+        CelValue::Ident(val.to_owned())
     }
 
     pub fn from_type(val: &str) -> CelValue {
-        CelValueInner::Type(val.to_owned()).into()
+        CelValue::Type(val.to_owned())
     }
 
     pub fn from_timestamp(val: &DateTime<Utc>) -> CelValue {
-        CelValueInner::TimeStamp(val.clone()).into()
+        CelValue::TimeStamp(val.clone())
     }
 
     pub fn from_duration(val: &Duration) -> CelValue {
-        CelValueInner::Duration(val.clone()).into()
+        CelValue::Duration(val.clone())
     }
 
     pub(crate) fn from_bytecode(val: &[ByteCode]) -> CelValue {
-        CelValueInner::ByteCode(val.to_owned()).into()
-    }
-
-    pub fn into_inner(self) -> CelValueInner {
-        match Arc::try_unwrap(self.inner) {
-            Ok(inner) => inner,
-            Err(rc) => (*rc).clone(),
-        }
-    }
-
-    pub fn inner<'l>(&'l self) -> &'l CelValueInner {
-        &self.inner
+        CelValue::ByteCode(val.to_owned())
     }
 
     pub fn is_true(&self) -> bool {
-        if let CelValueInner::Bool(val) = self.inner() {
+        if let CelValue::Bool(val) = self {
             *val
         } else {
             false
@@ -145,7 +100,7 @@ impl CelValue {
     }
 
     pub fn is_null(&self) -> bool {
-        if let CelValueInner::Null = self.inner() {
+        if let CelValue::Null = self {
             true
         } else {
             false
@@ -156,60 +111,48 @@ impl CelValue {
         let type1 = rhs.as_type();
         let type2 = rhs.as_type();
 
-        match self.inner() {
-            CelValueInner::Int(val1) => {
-                match rhs.inner() {
-                    CelValueInner::Int(val2) => return Ok(CelValue::from_bool(val1 == val2)),
-                    CelValueInner::UInt(val2) => {
-                        return Ok(CelValue::from_bool(*val1 == *val2 as i64))
-                    }
-                    CelValueInner::Float(val2) => {
-                        return Ok(CelValue::from_bool(*val1 as f64 == *val2))
-                    }
+        match self {
+            CelValue::Int(val1) => {
+                match rhs {
+                    CelValue::Int(val2) => return Ok(CelValue::from_bool(val1 == val2)),
+                    CelValue::UInt(val2) => return Ok(CelValue::from_bool(*val1 == *val2 as i64)),
+                    CelValue::Float(val2) => return Ok(CelValue::from_bool(*val1 as f64 == *val2)),
                     _ => {}
                 };
             }
-            CelValueInner::UInt(val1) => {
-                match rhs.inner() {
-                    CelValueInner::Int(val2) => {
-                        return Ok(CelValue::from_bool(*val1 as i64 == *val2))
-                    }
-                    CelValueInner::UInt(val2) => return Ok(CelValue::from_bool(val1 == val2)),
-                    CelValueInner::Float(val2) => {
-                        return Ok(CelValue::from_bool(*val1 as f64 == *val2))
-                    }
+            CelValue::UInt(val1) => {
+                match rhs {
+                    CelValue::Int(val2) => return Ok(CelValue::from_bool(*val1 as i64 == *val2)),
+                    CelValue::UInt(val2) => return Ok(CelValue::from_bool(val1 == val2)),
+                    CelValue::Float(val2) => return Ok(CelValue::from_bool(*val1 as f64 == *val2)),
                     _ => {}
                 };
             }
-            CelValueInner::Float(val1) => {
-                match rhs.inner() {
-                    CelValueInner::Int(val2) => {
-                        return Ok(CelValue::from_bool(*val1 == *val2 as f64))
-                    }
-                    CelValueInner::UInt(val2) => {
-                        return Ok(CelValue::from_bool(*val1 == *val2 as f64))
-                    }
-                    CelValueInner::Float(val2) => return Ok(CelValue::from_bool(val1 == val2)),
+            CelValue::Float(val1) => {
+                match rhs {
+                    CelValue::Int(val2) => return Ok(CelValue::from_bool(*val1 == *val2 as f64)),
+                    CelValue::UInt(val2) => return Ok(CelValue::from_bool(*val1 == *val2 as f64)),
+                    CelValue::Float(val2) => return Ok(CelValue::from_bool(val1 == val2)),
                     _ => {}
                 };
             }
-            CelValueInner::Bool(val1) => {
-                if let CelValueInner::Bool(val2) = rhs.inner() {
+            CelValue::Bool(val1) => {
+                if let CelValue::Bool(val2) = rhs {
                     return Ok(CelValue::from_bool(val1 == val2));
                 }
             }
-            CelValueInner::String(val1) => {
-                if let CelValueInner::String(val2) = rhs.inner() {
+            CelValue::String(val1) => {
+                if let CelValue::String(val2) = rhs {
                     return Ok(CelValue::from_bool(val1 == val2));
                 }
             }
-            CelValueInner::Bytes(val1) => {
-                if let CelValueInner::Bytes(val2) = rhs.inner() {
+            CelValue::Bytes(val1) => {
+                if let CelValue::Bytes(val2) = rhs {
                     return Ok(CelValue::from_bool(val1 == val2));
                 }
             }
-            CelValueInner::List(val1) => {
-                if let CelValueInner::List(val2) = rhs.inner() {
+            CelValue::List(val1) => {
+                if let CelValue::List(val2) = rhs {
                     if val1.len() != val2.len() {
                         return Ok(CelValue::from_bool(false));
                     }
@@ -217,7 +160,7 @@ impl CelValue {
                     for (v1, v2) in zip(val1, val2) {
                         match v1.eq(v2) {
                             Ok(res_cell) => {
-                                if let CelValueInner::Bool(res) = res_cell.inner() {
+                                if let CelValue::Bool(res) = res_cell {
                                     if !res {
                                         return Ok(CelValue::from_bool(false));
                                     }
@@ -229,20 +172,20 @@ impl CelValue {
                     return Ok(CelValue::from_bool(true));
                 }
             }
-            CelValueInner::Null => {
-                if let CelValueInner::Null = rhs.inner() {
+            CelValue::Null => {
+                if let CelValue::Null = rhs {
                     return Ok(CelValue::from_bool(true));
                 } else {
                     return Ok(CelValue::from_bool(false));
                 }
             }
-            CelValueInner::TimeStamp(v1) => {
-                if let CelValueInner::TimeStamp(v2) = rhs.inner() {
+            CelValue::TimeStamp(v1) => {
+                if let CelValue::TimeStamp(v2) = rhs {
                     return Ok(CelValue::from_bool(*v1 == *v2));
                 }
             }
-            CelValueInner::Duration(v1) => {
-                if let CelValueInner::Duration(v2) = rhs.inner() {
+            CelValue::Duration(v1) => {
+                if let CelValue::Duration(v2) = rhs {
                     return Ok(CelValue::from_bool(*v1 == *v2));
                 }
             }
@@ -256,7 +199,7 @@ impl CelValue {
     }
 
     pub fn neq(&self, rhs: &CelValue) -> CelResult<CelValue> {
-        if let CelValueInner::Bool(res) = self.eq(rhs)?.inner() {
+        if let CelValue::Bool(res) = self.eq(rhs)? {
             return Ok(CelValue::from_bool(!res));
         }
 
@@ -267,32 +210,32 @@ impl CelValue {
         let type1 = rhs.as_type();
         let type2 = rhs.as_type();
 
-        match self.inner() {
-            CelValueInner::Int(v1) => match rhs.inner() {
-                CelValueInner::Int(v2) => return Ok(Some(v1.cmp(v2))),
-                CelValueInner::UInt(v2) => return Ok(Some(v1.cmp(&(*v2 as i64)))),
-                CelValueInner::Float(v2) => return Ok((*v1 as f64).partial_cmp(v2)),
+        match self {
+            CelValue::Int(v1) => match rhs {
+                CelValue::Int(v2) => return Ok(Some(v1.cmp(v2))),
+                CelValue::UInt(v2) => return Ok(Some(v1.cmp(&(*v2 as i64)))),
+                CelValue::Float(v2) => return Ok((*v1 as f64).partial_cmp(v2)),
                 _ => {}
             },
-            CelValueInner::UInt(v1) => match rhs.inner() {
-                CelValueInner::Int(v2) => return Ok(Some((*v1 as i64).cmp(v2))),
-                CelValueInner::UInt(v2) => return Ok(Some(v1.cmp(v2))),
-                CelValueInner::Float(v2) => return Ok((*v1 as f64).partial_cmp(v2)),
+            CelValue::UInt(v1) => match rhs {
+                CelValue::Int(v2) => return Ok(Some((*v1 as i64).cmp(v2))),
+                CelValue::UInt(v2) => return Ok(Some(v1.cmp(v2))),
+                CelValue::Float(v2) => return Ok((*v1 as f64).partial_cmp(v2)),
                 _ => {}
             },
-            CelValueInner::Float(v1) => match rhs.inner() {
-                CelValueInner::Int(v2) => return Ok(v1.partial_cmp(&(*v2 as f64))),
-                CelValueInner::UInt(v2) => return Ok(v1.partial_cmp(&(*v2 as f64))),
-                CelValueInner::Float(v2) => return Ok(v1.partial_cmp(v2)),
+            CelValue::Float(v1) => match rhs {
+                CelValue::Int(v2) => return Ok(v1.partial_cmp(&(*v2 as f64))),
+                CelValue::UInt(v2) => return Ok(v1.partial_cmp(&(*v2 as f64))),
+                CelValue::Float(v2) => return Ok(v1.partial_cmp(v2)),
                 _ => {}
             },
-            CelValueInner::TimeStamp(v1) => {
-                if let CelValueInner::TimeStamp(v2) = rhs.inner() {
+            CelValue::TimeStamp(v1) => {
+                if let CelValue::TimeStamp(v2) = rhs {
                     return Ok(v1.partial_cmp(v2));
                 }
             }
-            CelValueInner::Duration(v1) => {
-                if let CelValueInner::Duration(v2) = rhs.inner() {
+            CelValue::Duration(v1) => {
+                if let CelValue::Duration(v2) = rhs {
                     return Ok(v1.partial_cmp(v2));
                 }
             }
@@ -332,8 +275,8 @@ impl CelValue {
     }
 
     pub fn or(&self, rhs: &CelValue) -> CelResult<CelValue> {
-        if let CelValueInner::Bool(lhs) = self.inner() {
-            if let CelValueInner::Bool(rhs) = rhs.inner() {
+        if let CelValue::Bool(lhs) = self {
+            if let CelValue::Bool(rhs) = rhs {
                 return Ok((*lhs || *rhs).into());
             }
         }
@@ -345,8 +288,8 @@ impl CelValue {
     }
 
     pub fn and(&self, rhs: &CelValue) -> CelResult<CelValue> {
-        if let CelValueInner::Bool(lhs) = self.inner() {
-            if let CelValueInner::Bool(rhs) = rhs.inner() {
+        if let CelValue::Bool(lhs) = self {
+            if let CelValue::Bool(rhs) = rhs {
                 return Ok((*lhs && *rhs).into());
             }
         }
@@ -358,14 +301,14 @@ impl CelValue {
     }
 
     pub fn into_json_value(self) -> Value {
-        match self.into_inner() {
-            CelValueInner::Int(val) => Value::from(val),
-            CelValueInner::UInt(val) => Value::from(val),
-            CelValueInner::Float(val) => Value::from(val),
-            CelValueInner::Bool(val) => Value::from(val),
-            CelValueInner::String(val) => Value::from(val),
-            CelValueInner::Bytes(val) => Value::from(val),
-            CelValueInner::List(val) => {
+        match self {
+            CelValue::Int(val) => Value::from(val),
+            CelValue::UInt(val) => Value::from(val),
+            CelValue::Float(val) => Value::from(val),
+            CelValue::Bool(val) => Value::from(val),
+            CelValue::String(val) => Value::from(val),
+            CelValue::Bytes(val) => Value::from(val),
+            CelValue::List(val) => {
                 let mut partial: Vec<Value> = Vec::new();
 
                 for v in val.into_iter() {
@@ -374,7 +317,7 @@ impl CelValue {
 
                 Value::Array(partial)
             }
-            CelValueInner::Map(val) => {
+            CelValue::Map(val) => {
                 let mut partial: Map<String, Value> = Map::new();
 
                 for (key, value) in val.into_iter() {
@@ -383,28 +326,28 @@ impl CelValue {
 
                 Value::Object(partial)
             }
-            CelValueInner::TimeStamp(val) => Value::from(val.to_rfc3339()),
-            CelValueInner::Duration(val) => Value::from(val.to_string()),
+            CelValue::TimeStamp(val) => Value::from(val.to_rfc3339()),
+            CelValue::Duration(val) => Value::from(val.to_string()),
             _ => Value::Null,
         }
     }
 
     pub fn as_type(&self) -> CelValue {
-        match self.inner() {
-            CelValueInner::Int(_) => CelValue::from_type("int"),
-            CelValueInner::UInt(_) => CelValue::from_type("uint"),
-            CelValueInner::Float(_) => CelValue::from_type("float"),
-            CelValueInner::Bool(_) => CelValue::from_type("bool"),
-            CelValueInner::String(_) => CelValue::from_type("string"),
-            CelValueInner::Bytes(_) => CelValue::from_type("bytes"),
-            CelValueInner::List(_) => CelValue::from_type("list"),
-            CelValueInner::Map(_) => CelValue::from_type("map"),
-            CelValueInner::Null => CelValue::from_type("null_type"),
-            CelValueInner::Ident(_) => CelValue::from_type("ident"),
-            CelValueInner::Type(_) => CelValue::from_type("type"),
-            CelValueInner::TimeStamp(_) => CelValue::from_type("timestamp"),
-            CelValueInner::Duration(_) => CelValue::from_type("duration"),
-            CelValueInner::ByteCode(_) => CelValue::from_type("bytecode"),
+        match self {
+            CelValue::Int(_) => CelValue::from_type("int"),
+            CelValue::UInt(_) => CelValue::from_type("uint"),
+            CelValue::Float(_) => CelValue::from_type("float"),
+            CelValue::Bool(_) => CelValue::from_type("bool"),
+            CelValue::String(_) => CelValue::from_type("string"),
+            CelValue::Bytes(_) => CelValue::from_type("bytes"),
+            CelValue::List(_) => CelValue::from_type("list"),
+            CelValue::Map(_) => CelValue::from_type("map"),
+            CelValue::Null => CelValue::from_type("null_type"),
+            CelValue::Ident(_) => CelValue::from_type("ident"),
+            CelValue::Type(_) => CelValue::from_type("type"),
+            CelValue::TimeStamp(_) => CelValue::from_type("timestamp"),
+            CelValue::Duration(_) => CelValue::from_type("duration"),
+            CelValue::ByteCode(_) => CelValue::from_type("bytecode"),
         }
     }
 }
@@ -505,8 +448,8 @@ impl TryInto<i64> for CelValue {
     type Error = CelError;
 
     fn try_into(self) -> CelResult<i64> {
-        if let CelValueInner::Int(val) = self.inner() {
-            return Ok(*val);
+        if let CelValue::Int(val) = self {
+            return Ok(val);
         }
 
         return Err(CelError::internal("Convertion Error"));
@@ -541,8 +484,8 @@ impl TryInto<u64> for CelValue {
     type Error = CelError;
 
     fn try_into(self) -> CelResult<u64> {
-        if let CelValueInner::UInt(val) = self.inner() {
-            return Ok(*val);
+        if let CelValue::UInt(val) = self {
+            return Ok(val);
         }
 
         return Err(CelError::internal("Convertion Error"));
@@ -559,8 +502,8 @@ impl TryInto<f64> for CelValue {
     type Error = CelError;
 
     fn try_into(self) -> CelResult<f64> {
-        if let CelValueInner::Float(val) = self.inner() {
-            return Ok(*val);
+        if let CelValue::Float(val) = self {
+            return Ok(val);
         }
 
         return Err(CelError::internal("Convertion Error"));
@@ -577,8 +520,8 @@ impl TryInto<bool> for CelValue {
     type Error = CelError;
 
     fn try_into(self) -> CelResult<bool> {
-        if let CelValueInner::Bool(val) = self.inner() {
-            return Ok(*val);
+        if let CelValue::Bool(val) = self {
+            return Ok(val);
         }
 
         return Err(CelError::internal("Convertion Error"));
@@ -601,7 +544,7 @@ impl TryInto<String> for CelValue {
     type Error = CelError;
 
     fn try_into(self) -> CelResult<String> {
-        if let CelValueInner::String(val) = self.into_inner() {
+        if let CelValue::String(val) = self {
             return Ok(val);
         }
 
@@ -617,7 +560,7 @@ impl From<&[u8]> for CelValue {
 
 impl From<Vec<u8>> for CelValue {
     fn from(val: Vec<u8>) -> CelValue {
-        CelValueInner::Bytes(val).into()
+        CelValue::Bytes(val).into()
     }
 }
 
@@ -625,7 +568,7 @@ impl TryInto<Vec<u8>> for CelValue {
     type Error = CelError;
 
     fn try_into(self) -> CelResult<Vec<u8>> {
-        if let CelValueInner::Bytes(val) = self.into_inner() {
+        if let CelValue::Bytes(val) = self {
             return Ok(val);
         }
 
@@ -641,7 +584,7 @@ impl From<&[CelValue]> for CelValue {
 
 impl From<Vec<CelValue>> for CelValue {
     fn from(val: Vec<CelValue>) -> CelValue {
-        CelValueInner::List(val).into()
+        CelValue::List(val).into()
     }
 }
 
@@ -649,7 +592,7 @@ impl TryInto<Vec<CelValue>> for CelValue {
     type Error = CelError;
 
     fn try_into(self) -> CelResult<Vec<CelValue>> {
-        if let CelValueInner::List(val) = self.into_inner() {
+        if let CelValue::List(val) = self {
             return Ok(val);
         }
 
@@ -667,7 +610,7 @@ impl TryInto<HashMap<String, CelValue>> for CelValue {
     type Error = CelError;
 
     fn try_into(self) -> CelResult<HashMap<String, CelValue>> {
-        if let CelValueInner::Map(val) = self.into_inner() {
+        if let CelValue::Map(val) = self {
             return Ok(val);
         }
 
@@ -691,7 +634,7 @@ impl TryInto<DateTime<Utc>> for CelValue {
     type Error = CelError;
 
     fn try_into(self) -> CelResult<DateTime<Utc>> {
-        if let CelValueInner::TimeStamp(val) = self.into_inner() {
+        if let CelValue::TimeStamp(val) = self {
             return Ok(val);
         }
 
@@ -709,7 +652,7 @@ impl TryInto<Duration> for CelValue {
     type Error = CelError;
 
     fn try_into(self) -> CelResult<Duration> {
-        if let CelValueInner::Duration(val) = self.into_inner() {
+        if let CelValue::Duration(val) = self {
             return Ok(val);
         }
 
@@ -727,7 +670,7 @@ impl TryInto<Vec<ByteCode>> for CelValue {
     type Error = CelError;
 
     fn try_into(self) -> CelResult<Vec<ByteCode>> {
-        if let CelValueInner::ByteCode(val) = self.into_inner() {
+        if let CelValue::ByteCode(val) = self {
             return Ok(val);
         }
 
@@ -742,53 +685,53 @@ impl Add for CelValue {
         let type1 = self.as_type();
         let type2 = rhs.as_type();
 
-        match self.into_inner() {
-            CelValueInner::Int(val1) => {
-                if let CelValueInner::Int(val2) = rhs.inner() {
+        match self {
+            CelValue::Int(val1) => {
+                if let CelValue::Int(val2) = rhs {
                     return Ok(CelValue::from(val1 + val2));
                 }
             }
-            CelValueInner::UInt(val1) => {
-                if let CelValueInner::UInt(val2) = rhs.inner() {
+            CelValue::UInt(val1) => {
+                if let CelValue::UInt(val2) = rhs {
                     return Ok(CelValue::from(val1 + val2));
                 }
             }
-            CelValueInner::Float(val1) => {
-                if let CelValueInner::Float(val2) = rhs.inner() {
+            CelValue::Float(val1) => {
+                if let CelValue::Float(val2) = rhs {
                     return Ok(CelValue::from(val1 + val2));
                 }
             }
-            CelValueInner::String(val1) => {
-                if let CelValueInner::String(val2) = rhs.into_inner() {
+            CelValue::String(val1) => {
+                if let CelValue::String(val2) = rhs {
                     let mut res = val1;
                     res.push_str(&val2);
                     return Ok(CelValue::from(res));
                 }
             }
-            CelValueInner::Bytes(val1) => {
-                if let CelValueInner::Bytes(val2) = rhs.inner() {
+            CelValue::Bytes(val1) => {
+                if let CelValue::Bytes(val2) = rhs {
                     let mut res = val1;
                     res.extend_from_slice(&val2);
                     return Ok(CelValue::from(res));
                 }
             }
-            CelValueInner::List(val1) => {
-                if let CelValueInner::List(val2) = rhs.inner() {
+            CelValue::List(val1) => {
+                if let CelValue::List(val2) = rhs {
                     let mut res = val1;
                     res.extend_from_slice(&val2);
                     return Ok(CelValue::from(res));
                 }
             }
-            CelValueInner::TimeStamp(v1) => {
-                if let CelValueInner::Duration(v2) = rhs.inner() {
-                    return Ok(CelValue::from_timestamp(&(v1 + *v2)));
+            CelValue::TimeStamp(v1) => {
+                if let CelValue::Duration(v2) = rhs {
+                    return Ok(CelValue::from_timestamp(&(v1 + v2)));
                 }
             }
-            CelValueInner::Duration(v1) => {
-                if let CelValueInner::TimeStamp(v2) = rhs.inner() {
-                    return Ok(CelValue::from_timestamp(&(*v2 + v1)));
-                } else if let CelValueInner::Duration(v2) = rhs.inner() {
-                    return Ok(CelValue::from_duration(&(v1 + *v2)));
+            CelValue::Duration(v1) => {
+                if let CelValue::TimeStamp(v2) = rhs {
+                    return Ok(CelValue::from_timestamp(&(v2 + v1)));
+                } else if let CelValue::Duration(v2) = rhs {
+                    return Ok(CelValue::from_duration(&(v1 + v2)));
                 }
             }
             _ => {}
@@ -808,32 +751,32 @@ impl Sub for CelValue {
         let type1 = self.as_type();
         let type2 = rhs.as_type();
 
-        match self.inner() {
-            CelValueInner::Int(val1) => {
-                if let CelValueInner::Int(val2) = rhs.inner() {
+        match self {
+            CelValue::Int(val1) => {
+                if let CelValue::Int(val2) = rhs {
                     return Ok(CelValue::from(val1 - val2));
                 }
             }
-            CelValueInner::UInt(val1) => {
-                if let CelValueInner::UInt(val2) = rhs.inner() {
+            CelValue::UInt(val1) => {
+                if let CelValue::UInt(val2) = rhs {
                     return Ok(CelValue::from(val1 - val2));
                 }
             }
-            CelValueInner::Float(val1) => {
-                if let CelValueInner::Float(val2) = rhs.inner() {
+            CelValue::Float(val1) => {
+                if let CelValue::Float(val2) = rhs {
                     return Ok(CelValue::from(val1 - val2));
                 }
             }
-            CelValueInner::TimeStamp(v1) => {
-                if let CelValueInner::Duration(v2) = rhs.inner() {
-                    return Ok(CelValue::from_timestamp(&(*v1 - *v2)));
+            CelValue::TimeStamp(v1) => {
+                if let CelValue::Duration(v2) = rhs {
+                    return Ok(CelValue::from_timestamp(&(v1 - v2)));
                 }
             }
-            CelValueInner::Duration(v1) => {
-                if let CelValueInner::TimeStamp(v2) = rhs.inner() {
-                    return Ok(CelValue::from_timestamp(&(*v2 - *v1)));
-                } else if let CelValueInner::Duration(v2) = rhs.inner() {
-                    return Ok(CelValue::from_duration(&(*v1 - *v2)));
+            CelValue::Duration(v1) => {
+                if let CelValue::TimeStamp(v2) = rhs {
+                    return Ok(CelValue::from_timestamp(&(v2 - v1)));
+                } else if let CelValue::Duration(v2) = rhs {
+                    return Ok(CelValue::from_duration(&(v1 - v2)));
                 }
             }
             _ => {}
@@ -853,19 +796,19 @@ impl Mul for CelValue {
         let type1 = self.as_type();
         let type2 = rhs.as_type();
 
-        match self.inner() {
-            CelValueInner::Int(val1) => {
-                if let CelValueInner::Int(val2) = rhs.inner() {
+        match self {
+            CelValue::Int(val1) => {
+                if let CelValue::Int(val2) = rhs {
                     return Ok(CelValue::from(val1 * val2));
                 }
             }
-            CelValueInner::UInt(val1) => {
-                if let CelValueInner::UInt(val2) = rhs.inner() {
+            CelValue::UInt(val1) => {
+                if let CelValue::UInt(val2) = rhs {
                     return Ok(CelValue::from(val1 * val2));
                 }
             }
-            CelValueInner::Float(val1) => {
-                if let CelValueInner::Float(val2) = rhs.inner() {
+            CelValue::Float(val1) => {
+                if let CelValue::Float(val2) = rhs {
                     return Ok(CelValue::from(val1 * val2));
                 }
             }
@@ -886,19 +829,19 @@ impl Div for CelValue {
         let type1 = self.as_type();
         let type2 = rhs.as_type();
 
-        match self.inner() {
-            CelValueInner::Int(val1) => {
-                if let CelValueInner::Int(val2) = rhs.inner() {
+        match self {
+            CelValue::Int(val1) => {
+                if let CelValue::Int(val2) = rhs {
                     return Ok(CelValue::from(val1 / val2));
                 }
             }
-            CelValueInner::UInt(val1) => {
-                if let CelValueInner::UInt(val2) = rhs.inner() {
+            CelValue::UInt(val1) => {
+                if let CelValue::UInt(val2) = rhs {
                     return Ok(CelValue::from(val1 / val2));
                 }
             }
-            CelValueInner::Float(val1) => {
-                if let CelValueInner::Float(val2) = rhs.inner() {
+            CelValue::Float(val1) => {
+                if let CelValue::Float(val2) = rhs {
                     return Ok(CelValue::from(val1 / val2));
                 }
             }
@@ -919,14 +862,14 @@ impl Rem for CelValue {
         let type1 = self.as_type();
         let type2 = rhs.as_type();
 
-        match self.inner() {
-            CelValueInner::Int(val1) => {
-                if let CelValueInner::Int(val2) = rhs.inner() {
+        match self {
+            CelValue::Int(val1) => {
+                if let CelValue::Int(val2) = rhs {
                     return Ok(CelValue::from(val1 % val2));
                 }
             }
-            CelValueInner::UInt(val1) => {
-                if let CelValueInner::UInt(val2) = rhs.inner() {
+            CelValue::UInt(val1) => {
+                if let CelValue::UInt(val2) = rhs {
                     return Ok(CelValue::from(val1 % val2));
                 }
             }
@@ -946,11 +889,11 @@ impl Neg for CelValue {
     fn neg(self) -> Self::Output {
         let type1 = self.as_type();
 
-        match self.inner() {
-            CelValueInner::Int(val1) => {
+        match self {
+            CelValue::Int(val1) => {
                 return Ok(CelValue::from(-val1));
             }
-            CelValueInner::Float(val1) => {
+            CelValue::Float(val1) => {
                 return Ok(CelValue::from(-val1));
             }
             _ => {}
@@ -969,8 +912,8 @@ impl Not for CelValue {
     fn not(self) -> Self::Output {
         let type1 = self.as_type();
 
-        match self.inner() {
-            CelValueInner::Bool(val1) => {
+        match self {
+            CelValue::Bool(val1) => {
                 return Ok(CelValue::from(!val1));
             }
             _ => {}
@@ -983,9 +926,25 @@ impl Not for CelValue {
     }
 }
 
-impl fmt::Debug for CelValue {
+impl fmt::Display for CelValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.inner())
+        use CelValue::*;
+        match self {
+            Int(val) => write!(f, "{}", val),
+            UInt(val) => write!(f, "{}", val),
+            Float(val) => write!(f, "{}", val),
+            Bool(val) => write!(f, "{}", val),
+            String(val) => write!(f, "\"{}\"", val),
+            Bytes(val) => write!(f, "{:?}", val),
+            List(val) => write!(f, "{:?}", val),
+            Map(val) => write!(f, "{:?}", val),
+            Null => write!(f, "NULL"),
+            Ident(val) => write!(f, "{}", val),
+            Type(val) => write!(f, "{}", val),
+            TimeStamp(val) => write!(f, "{}", val),
+            Duration(val) => write!(f, "{}", val),
+            ByteCode(val) => write!(f, "{:?}", val),
+        }
     }
 }
 
