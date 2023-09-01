@@ -1,6 +1,6 @@
 use crate::{interp::JmpWhen, program::ProgramDetails, ByteCode, Program};
 
-use super::grammar::Expr;
+use super::{ast_node::AstNode, grammar::Expr};
 
 pub struct ParseResult {
     bytecode: Vec<ByteCode>,
@@ -22,7 +22,7 @@ impl ParseResult {
         }
     }
 
-    pub fn into_program(self, source: String, ast: Expr) -> Program {
+    pub fn into_program(self, source: String, ast: AstNode<Expr>) -> Program {
         Program::new(source, self.details, self.bytecode, ast)
     }
 

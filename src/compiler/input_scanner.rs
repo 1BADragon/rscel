@@ -6,6 +6,7 @@ pub struct StringScanner<'l> {
     current: Option<char>,
     line: usize,
     column: usize,
+    eof: bool,
 }
 
 impl<'l> StringScanner<'l> {
@@ -16,6 +17,7 @@ impl<'l> StringScanner<'l> {
             current: None,
             line: 0,
             column: 0,
+            eof: false,
         }
     }
 
@@ -31,9 +33,7 @@ impl<'l> StringScanner<'l> {
         if let None = self.current {
             self.collect_next()
         } else {
-            let ret = self.current;
-            self.current = None;
-            ret
+            std::mem::replace(&mut self.current, None)
         }
     }
 
@@ -42,18 +42,25 @@ impl<'l> StringScanner<'l> {
     }
 
     fn collect_next(&mut self) -> Option<char> {
-        loop {
-            self.column += 1;
-            match self.iterator.next() {
-                Some(val) => match val {
-                    '\n' => {
-                        self.line += 1;
-                        self.column = 0;
-                        return Some('\n');
-                    }
-                    val => return Some(val),
-                },
-                None => return None,
+        if self.eof {
+            return None;
+        }
+
+        match self.iterator.next() {
+            Some(val) => match val {
+                '\n' => {
+                    self.line += 1;
+                    self.column = 0;
+                    Some('\n')
+                }
+                val => {
+                    self.column += 1;
+                    Some(val)
+                }
+            },
+            None => {
+                self.eof = true;
+                None
             }
         }
     }
