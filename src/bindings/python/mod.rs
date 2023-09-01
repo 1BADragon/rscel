@@ -195,9 +195,9 @@ impl<'source> FromPyObject<'source> for CelValue {
 /* private functions */
 impl ToPyObject for CelValue {
     fn to_object(&self, py: Python<'_>) -> PyObject {
-        use crate::CelValueInner::*;
+        use crate::CelValue::*;
 
-        match self.inner() {
+        match self {
             Int(i) => i.to_object(py),
             UInt(i) => i.to_object(py),
             Float(f) => f.to_object(py),

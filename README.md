@@ -28,4 +28,14 @@ let res = ctx.exec("main", &exec_ctx).unwrap(); // ValueCell::Int(6)
 assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
 ```
 
+## Current Benchmark Times
+| Bench Run                | Time           |
+|--------------------------|----------------|
+|Run One No Binding:       |  0.000310S     |
+|Run Many No Binding:      |  0.003657S     |
+|Run One With Binding:     |  0.000033S     |
+|Run Many With Bindings:   |  0.004281S     |
+|Build Many:               |  0.002312S     |
+|Build Many With Bindings: |  0.051369S     |
+
 Build status: [![Rust](https://github.com/1BADragon/rscel/actions/workflows/rust.yml/badge.svg)](https://github.com/1BADragon/rscel/actions/workflows/rust.yml)

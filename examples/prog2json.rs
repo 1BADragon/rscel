@@ -1,6 +1,6 @@
 use std::env;
 
-use rscel::Program;
+use rscel::{CelCompiler, StringTokenizer};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -10,6 +10,10 @@ fn main() {
         return;
     }
 
-    let prog = Program::from_source(&args[1]).unwrap();
+    let mut tokenizer = StringTokenizer::with_input(&args[1]);
+    let prog = CelCompiler::with_tokenizer(&mut tokenizer)
+        .compile()
+        .unwrap();
+
     println!("{}", serde_json::to_string_pretty(&prog).unwrap());
 }
