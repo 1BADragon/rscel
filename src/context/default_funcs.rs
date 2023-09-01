@@ -7,6 +7,7 @@ use chrono::{DateTime, Utc};
 use regex::Regex;
 
 const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
+    ("bool", &bool_impl),
     ("int", &int_impl),
     ("uint", &uint_impl),
     ("double", &double_impl),
@@ -34,6 +35,29 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
     for (name, func) in DEFAULT_FUNCS.iter() {
         exec_ctx.bind_func(name, *func);
+    }
+}
+
+fn bool_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    use CelValue::*;
+
+    if args.len() != 1 {
+        return Err(CelError::argument("bool() expects exactly one argument"));
+    }
+
+    match &args[0] {
+        Int(val) => Ok(CelValue::from_bool(*val != 0)),
+        UInt(val) => Ok(CelValue::from_bool(*val != 0)),
+        Float(val) => Ok(CelValue::from_bool(!val.is_nan())),
+        Bool(val) => Ok(CelValue::from_bool(*val)),
+        String(val) => Ok(CelValue::from_bool(val.len() > 0)),
+        Bytes(val) => Ok(CelValue::from_bool(val.len() > 0)),
+        List(val) => Ok(CelValue::from_bool(val.len() > 0)),
+        Map(val) => Ok(CelValue::from_bool(val.len() > 0)),
+        Null => Ok(CelValue::from_bool(false)),
+        TimeStamp(_) => Ok(CelValue::from_bool(true)),
+        Duration(_) => Ok(CelValue::from_bool(true)),
+        _ => Ok(CelValue::from_bool(false)),
     }
 }
 
