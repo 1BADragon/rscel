@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{CelError, CelResult, CelValue, CelValueInner, RsCelFunction, RsCelMacro};
+use crate::{CelError, CelResult, CelValue, RsCelFunction, RsCelMacro};
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -111,20 +111,6 @@ pub enum CelStackValue<'a> {
 }
 
 impl<'a> CelStackValue<'a> {
-    pub fn into_inner(self) -> CelResult<CelValueInner> {
-        match self {
-            CelStackValue::Value(val) => Ok(val.into_inner()),
-            _ => Err(CelError::internal("Expected value")),
-        }
-    }
-
-    pub fn as_inner(&'a self) -> CelResult<&'a CelValueInner> {
-        match self {
-            CelStackValue::Value(val) => Ok(val.inner()),
-            _ => Err(CelError::internal("Expected value")),
-        }
-    }
-
     pub fn into_value(self) -> CelResult<CelValue> {
         match self {
             CelStackValue::Value(val) => Ok(val),
