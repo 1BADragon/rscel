@@ -147,6 +147,17 @@ mod test {
     #[test_case("has(foo) && foo > 10", false.into(); "has works")]
     #[test_case("true ? 4 : 3", 4.into(); "ternary true")]
     #[test_case("false ? 4 : 3", 3.into(); "ternary false")]
+    #[test_case("bool(0)", false.into(); "bool zero")]
+    #[test_case("bool(1)", true.into(); "bool nonzero")]
+    #[test_case("bool(\"3\")", true.into(); "bool nonempty string")]
+    #[test_case("bool(\"\")", false.into(); "bool empty string")]
+    #[test_case("bool([])", false.into(); "bool empty list")]
+    #[test_case("bool([1])", true.into(); "bool nonempty list")]
+    #[test_case("bool(true)", true.into(); "bool true")]
+    #[test_case("bool(false)", false.into(); "bool false")]
+    #[test_case("bool(null)", false.into(); "bool null")]
+    #[test_case("bool({})", false.into(); "bool empty map")]
+    #[test_case("bool({\"foo\": 42})", true.into(); "bool nonempty map")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
