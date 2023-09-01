@@ -1,35 +1,42 @@
+use super::ast_node::AstNode;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Expr {
     Ternary {
-        condition: Box<ConditionalOr>,
-        true_clause: Box<ConditionalOr>,
-        false_clause: Box<Self>,
+        condition: Box<AstNode<ConditionalOr>>,
+        true_clause: Box<AstNode<ConditionalOr>>,
+        false_clause: Box<AstNode<Self>>,
     },
-    Unary(Box<ConditionalOr>),
+    Unary(Box<AstNode<ConditionalOr>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConditionalOr {
-    Binary { lhs: ConditionalAnd, rhs: Box<Self> },
-    Unary(ConditionalAnd),
+    Binary {
+        lhs: AstNode<ConditionalAnd>,
+        rhs: Box<AstNode<Self>>,
+    },
+    Unary(AstNode<ConditionalAnd>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConditionalAnd {
-    Binary { lhs: Relation, rhs: Box<Self> },
-    Unary(Relation),
+    Binary {
+        lhs: AstNode<Relation>,
+        rhs: Box<AstNode<Self>>,
+    },
+    Unary(AstNode<Relation>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Relation {
     Binary {
-        lhs: Addition,
+        lhs: AstNode<Addition>,
         op: Relop,
-        rhs: Box<Self>,
+        rhs: Box<AstNode<Self>>,
     },
-    Unary(Addition),
+    Unary(AstNode<Addition>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -46,11 +53,11 @@ pub enum Relop {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Addition {
     Binary {
-        lhs: Multiplication,
+        lhs: AstNode<Multiplication>,
         op: AddOp,
-        rhs: Box<Self>,
+        rhs: Box<AstNode<Self>>,
     },
-    Unary(Multiplication),
+    Unary(AstNode<Multiplication>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -62,11 +69,11 @@ pub enum AddOp {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Multiplication {
     Binary {
-        lhs: Unary,
+        lhs: AstNode<Unary>,
         op: MultOp,
-        rhs: Box<Self>,
+        rhs: Box<AstNode<Self>>,
     },
-    Unary(Unary),
+    Unary(AstNode<Unary>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -78,42 +85,48 @@ pub enum MultOp {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Unary {
-    Member(Member),
-    NotMember { nots: NotList, member: Member },
-    NegMember { negs: NegList, member: Member },
+    Member(AstNode<Member>),
+    NotMember {
+        nots: AstNode<NotList>,
+        member: AstNode<Member>,
+    },
+    NegMember {
+        negs: AstNode<NegList>,
+        member: AstNode<Member>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum NotList {
-    List { tail: Box<Self> },
+    List { tail: Box<AstNode<Self>> },
     EmptyList,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum NegList {
-    List { tail: Box<Self> },
+    List { tail: Box<AstNode<Self>> },
     EmptyList,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Member {
-    pub primary: Primary,
-    pub member: MemberPrime,
+    pub primary: AstNode<Primary>,
+    pub member: AstNode<MemberPrime>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MemberPrime {
     MemberAccess {
-        ident: Ident,
-        tail: Box<MemberPrime>,
+        ident: AstNode<Ident>,
+        tail: Box<AstNode<MemberPrime>>,
     },
     Call {
-        call: ExprList,
-        tail: Box<MemberPrime>,
+        call: AstNode<ExprList>,
+        tail: Box<AstNode<MemberPrime>>,
     },
     ArrayAccess {
-        access: Expr,
-        tail: Box<MemberPrime>,
+        access: AstNode<Expr>,
+        tail: Box<AstNode<MemberPrime>>,
     },
     Empty,
 }
@@ -125,26 +138,26 @@ pub struct Ident(pub String);
 pub enum Primary {
     Type,
     Ident(Ident),
-    Parens(Expr),
-    ListConstruction(ExprList),
-    ObjectInit(ObjInits),
+    Parens(AstNode<Expr>),
+    ListConstruction(AstNode<ExprList>),
+    ObjectInit(AstNode<ObjInits>),
     Literal(Literal),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExprList {
-    pub exprs: Vec<Expr>,
+    pub exprs: Vec<AstNode<Expr>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObjInit {
-    pub key: Expr,
-    pub value: Expr,
+    pub key: AstNode<Expr>,
+    pub value: AstNode<Expr>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObjInits {
-    pub inits: Vec<ObjInit>,
+    pub inits: Vec<AstNode<ObjInit>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

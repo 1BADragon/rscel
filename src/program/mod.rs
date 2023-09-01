@@ -2,7 +2,10 @@
 //mod program_cache;
 mod program_details;
 
-use crate::{compiler::grammar::Expr, interp::ByteCode};
+use crate::{
+    compiler::{ast_node::AstNode, grammar::Expr},
+    interp::ByteCode,
+};
 //use compile::ProgramCompiler;
 pub use program_details::ProgramDetails;
 use serde::{Deserialize, Serialize};
@@ -13,7 +16,7 @@ pub struct Program {
     details: ProgramDetails,
 
     bytecode: Vec<ByteCode>,
-    ast: Expr,
+    ast: AstNode<Expr>,
 }
 
 impl Program {
@@ -21,7 +24,7 @@ impl Program {
         source: String,
         details: ProgramDetails,
         bytecode: Vec<ByteCode>,
-        ast: Expr,
+        ast: AstNode<Expr>,
     ) -> Program {
         Program {
             source,
