@@ -1,24 +1,18 @@
 use std::fmt;
 
-use parsel::Span;
 use serde::Serialize;
+
+use crate::compiler::syntax_error::SyntaxError;
 
 #[derive(Debug, Serialize)]
 pub enum CelError {
     Misc(String),
-    Syntax {
-        start_line: usize,
-        start_column: usize,
-        end_line: usize,
-        end_column: usize,
-    },
+    Syntax(SyntaxError),
     Value(String),
     Argument(String),
     InvalidOp(String),
     Runtime(String),
-    Binding {
-        symbol: String,
-    },
+    Binding { symbol: String },
 
     Internal(String),
 }
@@ -29,13 +23,8 @@ impl CelError {
         CelError::Misc(msg.to_owned())
     }
 
-    pub fn syntax(span: &Span) -> CelError {
-        CelError::Syntax {
-            start_line: span.start().line,
-            start_column: span.start().column,
-            end_line: span.end().line,
-            end_column: span.end().column,
-        }
+    pub fn syntax(err: SyntaxError) -> CelError {
+        CelError::Syntax(err)
     }
 
     pub fn value(msg: &str) -> CelError {
@@ -81,32 +70,20 @@ impl CelError {
     }
 }
 
+impl From<SyntaxError> for CelError {
+    fn from(value: SyntaxError) -> Self {
+        CelError::Syntax(value)
+    }
+}
+
 impl fmt::Display for CelError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use CelError::*;
 
         match self {
             Misc(msg) => write!(f, "{}", msg),
-            Syntax {
-                start_line,
-                start_column,
-                end_line,
-                end_column,
-            } => {
-                if start_line == end_line {
-                    write!(
-                        f,
-                        "Syntax error on line {} {}:{}",
-                        start_line, start_column, end_column
-                    )
-                } else {
-                    write!(
-                        f,
-                        "Syntax error from {}:{} to {}:{}",
-                        start_line, start_column, end_line, end_column
-                    )
-                }
-            }
+            Syntax(err) => write!(f, "Syntax Error: {}", err),
+
             Value(msg) => write!(f, "{}", msg),
             Argument(msg) => write!(f, "{}", msg),
             InvalidOp(msg) => write!(f, "{}", msg),
