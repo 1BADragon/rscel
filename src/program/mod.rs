@@ -1,45 +1,33 @@
-//mod compile;
-//mod program_cache;
 mod program_details;
 
 use crate::{
     compiler::{ast_node::AstNode, grammar::Expr},
     interp::ByteCode,
 };
-//use compile::ProgramCompiler;
 pub use program_details::ProgramDetails;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Program {
-    source: String,
     details: ProgramDetails,
-
     bytecode: Vec<ByteCode>,
-    ast: AstNode<Expr>,
 }
 
 impl Program {
-    pub fn new(
-        source: String,
-        details: ProgramDetails,
-        bytecode: Vec<ByteCode>,
-        ast: AstNode<Expr>,
-    ) -> Program {
-        Program {
-            source,
-            details,
-            bytecode,
-            ast,
-        }
+    pub fn new(details: ProgramDetails, bytecode: Vec<ByteCode>) -> Program {
+        Program { details, bytecode }
     }
 
     pub fn params<'a>(&'a self) -> Vec<&'a str> {
         self.details.params()
     }
 
-    pub fn source<'a>(&'a self) -> &'a str {
-        &self.source
+    pub fn source<'a>(&'a self) -> Option<&'a str> {
+        self.details.source()
+    }
+
+    pub fn into_details(self) -> ProgramDetails {
+        self.details
     }
 
     pub fn details<'a>(&'a self) -> &'a ProgramDetails {
@@ -63,15 +51,17 @@ impl Program {
 
         lines.join("\n")
     }
+
+    pub fn ast<'a>(&'a self) -> Option<&'a AstNode<Expr>> {
+        self.details.ast()
+    }
 }
 
 impl Clone for Program {
     fn clone(&self) -> Self {
         Program {
-            source: self.source.clone(),
             details: self.details.clone(),
             bytecode: self.bytecode.clone(),
-            ast: self.ast.clone(),
         }
     }
 }

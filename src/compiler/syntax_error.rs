@@ -22,6 +22,10 @@ impl SyntaxError {
         self.message = Some(msg);
         self
     }
+
+    pub fn message<'a>(&'a self) -> Option<&'a str> {
+        self.message.as_deref()
+    }
 }
 
 impl fmt::Display for SyntaxError {
