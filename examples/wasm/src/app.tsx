@@ -1,11 +1,27 @@
-import CelComponent from "./pages/CelComponent";
-import { Card } from "@fluentui/react-components";
+import init from "rscel";
+import CelComponent from "./components/CelComponent";
 import * as React from "react";
+import { UnitTestsComponent } from "./components/UnitTests";
+import { useEffect, useState } from "react";
 
 export default function App() {
+  const [isInit, setIsInit] = useState<boolean>(false);
+
+  useEffect(() => {
+    init().then((_res: any) => {
+      setIsInit(true);
+    });
+  }, []);
+
+  if (!isInit) {
+    return <div>Loading...</div>;
+  }
   return (
-    <Card style={{ height: "640px", width: "480px", margin: "auto" }}>
-      <CelComponent />
-    </Card>
+    <div style={{ display: "grid", gridTemplateColumns: "30% auto" }}>
+      <UnitTestsComponent />
+      <div style={{ height: "640px", width: "480px", marginLeft: "50px" }}>
+        <CelComponent />
+      </div>
+    </div>
   );
 }

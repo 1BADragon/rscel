@@ -23,7 +23,11 @@ impl ParseResult {
     }
 
     pub fn into_program(self, source: String, ast: AstNode<Expr>) -> Program {
-        Program::new(source, self.details, self.bytecode, ast)
+        let mut details = self.details;
+        details.add_source(source);
+        details.add_ast(ast);
+
+        Program::new(details, self.bytecode)
     }
 
     pub fn add_ident(mut self, ident: &str) -> ParseResult {
