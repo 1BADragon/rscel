@@ -1,7 +1,7 @@
 import * as React from "react";
 import "./CelComponent.css";
 
-import init, { cel_eval, cel_details, CelFloat } from "rscel";
+import init, { cel_eval, cel_details } from "rscel";
 import { useState, useEffect } from "react";
 
 export default function CelComponent() {
@@ -32,9 +32,12 @@ export default function CelComponent() {
               setParamVals((old: any) => {
                 try {
                   let newObj = { ...old };
-                  const floatval = new CelFloat(Number(event.target.value));
-
-                  newObj[val] = floatval;
+                  newObj[val] = JSON.parse(event.target.value, (_, val) => {
+                    console.log(val);
+                    return typeof val === "string" && val.endsWith("n")
+                      ? BigInt(val.slice(0, -1))
+                      : val;
+                  });
                   setErrorMessage("");
                   return newObj;
                 } catch (e) {
@@ -66,11 +69,15 @@ export default function CelComponent() {
 
             if (res.success) {
               console.log(res);
-              const details = res.result.get("details");
-              setParams(details.get("params"));
+              const details = res.details;
+              setParams(details.params);
               setErrorMessage("");
             } else {
-              setErrorMessage(`${res.error.kind}: ${res.error.msg}`);
+              setErrorMessage(
+                res.error
+                  ? `${res.error.kind}: ${res.error.msg}`
+                  : "Unknown error",
+              );
             }
           }}
         >
@@ -83,9 +90,17 @@ export default function CelComponent() {
             console.log(result);
 
             if (result.success) {
-              setErrorMessage(`Result: ${result.result.toString()}`);
+              setErrorMessage(
+                `Result: ${JSON.stringify(result.result, (_, v) =>
+                  typeof v === "bigint" ? v.toString() : v,
+                )}`,
+              );
             } else {
-              setErrorMessage(`${result.error.kind}: ${result.error.msg}`);
+              setErrorMessage(
+                result.error
+                  ? `${result.error.kind}: ${result.error.msg}`
+                  : "Unknown error",
+              );
             }
           }}
         >

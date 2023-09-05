@@ -13,10 +13,10 @@ pub struct ObjectIterator {
 }
 
 impl ObjectIterator {
-    pub fn new(obj: JsValue) -> ObjectIterator {
-        let keys = keys(&obj);
+    pub fn new(obj: js_sys::Object) -> ObjectIterator {
+        let keys = js_sys::Reflect::own_keys(&obj).unwrap();
         ObjectIterator {
-            object: obj.dyn_into::<js_sys::Object>().unwrap(),
+            object: obj,
             keys,
             index: 0,
         }
