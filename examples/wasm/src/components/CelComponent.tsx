@@ -5,21 +5,10 @@ import init, { cel_eval, cel_details } from "rscel";
 import { useState, useEffect } from "react";
 
 export default function CelComponent() {
-  const [isInit, setIsInit] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [prog, setProg] = useState<string>("");
   const [params, setParams] = useState<string[]>([]);
   const [paramVals, setParamVals] = useState<any>({});
-
-  useEffect(() => {
-    init().then((_res: any) => {
-      setIsInit(true);
-    });
-  }, []);
-
-  if (!isInit) {
-    return <div>Loading...</div>;
-  }
 
   const generateParams = (): JSX.Element[] => {
     return params.map((val) => {
