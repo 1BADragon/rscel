@@ -9,7 +9,7 @@ export default function CelComponent() {
   const [prog, setProg] = useState<string>("");
   const [params, setParams] = useState<string[]>([]);
   const [paramVals, setParamVals] = useState<any>({});
-  const [result, setResult] = useState<any | undefined>(undefined);
+  const [lastResult, setLastResult] = useState<any | undefined>(undefined);
 
   const generateParams = (): JSX.Element[] => {
     return params.map((val) => {
@@ -42,6 +42,49 @@ export default function CelComponent() {
     });
   };
 
+  const renderResult = (currResult: any): JSX.Element => {
+    console.log("render", currResult, typeof currResult);
+    switch (typeof currResult) {
+      case "number":
+        return <label>{currResult.toString()}</label>;
+      case "bigint":
+        return <label>{currResult.toString()}</label>;
+      case "string":
+        return <label>{currResult}</label>;
+      case "object":
+        if (Array.isArray(currResult)) {
+          return (
+            <>
+              <label>[</label>
+              <div style={{ paddingLeft: "5px" }}>
+                {currResult.map((value, index) => (
+                  <span key={index.toString()}>{renderResult(value)}</span>
+                ))}
+              </div>
+              <label>]</label>
+            </>
+          );
+        } else {
+          return (
+            <>
+              <label>{"{"}</label>
+              <div style={{ paddingLeft: "5px" }}>
+                {Object.entries(currResult).map(([key, value], index) => {
+                  return (
+                    <span key={index.toString()}>
+                      <label>{key}:</label>
+                      {renderResult(value)}
+                    </span>
+                  );
+                })}
+              </div>
+              <label>{"}"}</label>
+            </>
+          );
+        }
+    }
+  };
+
   return (
     <div style={{ margin: "15px" }}>
       <h4>RsCel Evaluater</h4>
@@ -62,14 +105,14 @@ export default function CelComponent() {
               const details = res.details;
               setParams(details.params);
               setErrorMessage("");
-              setResult(res.result);
+              setLastResult(undefined);
             } else {
               setErrorMessage(
                 res.error
                   ? `${res.error.kind}: ${res.error.msg}`
-                  : "Unknown error",
+                  : "Unknown error"
               );
-              setResult(undefined);
+              setLastResult(undefined);
             }
           }}
         >
@@ -82,16 +125,13 @@ export default function CelComponent() {
             console.log(result);
 
             if (result.success) {
-              setErrorMessage(
-                `Result: ${JSON.stringify(result.result, (_, v) =>
-                  typeof v === "bigint" ? v.toString() : v,
-                )}`,
-              );
+              setLastResult(result.result);
+              setErrorMessage("");
             } else {
               setErrorMessage(
                 result.error
                   ? `${result.error.kind}: ${result.error.msg}`
-                  : "Unknown error",
+                  : "Unknown error"
               );
             }
           }}
@@ -101,6 +141,14 @@ export default function CelComponent() {
       </div>
       <label>{errorMessage}</label>
       <div style={{ marginTop: "40px" }}>{generateParams()}</div>
+      {lastResult && (
+        <>
+          <label key="label">Result:</label>
+          <div key="result" style={{ paddingLeft: "5px" }}>
+            {renderResult(lastResult)}
+          </div>
+        </>
+      )}
     </div>
   );
 }
