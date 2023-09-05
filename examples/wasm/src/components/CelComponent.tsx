@@ -9,6 +9,7 @@ export default function CelComponent() {
   const [prog, setProg] = useState<string>("");
   const [params, setParams] = useState<string[]>([]);
   const [paramVals, setParamVals] = useState<any>({});
+  const [result, setResult] = useState<any | undefined>(undefined);
 
   const generateParams = (): JSX.Element[] => {
     return params.map((val) => {
@@ -61,12 +62,14 @@ export default function CelComponent() {
               const details = res.details;
               setParams(details.params);
               setErrorMessage("");
+              setResult(res.result);
             } else {
               setErrorMessage(
                 res.error
                   ? `${res.error.kind}: ${res.error.msg}`
                   : "Unknown error",
               );
+              setResult(undefined);
             }
           }}
         >
