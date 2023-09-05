@@ -53,8 +53,6 @@ impl TryFrom<JsValue> for CelValue {
         if value.is_object() {
             let obj: js_sys::Object = value.into();
 
-            super::log(&format!("here: {:?}", obj));
-
             if obj.has_own_property(&"cel_float".into()) {
                 Ok(CelValue::from_float(extract_number_value(
                     &obj,

@@ -11,12 +11,23 @@ export const UnitTest = (props: UnitTestProps) => {
   const { name, test, expected } = props;
 
   const [testPassed, setTestPassed] = useState<boolean>(false);
+  const [result, setResult] = useState<any>({});
+
+  const EPSILON = 0.0000001;
 
   useEffect(() => {
     const result = test();
 
-    console.log(`test-${name}: ${result.toString()}, ${expected.toString()}`);
-    setTestPassed(test() === expected);
+    if (result.success) {
+      if (typeof result.result === "number" && typeof expected === "number") {
+        setResult(result.result);
+        setTestPassed(Math.abs(result.result - expected) < EPSILON);
+      } else {
+        setTestPassed(result.result === expected);
+      }
+    } else {
+      setTestPassed(false);
+    }
   }, []);
 
   const renderPassFail = () => {
@@ -24,7 +35,12 @@ export const UnitTest = (props: UnitTestProps) => {
       return <label style={{ color: "green" }}>PASS</label>;
     }
 
-    return <label style={{ color: "red" }}>FAIL</label>;
+    return (
+      <span>
+        <label style={{ color: "red" }}>FAIL</label>
+        <label>{`${result} != ${expected}`}</label>
+      </span>
+    );
   };
 
   return (

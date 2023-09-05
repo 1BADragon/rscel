@@ -1,13 +1,9 @@
 import * as React from "react";
 
-import { cel_eval } from "rscel";
 import { UnitTest } from "./UnitTest";
+import { tests } from "./testCases";
 
 export const UnitTestsComponent = () => {
-  const tests: [[string, () => any, any]] = [
-    ["basic", () => cel_eval("3+3", {}), 6n],
-  ];
-
   return (
     <div
       style={{
