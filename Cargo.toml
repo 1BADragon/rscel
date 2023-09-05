@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["wasm"]
+default = []
 ast_ser = []
 debug_output = []
 python = ["dep:pyo3"]
