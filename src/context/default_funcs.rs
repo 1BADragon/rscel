@@ -39,26 +39,11 @@ pub fn load_default_funcs(exec_ctx: &mut BindContext) {
 }
 
 fn bool_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
-    use CelValue::*;
-
     if args.len() != 1 {
         return Err(CelError::argument("bool() expects exactly one argument"));
     }
 
-    match &args[0] {
-        Int(val) => Ok(CelValue::from_bool(*val != 0)),
-        UInt(val) => Ok(CelValue::from_bool(*val != 0)),
-        Float(val) => Ok(CelValue::from_bool(!val.is_nan())),
-        Bool(val) => Ok(CelValue::from_bool(*val)),
-        String(val) => Ok(CelValue::from_bool(val.len() > 0)),
-        Bytes(val) => Ok(CelValue::from_bool(val.len() > 0)),
-        List(val) => Ok(CelValue::from_bool(val.len() > 0)),
-        Map(val) => Ok(CelValue::from_bool(val.len() > 0)),
-        Null => Ok(CelValue::from_bool(false)),
-        TimeStamp(_) => Ok(CelValue::from_bool(true)),
-        Duration(_) => Ok(CelValue::from_bool(true)),
-        _ => Ok(CelValue::from_bool(false)),
-    }
+    Ok(args[0].is_truthy().into())
 }
 
 fn int_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
@@ -72,6 +57,7 @@ fn int_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         Int(val) => Ok(CelValue::from_int(*val)),
         UInt(val) => Ok(CelValue::from_int(*val as i64)),
         Float(val) => Ok(CelValue::from_int(*val as i64)),
+        Bool(val) => Ok(CelValue::from_int(if *val { 1 } else { 0 })),
         String(val) => match val.parse::<i64>() {
             Ok(res) => Ok(CelValue::from_int(res)),
             Err(_err) => Err(CelError::value(&format!(
@@ -98,6 +84,7 @@ fn uint_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         Int(val) => Ok(CelValue::from_uint(*val as u64)),
         UInt(val) => Ok(CelValue::from_uint(*val)),
         Float(val) => Ok(CelValue::from_uint(*val as u64)),
+        Bool(val) => Ok(CelValue::from_uint(if *val { 1 } else { 0 })),
         String(val) => match val.parse::<u64>() {
             Ok(res) => Ok(CelValue::from_uint(res)),
             Err(_err) => Err(CelError::value(&format!(
@@ -123,6 +110,7 @@ fn double_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
         Int(val) => Ok(CelValue::from_float(*val as f64)),
         UInt(val) => Ok(CelValue::from_float(*val as f64)),
         Float(val) => Ok(CelValue::from_float(*val)),
+        Bool(val) => Ok(CelValue::from_float(if *val { 1.0 } else { 0.0 })),
         String(val) => match val.parse::<f64>() {
             Ok(res) => Ok(CelValue::from_float(res)),
             Err(_err) => Err(CelError::value(&format!(

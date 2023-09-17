@@ -211,10 +211,15 @@ impl<'a> Interpreter<'a> {
                     dist,
                     leave_val,
                 } => {
-                    let v1 = stack.pop_val()?;
+                    let mut v1 = stack.pop_val()?;
                     match when {
                         JmpWhen::True => {
-                            if let CelValue::Bool(v) = v1 {
+                            if cfg!(feature = "type_prop") {
+                                if v1.is_truthy() {
+                                    v1 = CelValue::from_bool(true);
+                                    pc += *dist as usize
+                                }
+                            } else if let CelValue::Bool(v) = v1 {
                                 if v {
                                     pc += *dist as usize
                                 }
@@ -226,7 +231,12 @@ impl<'a> Interpreter<'a> {
                             }
                         }
                         JmpWhen::False => {
-                            if let CelValue::Bool(v) = v1 {
+                            if cfg!(feature = "type_prop") {
+                                if !v1.is_truthy() {
+                                    v1 = CelValue::from_bool(false);
+                                    pc += *dist as usize
+                                }
+                            } else if let CelValue::Bool(v) = v1 {
                                 if !v {
                                     pc += *dist as usize
                                 }
