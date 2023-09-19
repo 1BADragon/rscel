@@ -315,6 +315,39 @@ impl CelValue {
         )));
     }
 
+    pub fn in_(&self, rhs: &CelValue) -> CelResult<CelValue> {
+        let rhs_type = rhs.as_type();
+        let lhs_type = self.as_type();
+
+        match rhs {
+            CelValue::List(l) => {
+                for value in l.iter() {
+                    if *self == *value {
+                        return Ok(true.into());
+                    }
+                }
+
+                Ok(false.into())
+            }
+            CelValue::Map(m) => {
+                if let CelValue::String(r) = self {
+                    Ok(CelValue::from_bool(m.contains_key(r)))
+                } else {
+                    return Err(CelError::invalid_op(&format!(
+                        "Op 'in' invalid between {:?} and {:?}",
+                        lhs_type, rhs_type
+                    )));
+                }
+            }
+            _ => {
+                return Err(CelError::invalid_op(&format!(
+                    "Op 'in' invalid between {:?} and {:?}",
+                    lhs_type, rhs_type
+                )));
+            }
+        }
+    }
+
     pub fn and(&self, rhs: &CelValue) -> CelResult<CelValue> {
         if cfg!(feature = "type_prop") {
             return Ok((self.is_truthy() && rhs.is_truthy()).into());
