@@ -211,10 +211,15 @@ impl<'a> Interpreter<'a> {
                     dist,
                     leave_val,
                 } => {
-                    let v1 = stack.pop_val()?;
+                    let mut v1 = stack.pop_val()?;
                     match when {
                         JmpWhen::True => {
-                            if let CelValue::Bool(v) = v1 {
+                            if cfg!(feature = "type_prop") {
+                                if v1.is_truthy() {
+                                    v1 = CelValue::from_bool(true);
+                                    pc += *dist as usize
+                                }
+                            } else if let CelValue::Bool(v) = v1 {
                                 if v {
                                     pc += *dist as usize
                                 }
@@ -226,7 +231,12 @@ impl<'a> Interpreter<'a> {
                             }
                         }
                         JmpWhen::False => {
-                            if let CelValue::Bool(v) = v1 {
+                            if cfg!(feature = "type_prop") {
+                                if !v1.is_truthy() {
+                                    v1 = CelValue::from_bool(false);
+                                    pc += *dist as usize
+                                }
+                            } else if let CelValue::Bool(v) = v1 {
                                 if !v {
                                     pc += *dist as usize
                                 }
@@ -282,37 +292,7 @@ impl<'a> Interpreter<'a> {
                     let rhs = stack.pop_val()?;
                     let lhs = stack.pop_val()?;
 
-                    let rhs_type = rhs.as_type();
-                    let lhs_type = lhs.as_type();
-
-                    match rhs {
-                        CelValue::List(l) => 'outer: {
-                            for value in l.iter() {
-                                if lhs == *value {
-                                    stack.push_val(true.into());
-                                    break 'outer;
-                                }
-                            }
-
-                            stack.push_val(false.into());
-                        }
-                        CelValue::Map(m) => {
-                            if let CelValue::String(r) = lhs {
-                                stack.push_val(CelValue::from_bool(m.contains_key(&r)));
-                            } else {
-                                return Err(CelError::invalid_op(&format!(
-                                    "Op 'in' invalid between {:?} and {:?}",
-                                    lhs_type, rhs_type
-                                )));
-                            }
-                        }
-                        _ => {
-                            return Err(CelError::invalid_op(&format!(
-                                "Op 'in' invalid between {:?} and {:?}",
-                                lhs_type, rhs_type
-                            )));
-                        }
-                    }
+                    stack.push_val(lhs.in_(&rhs)?);
                 }
                 ByteCode::MkList(size) => {
                     let mut v = Vec::new();
@@ -388,17 +368,37 @@ impl<'a> Interpreter<'a> {
                         if let CelValue::Map(ref map) = obj {
                             match map.get(ident.as_str()) {
                                 Some(val) => stack.push_val(val.clone()),
-                                // TODO: Determine if .foo is callable before making a bound call
-                                None => stack.push(CelStackValue::BoundCall {
+                                None => match self.callable_by_name(ident.as_str()) {
+                                    Ok(callable) => stack.push(CelStackValue::BoundCall {
+                                        callable,
+                                        value: obj,
+                                    }),
+                                    Err(_) => {
+                                        return Err(CelError::value(&format!(
+                                            "field {} does not exist",
+                                            ident.as_str()
+                                        )))
+                                    }
+                                },
+                            }
+                        } else if let Some(bindings) = self.bindings {
+                            if bindings.get_func(ident.as_str()).is_some()
+                                || bindings.get_macro(ident.as_str()).is_some()
+                            {
+                                stack.push(CelStackValue::BoundCall {
                                     callable: self.callable_by_name(ident.as_str())?,
                                     value: obj,
-                                }),
+                                });
+                            } else {
+                                return Err(CelError::value(&format!(
+                                    "Field {} does not exist",
+                                    ident.as_str()
+                                )));
                             }
                         } else {
-                            stack.push(CelStackValue::BoundCall {
-                                callable: self.callable_by_name(ident.as_str())?,
-                                value: obj,
-                            });
+                            return Err(CelError::Runtime(
+                                "Invalid state: no bindings".to_string(),
+                            ));
                         }
                     } else {
                         let obj = stack.pop()?;
