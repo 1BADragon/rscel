@@ -32,9 +32,9 @@ pub enum ConditionalAnd {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Relation {
     Binary {
-        lhs: AstNode<Addition>,
+        lhs: Box<AstNode<Self>>,
         op: Relop,
-        rhs: Box<AstNode<Self>>,
+        rhs: AstNode<Addition>,
     },
     Unary(AstNode<Addition>),
 }
@@ -53,9 +53,9 @@ pub enum Relop {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Addition {
     Binary {
-        lhs: AstNode<Multiplication>,
+        lhs: Box<AstNode<Self>>,
         op: AddOp,
-        rhs: Box<AstNode<Self>>,
+        rhs: AstNode<Multiplication>,
     },
     Unary(AstNode<Multiplication>),
 }
@@ -69,9 +69,9 @@ pub enum AddOp {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Multiplication {
     Binary {
-        lhs: AstNode<Unary>,
+        lhs: Box<AstNode<Self>>,
         op: MultOp,
-        rhs: Box<AstNode<Self>>,
+        rhs: AstNode<Unary>,
     },
     Unary(AstNode<Unary>),
 }

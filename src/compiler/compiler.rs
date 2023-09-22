@@ -151,265 +151,248 @@ impl<'l> CelCompiler<'l> {
 
     fn parse_relation(&mut self) -> CelResult<(ParseResult, AstNode<Relation>)> {
         let start_loc = self.tokenizer.location();
-        let (lhs, lhs_ast) = self.parse_addition()?;
+        let (mut current_node, lhs_ast) = self.parse_addition()?;
 
-        match self.tokenizer.peek()? {
-            Some(Token::LessThan) => {
-                self.tokenizer.next()?;
+        let (lhs_start, lhs_end) = (lhs_ast.start(), lhs_ast.end());
+        let mut current_ast = AstNode::new(Relation::Unary(lhs_ast), lhs_start, lhs_end);
 
-                let (rhs, rhs_ast) = self.parse_relation()?;
+        loop {
+            match self.tokenizer.peek()? {
+                Some(Token::LessThan) => {
+                    self.tokenizer.next()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Lt]).consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    let (rhs, rhs_ast) = self.parse_addition()?;
+
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::Lt])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Relation::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: Relop::Lt,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
-            }
-            Some(Token::LessEqual) => {
-                self.tokenizer.next()?;
-                let (rhs, rhs_ast) = self.parse_relation()?;
+                    );
+                }
+                Some(Token::LessEqual) => {
+                    self.tokenizer.next()?;
+                    let (rhs, rhs_ast) = self.parse_addition()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Le]).consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::Le])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Relation::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: Relop::Le,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
-            }
-            Some(Token::EqualEqual) => {
-                self.tokenizer.next()?;
-                let (rhs, rhs_ast) = self.parse_relation()?;
+                    );
+                }
+                Some(Token::EqualEqual) => {
+                    self.tokenizer.next()?;
+                    let (rhs, rhs_ast) = self.parse_addition()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Eq]).consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::Eq])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Relation::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: Relop::Eq,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
-            }
-            Some(Token::NotEqual) => {
-                self.tokenizer.next()?;
-                let (rhs, rhs_ast) = self.parse_relation()?;
+                    );
+                }
+                Some(Token::NotEqual) => {
+                    self.tokenizer.next()?;
+                    let (rhs, rhs_ast) = self.parse_addition()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Ne]).consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::Ne])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Relation::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: Relop::Ne,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
-            }
-            Some(Token::GreaterEqual) => {
-                self.tokenizer.next()?;
-                let (rhs, rhs_ast) = self.parse_relation()?;
+                    );
+                }
+                Some(Token::GreaterEqual) => {
+                    self.tokenizer.next()?;
+                    let (rhs, rhs_ast) = self.parse_addition()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Ge]).consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::Ge])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Relation::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: Relop::Ge,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
-            }
-            Some(Token::GreaterThan) => {
-                self.tokenizer.next()?;
-                let (rhs, rhs_ast) = self.parse_relation()?;
+                    );
+                }
+                Some(Token::GreaterThan) => {
+                    self.tokenizer.next()?;
+                    let (rhs, rhs_ast) = self.parse_addition()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Gt]).consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::Gt])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Relation::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: Relop::Gt,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
-            }
-            Some(Token::In) => {
-                self.tokenizer.next()?;
-                let (rhs, rhs_ast) = self.parse_relation()?;
+                    );
+                }
+                Some(Token::In) => {
+                    self.tokenizer.next()?;
+                    let (rhs, rhs_ast) = self.parse_addition()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::In]).consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::In])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Relation::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: Relop::In,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
+                    );
+                }
+                _ => break,
             }
-            _ => Ok((
-                lhs,
-                AstNode::new(
-                    Relation::Unary(lhs_ast),
-                    start_loc,
-                    self.tokenizer.location(),
-                ),
-            )),
         }
+
+        return Ok((current_node, current_ast));
     }
 
     fn parse_addition(&mut self) -> CelResult<(ParseResult, AstNode<Addition>)> {
         let start_loc = self.tokenizer.location();
-        let (lhs, lhs_ast) = self.parse_multiplication()?;
+        let (mut current_node, lhs_ast) = self.parse_multiplication()?;
 
-        match self.tokenizer.peek()? {
-            Some(Token::Add) => {
-                self.tokenizer.next()?;
+        let (lhs_start, lhs_end) = (lhs_ast.start(), lhs_ast.end());
+        let mut current_ast = AstNode::new(Addition::Unary(lhs_ast), lhs_start, lhs_end);
 
-                let (rhs, rhs_ast) = self.parse_addition()?;
+        loop {
+            match self.tokenizer.peek()? {
+                Some(Token::Add) => {
+                    self.tokenizer.next()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Add])
-                        .consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    let (rhs, rhs_ast) = self.parse_multiplication()?;
+
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::Add])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Addition::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: AddOp::Add,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
-            }
-            Some(Token::Minus) => {
-                self.tokenizer.next()?;
+                    );
+                }
+                Some(Token::Minus) => {
+                    self.tokenizer.next()?;
 
-                let (rhs, rhs_ast) = self.parse_addition()?;
+                    let (rhs, rhs_ast) = self.parse_multiplication()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Sub])
-                        .consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::Sub])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Addition::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: AddOp::Sub,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
+                    );
+                }
+                _ => break,
             }
-            _ => Ok((
-                lhs,
-                AstNode::new(
-                    Addition::Unary(lhs_ast),
-                    start_loc,
-                    self.tokenizer.location(),
-                ),
-            )),
         }
+
+        Ok((current_node, current_ast))
     }
 
     fn parse_multiplication(&mut self) -> CelResult<(ParseResult, AstNode<Multiplication>)> {
         let start_loc = self.tokenizer.location();
-        let (lhs, lhs_ast) = self.parse_unary()?;
+        let (mut current_node, lhs_ast) = self.parse_unary()?;
 
-        match self.tokenizer.peek()? {
-            Some(Token::Multiply) => {
-                self.tokenizer.next()?;
+        let (lhs_start, lhs_end) = (lhs_ast.start(), lhs_ast.end());
+        let mut current_ast = AstNode::new(Multiplication::Unary(lhs_ast), lhs_start, lhs_end);
 
-                let (rhs, rhs_ast) = self.parse_multiplication()?;
+        loop {
+            match self.tokenizer.peek()? {
+                Some(Token::Multiply) => {
+                    self.tokenizer.next()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Mul])
-                        .consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    let (rhs, rhs_ast) = self.parse_unary()?;
+
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::Mul])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Multiplication::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: MultOp::Mult,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
-            }
-            Some(Token::Divide) => {
-                self.tokenizer.next()?;
+                    );
+                }
+                Some(Token::Divide) => {
+                    self.tokenizer.next()?;
 
-                let (rhs, rhs_ast) = self.parse_multiplication()?;
+                    let (rhs, rhs_ast) = self.parse_unary()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Div])
-                        .consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::Div])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Multiplication::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: MultOp::Div,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
-            }
-            Some(Token::Mod) => {
-                self.tokenizer.next()?;
+                    );
+                }
+                Some(Token::Mod) => {
+                    self.tokenizer.next()?;
 
-                let (rhs, rhs_ast) = self.parse_multiplication()?;
+                    let (rhs, rhs_ast) = self.parse_unary()?;
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Mod])
-                        .consume_children(vec![lhs, rhs]),
-                    AstNode::new(
+                    current_node = ParseResult::with_bytecode(vec![ByteCode::Mod])
+                        .consume_children(vec![current_node, rhs]);
+                    current_ast = AstNode::new(
                         Multiplication::Binary {
-                            lhs: lhs_ast,
+                            lhs: Box::new(current_ast),
                             op: MultOp::Mod,
-                            rhs: Box::new(rhs_ast),
+                            rhs: rhs_ast,
                         },
                         start_loc,
                         self.tokenizer.location(),
-                    ),
-                ))
+                    );
+                }
+                _ => break,
             }
-            _ => Ok((
-                lhs,
-                AstNode::new(
-                    Multiplication::Unary(lhs_ast),
-                    start_loc,
-                    self.tokenizer.location(),
-                ),
-            )),
         }
+
+        return Ok((current_node, current_ast));
     }
 
     fn parse_unary(&mut self) -> CelResult<(ParseResult, AstNode<Unary>)> {

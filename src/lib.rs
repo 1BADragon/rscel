@@ -98,7 +98,7 @@ mod test {
     #[test_case("7 % 2", 1.into(); "test mod")]
     #[test_case("(4+2) * (6-5)", 6.into(); "test parens")]
     #[test_case("4+2*6-5", 11.into(); "test op order")]
-    #[test_case("4-2+5*2", (-8).into(); "test op order 2")]
+    #[test_case("4-2+5*2", (12).into(); "test op order 2")]
     #[test_case("[1, 2, 3].map(x, x+2)", CelValue::from_list(vec![3.into(), 4.into(), 5.into()]); "test map")]
     #[test_case("[1,2,3][1]", 2.into(); "array index")]
     #[test_case("{\"foo\": 3}.foo", 3.into(); "obj dot access")]
@@ -158,6 +158,11 @@ mod test {
     #[test_case("bool(null)", false.into(); "bool null")]
     #[test_case("bool({})", false.into(); "bool empty map")]
     #[test_case("bool({\"foo\": 42})", true.into(); "bool nonempty map")]
+    #[test_case("2 * 4 * 8 * 72 / 144", 32.into(); "long multiply operation")]
+    #[test_case("2 * 3 + 7", 13.into(); "long mixed operation")]
+    #[test_case("true && false || true && true", true.into(); "long logic operation")]
+    #[test_case("2 + 3 - 1", 4.into(); "long add/sub operation")]
+    #[test_case("2 < 3 >= 1", true.into(); "type prop: chained cmp")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
