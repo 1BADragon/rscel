@@ -164,6 +164,15 @@ mod test {
     #[test_case("2 + 3 - 1", 4.into(); "long add/sub operation")]
     #[test_case("2 < 3 >= 1", true.into(); "type prop: chained cmp")]
     #[test_case("3 * 2 - 1 / 4 * 2", 6.into(); "large op 2")]
+    #[test_case("true || unbound || unbound", true.into(); "Or short cut")]
+    #[test_case("true == true || false == true && false", true.into(); "Incorrect equality precedence")]
+    #[test_case("5 < 10 || 10 < 5 && false", true.into(); "Incorrect less-than precedence")]
+    #[test_case("true || false && false", true.into(); "Incorrect AND precedence")]
+    #[test_case("false && true || true", true.into(); "Incorrect OR precedence")]
+    #[test_case("5 + 5 == 10 || 10 - 5 == 5 && false", true.into(); "Incorrect addition precedence")]
+    #[test_case("6 / 2 == 3 || 2 * 3 == 6 && false", true.into(); "Incorrect division precedence")]
+    #[test_case("(true || false) && false", false.into(); "Incorrect parentheses precedence")]
+    #[test_case("5 + (5 == 10 || 10 - 5 == 5) && false", false.into(); "Complex mixed precedence")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();

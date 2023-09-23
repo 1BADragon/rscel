@@ -79,74 +79,69 @@ impl<'l> CelCompiler<'l> {
 
     fn parse_conditional_or(&mut self) -> CelResult<(ParseResult, AstNode<ConditionalOr>)> {
         let start_loc = self.tokenizer.location();
-        let (lhs, lhs_ast) = self.parse_conditional_and()?;
+        let (mut current_node, lhs_ast) = self.parse_conditional_and()?;
 
-        if let Some(Token::OrOr) = self.tokenizer.peek()? {
-            self.tokenizer.next()?;
-            let (rhs, rhs_ast) = self.parse_conditional_or()?;
-            let jmp = ParseResult::with_bytecode(vec![ByteCode::JmpCond {
-                when: JmpWhen::True,
-                dist: rhs.bytecode().len() as u32 + 1,
-                leave_val: true,
-            }]);
-            Ok((
-                ParseResult::with_bytecode(vec![ByteCode::Or])
-                    .consume_children(vec![lhs, jmp, rhs]),
-                AstNode::new(
+        let (lhs_start, lhs_end) = (lhs_ast.start(), lhs_ast.end());
+        let mut current_ast = AstNode::new(ConditionalOr::Unary(lhs_ast), lhs_start, lhs_end);
+
+        loop {
+            if let Some(Token::OrOr) = self.tokenizer.peek()? {
+                self.tokenizer.next()?;
+                let (rhs, rhs_ast) = self.parse_conditional_and()?;
+                let jmp = ParseResult::with_bytecode(vec![ByteCode::JmpCond {
+                    when: JmpWhen::True,
+                    dist: rhs.bytecode().len() as u32 + 1,
+                    leave_val: true,
+                }]);
+                current_node = ParseResult::with_bytecode(vec![ByteCode::Or])
+                    .consume_children(vec![current_node, jmp, rhs]);
+                current_ast = AstNode::new(
                     ConditionalOr::Binary {
-                        lhs: lhs_ast,
-                        rhs: Box::new(rhs_ast),
+                        lhs: Box::new(current_ast),
+                        rhs: rhs_ast,
                     },
                     start_loc,
                     self.tokenizer.location(),
-                ),
-            ))
-        } else {
-            Ok((
-                lhs,
-                AstNode::new(
-                    ConditionalOr::Unary(lhs_ast),
-                    start_loc,
-                    self.tokenizer.location(),
-                ),
-            ))
+                );
+            } else {
+                break;
+            }
         }
+        Ok((current_node, current_ast))
     }
 
     fn parse_conditional_and(&mut self) -> CelResult<(ParseResult, AstNode<ConditionalAnd>)> {
         let start_loc = self.tokenizer.location();
-        let (lhs, lhs_ast) = self.parse_relation()?;
+        let (mut current_node, lhs_ast) = self.parse_relation()?;
 
-        if let Some(Token::AndAnd) = self.tokenizer.peek()? {
-            self.tokenizer.next()?;
-            let (rhs, rhs_ast) = self.parse_conditional_and()?;
-            let jmp = ParseResult::with_bytecode(vec![ByteCode::JmpCond {
-                when: JmpWhen::False,
-                dist: rhs.bytecode().len() as u32 + 1,
-                leave_val: true,
-            }]);
-            Ok((
-                ParseResult::with_bytecode(vec![ByteCode::And])
-                    .consume_children(vec![lhs, jmp, rhs]),
-                AstNode::new(
+        let (lhs_start, lhs_end) = (lhs_ast.start(), lhs_ast.end());
+        let mut current_ast = AstNode::new(ConditionalAnd::Unary(lhs_ast), lhs_start, lhs_end);
+
+        loop {
+            if let Some(Token::AndAnd) = self.tokenizer.peek()? {
+                self.tokenizer.next()?;
+                let (rhs, rhs_ast) = self.parse_relation()?;
+                let jmp = ParseResult::with_bytecode(vec![ByteCode::JmpCond {
+                    when: JmpWhen::False,
+                    dist: rhs.bytecode().len() as u32 + 1,
+                    leave_val: true,
+                }]);
+
+                current_node = ParseResult::with_bytecode(vec![ByteCode::And])
+                    .consume_children(vec![current_node, jmp, rhs]);
+                current_ast = AstNode::new(
                     ConditionalAnd::Binary {
-                        lhs: lhs_ast,
-                        rhs: Box::new(rhs_ast),
+                        lhs: Box::new(current_ast),
+                        rhs: rhs_ast,
                     },
                     start_loc,
                     self.tokenizer.location(),
-                ),
-            ))
-        } else {
-            Ok((
-                lhs,
-                AstNode::new(
-                    ConditionalAnd::Unary(lhs_ast),
-                    start_loc,
-                    self.tokenizer.location(),
-                ),
-            ))
+                );
+            } else {
+                break;
+            }
         }
+        Ok((current_node, current_ast))
     }
 
     fn parse_relation(&mut self) -> CelResult<(ParseResult, AstNode<Relation>)> {

@@ -14,8 +14,8 @@ pub enum Expr {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConditionalOr {
     Binary {
-        lhs: AstNode<ConditionalAnd>,
-        rhs: Box<AstNode<Self>>,
+        lhs: Box<AstNode<Self>>,
+        rhs: AstNode<ConditionalAnd>,
     },
     Unary(AstNode<ConditionalAnd>),
 }
@@ -23,8 +23,8 @@ pub enum ConditionalOr {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConditionalAnd {
     Binary {
-        lhs: AstNode<Relation>,
-        rhs: Box<AstNode<Self>>,
+        lhs: Box<AstNode<Self>>,
+        rhs: AstNode<Relation>,
     },
     Unary(AstNode<Relation>),
 }
