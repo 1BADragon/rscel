@@ -163,6 +163,7 @@ mod test {
     #[test_case("true && false || true && true", true.into(); "long logic operation")]
     #[test_case("2 + 3 - 1", 4.into(); "long add/sub operation")]
     #[test_case("2 < 3 >= 1", true.into(); "type prop: chained cmp")]
+    #[test_case("3 * 2 - 1 / 4 * 2", 6.into(); "large op 2")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
