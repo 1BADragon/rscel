@@ -172,7 +172,6 @@ mod test {
     #[test_case("5 + 5 == 10 || 10 - 5 == 5 && false", true.into(); "Incorrect addition precedence")]
     #[test_case("6 / 2 == 3 || 2 * 3 == 6 && false", true.into(); "Incorrect division precedence")]
     #[test_case("(true || false) && false", false.into(); "Incorrect parentheses precedence")]
-    #[test_case("5 + (5 == 10 || 10 - 5 == 5) && false", false.into(); "Complex mixed precedence")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
@@ -371,6 +370,7 @@ mod type_prop_tests {
     #[test_case("\"1\" ? 1 : 2", 1.into(); "type prop: full string as bool")]
     #[test_case("[1] ? 1 : 2", 1.into(); "type prop: full list as bool")]
     #[test_case("{\"foo\": 1} ? 1 : 2", 1.into(); "type prop: full obj as bool")]
+    #[test_case("5 + (5 == 10 || 10 - 5 == 5) && false", false.into(); "Complex mixed precedence")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
