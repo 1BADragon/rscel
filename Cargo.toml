@@ -20,21 +20,20 @@ wasm = [
 
 
 [dependencies]
-test-case = "3.1.0"
-regex = "1.9.4"
-serde = { version = "1.0.188", features = ["derive", "rc"] }
-serde_with = { version = "3.0.0", features = ["chrono"] }
-serde_json = { version = "1.0.105", features = ["raw_value"] }
-chrono = { version = "0.4.26", features = ["serde"] }
-duration-str = "0.5.1"
+test-case = "3.2.1"
+regex = "1.10.2"
+serde = { version = "1.0.190", features = ["derive", "rc"] }
+serde_with = { version = "3.4.0", features = ["chrono"] }
+serde_json = { version = "1.0.108", features = ["raw_value"] }
+chrono = { version = "0.4.31", features = ["serde"] }
+duration-str = "0.7.0"
 num = "0.4.1"
-cfg = "0.6.2"
 
 # Dependencies for python bindings
-pyo3 = { version = "0.19.2", optional = true, features = ["extension-module", "chrono"] }
+pyo3 = { version = "0.20.0", optional = true, features = ["extension-module", "chrono"] }
 
 # Dependencies for wasm bindings
 wasm-bindgen = { version = "0.2.87", optional = true}
 console_error_panic_hook = { version = "0.1.7", optional = true }
-serde-wasm-bindgen = { version = "0.5.0", optional = true }
+serde-wasm-bindgen = { version = "0.6.1", optional = true }
 js-sys = { version = "0.3.64", optional = true }

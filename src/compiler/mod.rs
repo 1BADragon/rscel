@@ -7,5 +7,3 @@ pub mod string_tokenizer;
 pub mod syntax_error;
 pub mod tokenizer;
 pub mod tokens;
-
-pub use compiler::CelCompiler;
