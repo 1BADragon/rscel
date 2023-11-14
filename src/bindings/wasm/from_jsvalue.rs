@@ -5,7 +5,7 @@ use wasm_bindgen::{JsCast, JsValue};
 
 use crate::{CelError, CelResult, CelValue};
 
-use super::{object_iter::ObjectIterator, values};
+use super::{log, object_iter::ObjectIterator, values};
 
 fn extract_number_value<T: num::cast::FromPrimitive + FromStr>(
     obj: &js_sys::Object,
@@ -50,7 +50,15 @@ fn extract_number_value<T: num::cast::FromPrimitive + FromStr>(
 impl TryFrom<JsValue> for CelValue {
     type Error = CelError;
     fn try_from(value: JsValue) -> Result<Self, Self::Error> {
-        if value.is_object() {
+        if value.is_array() {
+            let mut list: Vec<CelValue> = Vec::new();
+
+            for list_value in values(&value).into_iter() {
+                list.push(list_value.try_into()?);
+            }
+
+            Ok(CelValue::from_list(list))
+        } else if value.is_object() {
             let obj: js_sys::Object = value.into();
 
             if obj.has_own_property(&"cel_float".into()) {
@@ -82,14 +90,6 @@ impl TryFrom<JsValue> for CelValue {
             }
         } else if value.is_string() {
             Ok(CelValue::from_string(value.as_string().unwrap()))
-        } else if value.is_array() {
-            let mut list: Vec<CelValue> = Vec::new();
-
-            for list_value in values(&value).into_iter() {
-                list.push(list_value.try_into()?);
-            }
-
-            Ok(CelValue::from_list(list))
         } else if value.is_null() || value.is_undefined() {
             Ok(CelValue::from_null())
         } else if value.is_truthy() {

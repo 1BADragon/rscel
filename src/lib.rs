@@ -314,6 +314,22 @@ mod test {
         exec.bind_param("foo", 10.into());
         assert_eq!(ctx.exec("entry", &exec).unwrap(), 13.into());
     }
+
+    #[test]
+    fn test_object_access_in_array() {
+        let mut ctx = CelContext::new();
+        let mut exec = BindContext::new();
+
+        ctx.add_program_str("entry", "my_list[0].foo").unwrap();
+
+        let mut obj_map = HashMap::<String, CelValue>::new();
+        obj_map.insert("foo".to_owned(), "value".into());
+
+        let obj = CelValue::from_val_slice(&vec![obj_map.into()]);
+        exec.bind_param("my_list", obj);
+
+        assert_eq!(ctx.exec("entry", &exec).unwrap(), "value".into());
+    }
 }
 
 #[cfg(test)]

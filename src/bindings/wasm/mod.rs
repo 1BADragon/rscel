@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
-    fn log(msg: &str);
+    pub fn log(msg: &str);
 
     #[wasm_bindgen(js_namespace = Object)]
     fn keys(obj: &JsValue) -> js_sys::Array;
