@@ -33,6 +33,7 @@ fn has_impl(ctx: &Interpreter, _this: CelValue, exprlist: &[&[ByteCode]]) -> Cel
         Ok(_) => Ok(CelValue::from_bool(true)),
         Err(err) => match err {
             CelError::Binding { .. } => Ok(CelValue::from_bool(false)),
+            CelError::Attribute { .. } => Ok(CelValue::from_bool(false)),
             _ => Err(err),
         },
     }

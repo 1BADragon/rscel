@@ -50,34 +50,36 @@ fn extract_number_value<T: num::cast::FromPrimitive + FromStr>(
 impl TryFrom<JsValue> for CelValue {
     type Error = CelError;
     fn try_from(value: JsValue) -> Result<Self, Self::Error> {
-        if value.is_array() {
-            let mut list: Vec<CelValue> = Vec::new();
+        if value.is_object() {
+            if value.is_array() {
+                let mut list: Vec<CelValue> = Vec::new();
 
-            for list_value in values(&value).into_iter() {
-                list.push(list_value.try_into()?);
-            }
-
-            Ok(CelValue::from_list(list))
-        } else if value.is_object() {
-            let obj: js_sys::Object = value.into();
-
-            if obj.has_own_property(&"cel_float".into()) {
-                Ok(CelValue::from_float(extract_number_value(
-                    &obj,
-                    "cel_float",
-                )?))
-            } else if obj.has_own_property(&"cel_int".into()) {
-                Ok(CelValue::from_int(extract_number_value(&obj, "cel_int")?))
-            } else if obj.has_own_property(&"cel_uint".into()) {
-                Ok(CelValue::from_uint(extract_number_value(&obj, "cel_uint")?))
-            } else {
-                let mut map = HashMap::new();
-
-                for (key, value) in ObjectIterator::new(obj) {
-                    map.insert(key, value.try_into()?);
+                for list_value in values(&value).into_iter() {
+                    list.push(list_value.try_into()?);
                 }
 
-                Ok(CelValue::from_map(map))
+                Ok(CelValue::from_list(list))
+            } else {
+                let obj: js_sys::Object = value.into();
+
+                if obj.has_own_property(&"cel_float".into()) {
+                    Ok(CelValue::from_float(extract_number_value(
+                        &obj,
+                        "cel_float",
+                    )?))
+                } else if obj.has_own_property(&"cel_int".into()) {
+                    Ok(CelValue::from_int(extract_number_value(&obj, "cel_int")?))
+                } else if obj.has_own_property(&"cel_uint".into()) {
+                    Ok(CelValue::from_uint(extract_number_value(&obj, "cel_uint")?))
+                } else {
+                    let mut map = HashMap::new();
+
+                    for (key, value) in ObjectIterator::new(obj) {
+                        map.insert(key, value.try_into()?);
+                    }
+
+                    Ok(CelValue::from_map(map))
+                }
             }
         } else if let Some(numval) = value.dyn_ref::<js_sys::Number>() {
             if numval

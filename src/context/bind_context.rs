@@ -47,7 +47,7 @@ pub type RsCelFunction = dyn Fn(CelValue, &[CelValue]) -> CelResult<CelValue>;
 /// all arguents passed to the macro are left unresolved bytecode. An additional argument,
 /// the Interpreter context, is provided to the macro for bytecode resolution.
 pub type RsCelMacro =
-    dyn for<'a, 'b> Fn(&'a Interpreter<'a>, CelValue, &'b [&'b [ByteCode]]) -> CelResult<CelValue>;
+    dyn for<'a, 'b> Fn(&'a Interpreter<'a>, CelValue, &[&[ByteCode]]) -> CelResult<CelValue>;
 
 /// Bindings context for a cel evaluation.
 ///
