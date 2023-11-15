@@ -345,16 +345,13 @@ impl<'a> Interpreter<'a> {
                             match map.get(&index) {
                                 Some(val) => stack.push_val(val.clone()),
                                 None => {
-                                    return Err(CelError::value(&format!(
-                                        "Object does not contain key \"{}\"",
-                                        index
-                                    )))
+                                    return Err(CelError::attribute("obj", &index));
                                 }
                             }
                         }
                     } else {
                         return Err(CelError::value(&format!(
-                            "Index operator invalide between {:?} and {:?}",
+                            "Index operator invalid between {:?} and {:?}",
                             index.as_type(),
                             obj.as_type()
                         )));
@@ -374,10 +371,7 @@ impl<'a> Interpreter<'a> {
                                         value: obj,
                                     }),
                                     Err(_) => {
-                                        return Err(CelError::value(&format!(
-                                            "field {} does not exist",
-                                            ident.as_str()
-                                        )))
+                                        return Err(CelError::attribute("obj", ident.as_str()));
                                     }
                                 },
                             }
@@ -390,10 +384,7 @@ impl<'a> Interpreter<'a> {
                                     value: obj,
                                 });
                             } else {
-                                return Err(CelError::value(&format!(
-                                    "Field {} does not exist",
-                                    ident.as_str()
-                                )));
+                                return Err(CelError::attribute("obj", ident.as_str()));
                             }
                         } else {
                             return Err(CelError::Runtime(
