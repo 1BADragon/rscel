@@ -67,6 +67,7 @@ mod test {
         BindContext, CelContext, CelValue, Program,
     };
     use chrono::DateTime;
+    use serde_json::Value;
     use std::{assert, assert_eq, collections::HashMap};
     use test_case::test_case;
 
@@ -329,6 +330,26 @@ mod test {
         exec.bind_param("my_list", obj);
 
         assert_eq!(ctx.exec("entry", &exec).unwrap(), "value".into());
+    }
+
+    #[test]
+    fn test_has_in_reduce() {
+        let mut ctx = CelContext::new();
+        let mut exec = BindContext::new();
+
+        ctx.add_program_str(
+            "entry",
+            "my_list.reduce(curr, next, curr + int(has(next.foo)), 0)",
+        )
+        .unwrap();
+
+        let obj: CelValue = serde_json::from_str::<Value>("[{\"foo\": 1}, {}, {\"foo\": 1}]")
+            .unwrap()
+            .into();
+
+        exec.bind_param("my_list", obj.into());
+
+        assert_eq!(ctx.exec("entry", &exec).unwrap(), 2.into());
     }
 }
 

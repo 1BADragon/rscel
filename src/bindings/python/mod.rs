@@ -19,7 +19,7 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &PyDict) -> PyResult<PyObjec
         let mut callables = Vec::new();
         for keyobj in bindings.keys().iter() {
             let key = keyobj.downcast::<PyString>()?;
-            let val = bindings.get_item(keyobj).unwrap();
+            let val = bindings.get_item(keyobj).unwrap().unwrap();
 
             if val.is_callable() {
                 callables.push((key.to_str()?, CelPyCallable::new(val.into())));
@@ -35,7 +35,7 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &PyDict) -> PyResult<PyObjec
     for keyobj in bindings.keys().iter() {
         let key = keyobj.downcast::<PyString>()?;
 
-        let val = bindings.get_item(keyobj).unwrap();
+        let val = bindings.get_item(keyobj).unwrap().unwrap();
 
         if !val.is_callable() {
             exec_ctx.bind_param(key.to_str()?, val.extract()?)
@@ -168,7 +168,7 @@ impl<'source> FromPyObject<'source> for CelValue {
                     for keyobj in mapobj.keys().iter() {
                         let key = keyobj.downcast::<PyString>()?.to_string();
 
-                        map.insert(key, mapobj.get_item(keyobj).unwrap().extract()?);
+                        map.insert(key, mapobj.get_item(keyobj).unwrap().unwrap().extract()?);
                     }
 
                     Ok(map.into())

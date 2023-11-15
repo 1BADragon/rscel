@@ -13,6 +13,7 @@ pub enum CelError {
     InvalidOp(String),
     Runtime(String),
     Binding { symbol: String },
+    Attribute { parent: String, field: String },
 
     Internal(String),
 }
@@ -53,6 +54,13 @@ impl CelError {
         }
     }
 
+    pub fn attribute(parent_name: &str, field_name: &str) -> CelError {
+        CelError::Attribute {
+            parent: parent_name.to_string(),
+            field: field_name.to_string(),
+        }
+    }
+
     pub fn type_string(&self) -> &'static str {
         use CelError::*;
 
@@ -66,6 +74,7 @@ impl CelError {
             Internal(..) => "INTERNAL",
             Runtime(_) => "RUNTIME",
             Binding { .. } => "BINDING",
+            Attribute { .. } => "ATTRIBUTE",
         }
     }
 }
@@ -91,6 +100,9 @@ impl fmt::Display for CelError {
             Internal(msg) => write!(f, "{}", msg),
             Runtime(msg) => write!(f, "{}", msg),
             Binding { symbol } => write!(f, "Symbol not bound: {}", symbol),
+            Attribute { parent, field } => {
+                write!(f, "Field {} does not exist on {}", field, parent)
+            }
         }
     }
 }

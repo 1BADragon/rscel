@@ -136,6 +136,11 @@ impl Into<JsValue> for CelError {
                 js_sys::Reflect::set(&val, &"type".into(), &"internal".into()).unwrap();
                 js_sys::Reflect::set(&val, &"msg".into(), &msg.into()).unwrap();
             }
+            CelError::Attribute { parent, field } => {
+                js_sys::Reflect::set(&val, &"type".into(), &"attribute".into()).unwrap();
+                js_sys::Reflect::set(&val, &"parent".into(), &parent.into()).unwrap();
+                js_sys::Reflect::set(&val, &"field".into(), &field.into()).unwrap();
+            }
         };
 
         val.into()
