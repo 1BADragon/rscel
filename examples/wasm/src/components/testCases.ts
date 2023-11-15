@@ -11,4 +11,5 @@ export const tests: [string, () => any, any][] = [
   ],
   ["float", () => cel_eval("3.2 + foo", { foo: 2.1 }), 5.3],
   ["int", () => cel_eval("3 + foo", { foo: 3 }), BigInt(6)],
+  ["bigint", () => cel_eval("3 + foo", { foo: BigInt(5) }), BigInt(8)],
 ];

@@ -5,7 +5,7 @@ use wasm_bindgen::{JsCast, JsValue};
 
 use crate::{CelError, CelResult, CelValue};
 
-use super::{log, object_iter::ObjectIterator, values};
+use super::{object_iter::ObjectIterator, values};
 
 fn extract_number_value<T: num::cast::FromPrimitive + FromStr>(
     obj: &js_sys::Object,
@@ -80,6 +80,14 @@ impl TryFrom<JsValue> for CelValue {
 
                     Ok(CelValue::from_map(map))
                 }
+            }
+        } else if value.is_bigint() {
+            let bigint_val: js_sys::BigInt = value.into();
+
+            let str_val: String = bigint_val.to_string(10).unwrap().into();
+            match str_val.parse::<i64>() {
+                Ok(val) => Ok(val.into()),
+                Err(_) => Err(CelError::value(&format!("{} is invalid for int", str_val))),
             }
         } else if let Some(numval) = value.dyn_ref::<js_sys::Number>() {
             if numval
