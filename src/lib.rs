@@ -20,7 +20,7 @@
 //! let mut exec_ctx = BindContext::new();
 //!
 //! ctx.add_program_str("main", "foo + 3").unwrap();
-//! exec_ctx.bind_param("foo", 3.into()); // 3 converted to ValueCell
+//! exec_ctx.bind_param("foo", 3.into()); // 3 converted to CelValue
 //!
 //! let res = ctx.exec("main", &exec_ctx).unwrap(); // ValueCell::Int(6)
 //! assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
