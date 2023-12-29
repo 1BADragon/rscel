@@ -314,6 +314,19 @@ mod test {
 
         exec.bind_param("foo", 10.into());
         assert_eq!(ctx.exec("entry", &exec).unwrap(), 13.into());
+
+        ctx.add_program_str("entry2", "has(a.b.c)").unwrap();
+        assert_eq!(ctx.exec("entry2", &exec).unwrap(), false.into());
+
+        let mut a = HashMap::<String, CelValue>::new();
+        exec.bind_param("a", a.clone().into());
+        assert_eq!(ctx.exec("entry2", &exec).unwrap(), false.into());
+
+        let mut b = HashMap::<String, CelValue>::new();
+        b.insert("c".to_string(), 4.into());
+        a.insert("b".to_string(), b.into());
+        exec.bind_param("a", a.into());
+        assert_eq!(ctx.exec("entry2", &exec).unwrap(), true.into());
     }
 
     #[test]
