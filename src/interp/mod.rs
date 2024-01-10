@@ -216,7 +216,7 @@ impl<'a> Interpreter<'a> {
                         JmpWhen::True => {
                             if cfg!(feature = "type_prop") {
                                 if v1.is_truthy() {
-                                    v1 = CelValue::from_bool(true);
+                                    v1 = CelValue::true_();
                                     pc += *dist as usize
                                 }
                             } else if let CelValue::Bool(v) = v1 {
@@ -233,7 +233,7 @@ impl<'a> Interpreter<'a> {
                         JmpWhen::False => {
                             if cfg!(feature = "type_prop") {
                                 if !v1.is_truthy() {
-                                    v1 = CelValue::from_bool(false);
+                                    v1 = CelValue::false_();
                                     pc += *dist as usize
                                 }
                             } else if let CelValue::Bool(v) = v1 {

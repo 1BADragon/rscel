@@ -14,6 +14,10 @@ use serde_json::value::Value;
 
 use crate::{interp::ByteCode, CelError, CelResult};
 
+/// The basic value of the CEL interpreter.
+///
+/// Houses all possible types and implements most of the valid operations within the
+/// interpreter
 #[serde_as]
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 pub enum CelValue {
@@ -50,6 +54,14 @@ impl CelValue {
 
     pub fn from_bool(val: bool) -> CelValue {
         CelValue::Bool(val)
+    }
+
+    pub fn true_() -> CelValue {
+        CelValue::Bool(true)
+    }
+
+    pub fn false_() -> CelValue {
+        CelValue::Bool(false)
     }
 
     pub fn from_string(val: String) -> CelValue {
@@ -206,20 +218,20 @@ impl CelValue {
                         Ok(res_cell) => {
                             if let CelValue::Bool(res) = res_cell {
                                 if !res {
-                                    return Ok(CelValue::from_bool(false));
+                                    return Ok(CelValue::false_());
                                 }
                             }
                         }
-                        Err(_) => return Ok(CelValue::from_bool(false)),
+                        Err(_) => return Ok(CelValue::false_()),
                     }
                 }
-                Ok(CelValue::from_bool(true))
+                Ok(CelValue::true_())
             }
         } else if let CelValue::Null = lhs.as_ref() {
             if let CelValue::Null = rhs.as_ref() {
-                return Ok(CelValue::from_bool(true));
+                return Ok(CelValue::true_());
             } else {
-                return Ok(CelValue::from_bool(false));
+                return Ok(CelValue::false_());
             }
         } else if let (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) =
             (lhs.as_ref(), rhs.as_ref())

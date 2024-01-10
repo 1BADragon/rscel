@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{error, fmt};
 
 use serde::Serialize;
 
@@ -106,3 +106,5 @@ impl fmt::Display for CelError {
         }
     }
 }
+
+impl error::Error for CelError {}
