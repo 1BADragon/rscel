@@ -173,11 +173,11 @@ impl<'source> FromPyObject<'source> for CelValue {
 
                     Ok(map.into())
                 }
-                "datetime.datetime" => Ok(ob
+                "datetime" => Ok(ob
                     .downcast::<PyDateTime>()?
                     .extract::<DateTime<Utc>>()?
                     .into()),
-                "datetime.timedelta" => Ok(ob.downcast::<PyDelta>()?.extract::<Duration>()?.into()),
+                "timedelta" => Ok(ob.downcast::<PyDelta>()?.extract::<Duration>()?.into()),
                 "NoneType" => Ok(CelValue::from_null()),
                 other => Err(PyValueError::new_err(format!(
                     "{} is not a compatable rscel type",
