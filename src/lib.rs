@@ -20,7 +20,7 @@
 //! let mut exec_ctx = BindContext::new();
 //!
 //! ctx.add_program_str("main", "foo + 3").unwrap();
-//! exec_ctx.bind_param("foo", 3.into()); // 3 converted to ValueCell
+//! exec_ctx.bind_param("foo", 3.into()); // 3 converted to CelValue
 //!
 //! let res = ctx.exec("main", &exec_ctx).unwrap(); // ValueCell::Int(6)
 //! assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
@@ -314,6 +314,19 @@ mod test {
 
         exec.bind_param("foo", 10.into());
         assert_eq!(ctx.exec("entry", &exec).unwrap(), 13.into());
+
+        ctx.add_program_str("entry2", "has(a.b.c)").unwrap();
+        assert_eq!(ctx.exec("entry2", &exec).unwrap(), false.into());
+
+        let mut a = HashMap::<String, CelValue>::new();
+        exec.bind_param("a", a.clone().into());
+        assert_eq!(ctx.exec("entry2", &exec).unwrap(), false.into());
+
+        let mut b = HashMap::<String, CelValue>::new();
+        b.insert("c".to_string(), 4.into());
+        a.insert("b".to_string(), b.into());
+        exec.bind_param("a", a.into());
+        assert_eq!(ctx.exec("entry2", &exec).unwrap(), true.into());
     }
 
     #[test]

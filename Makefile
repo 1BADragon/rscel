@@ -1,6 +1,9 @@
 CARGO_ARGS?=
 
-default:
+.PHONY: default
+default: build
+
+build:
 	cargo build $(CARGO_ARGS)
 
 test:
@@ -32,4 +35,4 @@ wasm-example-release: wasm-binding-release
 	cd examples/wasm && npm start
 
 .PHONY: all
-all: wasm-binding python-binding
+all: wasm-binding python-binding build

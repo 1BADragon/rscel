@@ -30,10 +30,10 @@ fn has_impl(ctx: &Interpreter, _this: CelValue, exprlist: &[&[ByteCode]]) -> Cel
 
     let res = ctx.run_raw(&exprlist[0], true);
     match res {
-        Ok(_) => Ok(CelValue::from_bool(true)),
+        Ok(_) => Ok(CelValue::true_()),
         Err(err) => match err {
-            CelError::Binding { .. } => Ok(CelValue::from_bool(false)),
-            CelError::Attribute { .. } => Ok(CelValue::from_bool(false)),
+            CelError::Binding { .. } => Ok(CelValue::false_()),
+            CelError::Attribute { .. } => Ok(CelValue::false_()),
             _ => Err(err),
         },
     }
