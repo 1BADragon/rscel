@@ -1,9 +1,12 @@
+use std::str::FromStr;
+
 use super::bind_context::RsCelFunction;
 use crate::{
     cel_error::{CelError, CelResult},
     BindContext, CelValue,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
+use chrono_tz::Tz;
 use regex::Regex;
 
 const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
@@ -30,6 +33,8 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("round", &round_impl),
     ("min", &min_impl),
     ("max", &max_impl),
+    ("getDate", &get_date_impl),
+    ("getDayOfMonth", &get_day_of_month_impl),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
@@ -451,4 +456,40 @@ fn max_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     }
 
     return Ok(curr_min.unwrap().clone());
+}
+
+fn get_adjusted_datetime(this: CelValue, args: &[CelValue]) -> CelResult<DateTime<FixedOffset>> {
+    if let CelValue::TimeStamp(ts) = this {
+        if args.len() == 0 {
+            return Ok(ts.into());
+        } else if args.len() == 1 {
+            if let CelValue::String(s) = args[0] {
+                if let Ok(tz) = Tz::from_str(&s) {
+                    Ok(ts.with_timezone(tz.offset_from_utc_date()))
+                } else {
+                    Err(CelError::argument("Failed to parse timezone"))
+                }
+            } else {
+                Err(CelError::argument("Argument must be a string"))
+            }
+        } else {
+            Err(CelError::argument("Expected either 0 or 1 argumnets"))
+        }
+    } else {
+        Err(CelError::argument("First parameter is not a timestamp"))
+    }
+}
+
+fn get_date_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    let date = get_adjusted_datetime(this, args)?;
+
+    let day_of_month = date.day();
+    Ok(CelValue::from_int(day_of_month as i64))
+}
+
+fn get_day_of_month_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    let date = get_adjusted_datetime(this, args)?;
+
+    let day_of_month = date.day() - 1;
+    Ok(CelValue::from_int(day_of_month as i64))
 }
