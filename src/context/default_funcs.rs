@@ -5,7 +5,7 @@ use crate::{
     cel_error::{CelError, CelResult},
     BindContext, CelValue,
 };
-use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use chrono_tz::Tz;
 use regex::Regex;
 
@@ -35,6 +35,14 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("max", &max_impl),
     ("getDate", &get_date_impl),
     ("getDayOfMonth", &get_day_of_month_impl),
+    ("getDayOfWeek", &get_day_of_week_impl),
+    ("getDayOfYear", &get_day_of_year_impl),
+    ("getFullYear", &get_full_year_impl),
+    ("getHours", &get_hours_impl),
+    ("getMilliseconds", &get_milliseconds_impl),
+    ("getMinutes", &get_minutes_impl),
+    ("getMonth", &get_month_impl),
+    ("getSeconds", &get_seconds_impl),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
@@ -458,14 +466,14 @@ fn max_impl(_this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
     return Ok(curr_min.unwrap().clone());
 }
 
-fn get_adjusted_datetime(this: CelValue, args: &[CelValue]) -> CelResult<DateTime<FixedOffset>> {
+fn get_adjusted_datetime(this: CelValue, args: &[CelValue]) -> CelResult<DateTime<Tz>> {
     if let CelValue::TimeStamp(ts) = this {
         if args.len() == 0 {
-            return Ok(ts.into());
+            return Ok(ts.with_timezone(&Tz::UTC));
         } else if args.len() == 1 {
-            if let CelValue::String(s) = args[0] {
-                if let Ok(tz) = Tz::from_str(&s) {
-                    Ok(ts.with_timezone(tz.offset_from_utc_date()))
+            if let CelValue::String(ref s) = args[0] {
+                if let Ok(tz) = Tz::from_str(s) {
+                    Ok(ts.with_timezone(&tz))
                 } else {
                     Err(CelError::argument("Failed to parse timezone"))
                 }
@@ -492,4 +500,60 @@ fn get_day_of_month_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValu
 
     let day_of_month = date.day() - 1;
     Ok(CelValue::from_int(day_of_month as i64))
+}
+
+fn get_day_of_week_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    let date = get_adjusted_datetime(this, args)?;
+
+    let day_of_week = date.weekday().number_from_sunday() - 1;
+    Ok(CelValue::from_int(day_of_week as i64))
+}
+
+fn get_day_of_year_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    let date = get_adjusted_datetime(this, args)?;
+
+    let day_of_year = date.ordinal() - 1;
+    Ok(CelValue::from_int(day_of_year as i64))
+}
+
+fn get_full_year_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    let date = get_adjusted_datetime(this, args)?;
+
+    let year = date.year();
+    Ok(CelValue::from_int(year as i64))
+}
+
+fn get_hours_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    let date = get_adjusted_datetime(this, args)?;
+
+    let hours = date.time().hour();
+    Ok(CelValue::from_int(hours as i64))
+}
+
+fn get_milliseconds_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    let date = get_adjusted_datetime(this, args)?;
+
+    let milliseconds = date.timestamp_subsec_millis();
+    Ok(CelValue::from_int(milliseconds as i64))
+}
+
+fn get_minutes_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    let date = get_adjusted_datetime(this, args)?;
+
+    let minutes = date.time().minute();
+    Ok(CelValue::from_int(minutes as i64))
+}
+
+fn get_month_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    let date = get_adjusted_datetime(this, args)?;
+
+    let month = date.month0();
+    Ok(CelValue::from_int(month as i64))
+}
+
+fn get_seconds_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
+    let date = get_adjusted_datetime(this, args)?;
+
+    let second = date.time().second();
+    Ok(CelValue::from_int(second as i64))
 }
