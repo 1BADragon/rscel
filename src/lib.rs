@@ -66,7 +66,7 @@ mod test {
         compiler::{compiler::CelCompiler, string_tokenizer::StringTokenizer},
         BindContext, CelContext, CelValue, Program,
     };
-    use chrono::DateTime;
+    use chrono::{DateTime, TimeZone, Utc};
     use serde_json::Value;
     use std::{assert, assert_eq, collections::HashMap};
     use test_case::test_case;
@@ -363,6 +363,40 @@ mod test {
         exec.bind_param("my_list", obj.into());
 
         assert_eq!(ctx.exec("entry", &exec).unwrap(), 2.into());
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_timestamp_functions() {
+        let mut ctx = CelContext::new();
+        let mut exec = BindContext::new();
+
+        let dt = Utc
+            .ymd(2024, 01, 10)
+            .and_hms_milli_opt(8, 57, 45, 123)
+            .unwrap();
+        exec.bind_param("time", CelValue::from_timestamp(&dt));
+
+        let progs = [
+            ("time.getDate()", 10),
+            ("time.getDayOfMonth()", 9),
+            ("time.getDayOfWeek()", 3),
+            ("time.getDayOfYear()", 9),
+            ("time.getFullYear()", 2024),
+            ("time.getHours()", 8),
+            ("time.getMilliseconds()", 123),
+            ("time.getMinutes()", 57),
+            ("time.getMonth()", 0),
+            ("time.getSeconds()", 45),
+        ];
+
+        for prog in progs.iter() {
+            ctx.add_program_str("entry", prog.0).unwrap();
+
+            let res = ctx.exec("entry", &exec).unwrap();
+            println!("{}:{} == {}", prog.0, res, prog.1);
+            assert!(res == prog.1.into());
+        }
     }
 }
 
