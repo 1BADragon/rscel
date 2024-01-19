@@ -186,6 +186,8 @@ mod test {
     #[test_case("type(3.2) == float", true.into(); "float type eq")]
     #[test_case("type(true) == double", false.into(); "bool type neq")]
     #[test_case("type(true) != double", true.into(); "bool type neq 2")]
+    #[test_case("type([1,2,3]) == type([])", true.into(); "list type neq")]
+    #[test_case("type({'foo': 3}) == type({})", true.into(); "map type neq")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
