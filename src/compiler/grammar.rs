@@ -141,7 +141,7 @@ pub enum Primary {
     Parens(AstNode<Expr>),
     ListConstruction(AstNode<ExprList>),
     ObjectInit(AstNode<ObjInits>),
-    Literal(LiteralAndKeyworkds),
+    Literal(LiteralsAndKeywords),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -161,7 +161,7 @@ pub struct ObjInits {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum LiteralAndKeyworkds {
+pub enum LiteralsAndKeywords {
     Type,
 
     NullType,
