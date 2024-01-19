@@ -620,13 +620,6 @@ impl<'l> CelCompiler<'l> {
         let start_loc = self.tokenizer.location();
 
         match self.tokenizer.peek()? {
-            Some(Token::Type) => {
-                self.tokenizer.next()?;
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::from_ident("type"))]),
-                    AstNode::new(Primary::Type, start_loc, self.tokenizer.location()),
-                ))
-            }
             Some(Token::Ident(val)) => {
                 self.tokenizer.next()?;
                 Ok((
@@ -696,7 +689,7 @@ impl<'l> CelCompiler<'l> {
                 Ok((
                     ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::from_uint(val))]),
                     AstNode::new(
-                        Primary::Literal(Literal::Unsigned(val)),
+                        Primary::Literal(LiteralAndKeyworkds::UnsignedLit(val)),
                         start_loc,
                         self.tokenizer.location(),
                     ),
@@ -707,7 +700,7 @@ impl<'l> CelCompiler<'l> {
                 Ok((
                     ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::from_int(val))]),
                     AstNode::new(
-                        Primary::Literal(Literal::Integer(val)),
+                        Primary::Literal(LiteralAndKeyworkds::IntegerLit(val)),
                         start_loc,
                         self.tokenizer.location(),
                     ),
@@ -718,7 +711,7 @@ impl<'l> CelCompiler<'l> {
                 Ok((
                     ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::from_float(val))]),
                     AstNode::new(
-                        Primary::Literal(Literal::Floating(val)),
+                        Primary::Literal(LiteralAndKeyworkds::FloatingLit(val)),
                         start_loc,
                         self.tokenizer.location(),
                     ),
@@ -731,7 +724,7 @@ impl<'l> CelCompiler<'l> {
                         val.clone(),
                     ))]),
                     AstNode::new(
-                        Primary::Literal(Literal::String(val)),
+                        Primary::Literal(LiteralAndKeyworkds::StringLit(val)),
                         start_loc,
                         self.tokenizer.location(),
                     ),
@@ -744,7 +737,7 @@ impl<'l> CelCompiler<'l> {
                         val.clone(),
                     ))]),
                     AstNode::new(
-                        Primary::Literal(Literal::ByteString(val)),
+                        Primary::Literal(LiteralAndKeyworkds::ByteStringLit(val)),
                         start_loc,
                         self.tokenizer.location(),
                     ),
@@ -755,7 +748,7 @@ impl<'l> CelCompiler<'l> {
                 Ok((
                     ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::from_bool(val))]),
                     AstNode::new(
-                        Primary::Literal(Literal::Boolean(val)),
+                        Primary::Literal(LiteralAndKeyworkds::BooleanLit(val)),
                         start_loc,
                         self.tokenizer.location(),
                     ),
@@ -766,7 +759,106 @@ impl<'l> CelCompiler<'l> {
                 Ok((
                     ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::from_null())]),
                     AstNode::new(
-                        Primary::Literal(Literal::Null),
+                        Primary::Literal(LiteralAndKeyworkds::NullLit),
+                        start_loc,
+                        self.tokenizer.location(),
+                    ),
+                ))
+            }
+            Some(Token::NullType) => {
+                self.tokenizer.next()?;
+                Ok((
+                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::null_type())]),
+                    AstNode::new(
+                        Primary::Literal(LiteralAndKeyworkds::NullType),
+                        start_loc,
+                        self.tokenizer.location(),
+                    ),
+                ))
+            }
+            Some(Token::Int) => {
+                self.tokenizer.next()?;
+                Ok((
+                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::int_type())]),
+                    AstNode::new(
+                        Primary::Literal(LiteralAndKeyworkds::Int),
+                        start_loc,
+                        self.tokenizer.location(),
+                    ),
+                ))
+            }
+            Some(Token::Uint) => {
+                self.tokenizer.next()?;
+                Ok((
+                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::uint_type())]),
+                    AstNode::new(
+                        Primary::Literal(LiteralAndKeyworkds::Uint),
+                        start_loc,
+                        self.tokenizer.location(),
+                    ),
+                ))
+            }
+            Some(Token::Float) => {
+                self.tokenizer.next()?;
+                Ok((
+                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::float_type())]),
+                    AstNode::new(
+                        Primary::Literal(LiteralAndKeyworkds::Float),
+                        start_loc,
+                        self.tokenizer.location(),
+                    ),
+                ))
+            }
+            Some(Token::Bool) => {
+                self.tokenizer.next()?;
+                Ok((
+                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::bool_type())]),
+                    AstNode::new(
+                        Primary::Literal(LiteralAndKeyworkds::Bool),
+                        start_loc,
+                        self.tokenizer.location(),
+                    ),
+                ))
+            }
+            Some(Token::Timestamp) => {
+                self.tokenizer.next()?;
+                Ok((
+                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::timestamp_type())]),
+                    AstNode::new(
+                        Primary::Literal(LiteralAndKeyworkds::Timestamp),
+                        start_loc,
+                        self.tokenizer.location(),
+                    ),
+                ))
+            }
+            Some(Token::Duration) => {
+                self.tokenizer.next()?;
+                Ok((
+                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::duration_type())]),
+                    AstNode::new(
+                        Primary::Literal(LiteralAndKeyworkds::Duration),
+                        start_loc,
+                        self.tokenizer.location(),
+                    ),
+                ))
+            }
+            Some(Token::String) => {
+                self.tokenizer.next()?;
+                Ok((
+                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::string_type())]),
+                    AstNode::new(
+                        Primary::Literal(LiteralAndKeyworkds::String),
+                        start_loc,
+                        self.tokenizer.location(),
+                    ),
+                ))
+            }
+            Some(Token::Type) => {
+                self.tokenizer.next()?;
+                Ok((
+                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::type_type())]),
+                    AstNode::new(
+                        Primary::Literal(LiteralAndKeyworkds::Type),
                         start_loc,
                         self.tokenizer.location(),
                     ),

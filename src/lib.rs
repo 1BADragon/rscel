@@ -115,7 +115,7 @@ mod test {
     #[test_case("\"hello world\".startsWith(\"hello\")", true.into(); "test startsWith")]
     #[test_case("\"abc123\".matches(\"[a-z]{3}[0-9]{3}\")", true.into(); "test matches")]
     #[test_case("string(1)", "1".into(); "test string")]
-    #[test_case("type(1)", CelValue::from_type("int"); "test type")]
+    #[test_case("type(1)", CelValue::int_type(); "test type")]
     #[test_case("4 > 5", false.into(); "test gt")]
     #[test_case("4 < 5", true.into(); "test lt")]
     #[test_case("4 >= 4", true.into(); "test ge")]
@@ -173,6 +173,19 @@ mod test {
     #[test_case("5 + 5 == 10 || 10 - 5 == 5 && false", true.into(); "Incorrect addition precedence")]
     #[test_case("6 / 2 == 3 || 2 * 3 == 6 && false", true.into(); "Incorrect division precedence")]
     #[test_case("(true || false) && false", false.into(); "Incorrect parentheses precedence")]
+    #[test_case("'foo' in 'foot'", true.into(); "in string operator")]
+    #[test_case("'foot' in 'foo'", false.into(); "in string operator false")]
+    #[test_case("type(3) == type(3)", true.into(); "type eq")]
+    #[test_case("type(null) == null_type", true.into(); "null_type eq")]
+    #[test_case("type(3) == int", true.into(); "int type eq")]
+    #[test_case("type(3u) == uint", true.into(); "uint type eq")]
+    #[test_case("type('foo') == string", true.into(); "string type eq")]
+    #[test_case("type(true) == bool", true.into(); "bool type eq true")]
+    #[test_case("type(false) == bool", true.into(); "bool type eq false")]
+    #[test_case("type(3.2) == double", true.into(); "double type eq")]
+    #[test_case("type(3.2) == float", true.into(); "float type eq")]
+    #[test_case("type(true) == double", false.into(); "bool type neq")]
+    #[test_case("type(true) != double", true.into(); "bool type neq 2")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
@@ -281,25 +294,6 @@ mod test {
         ctx.add_program_str("entry", "entry + 3").unwrap();
 
         assert!(ctx.exec("entry", &exec).is_err());
-    }
-
-    #[test]
-    fn test_binding_filter() {
-        let mut tokenizer = StringTokenizer::with_input("foo + int(3)");
-        let prog = CelCompiler::with_tokenizer(&mut tokenizer)
-            .compile()
-            .unwrap();
-
-        let mut dets = prog.details().clone();
-        let bindings = BindContext::new();
-
-        assert!(dets.params().contains(&"int"));
-        assert!(dets.params().contains(&"int"));
-
-        dets.filter_from_bindings(&bindings);
-
-        assert!(!dets.params().contains(&"int"));
-        assert!(dets.params().contains(&"foo"));
     }
 
     #[test]
