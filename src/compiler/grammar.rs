@@ -141,7 +141,7 @@ pub enum Primary {
     Parens(AstNode<Expr>),
     ListConstruction(AstNode<ExprList>),
     ObjectInit(AstNode<ObjInits>),
-    Literal(Literal),
+    Literal(LiteralsAndKeywords),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -161,13 +161,24 @@ pub struct ObjInits {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum Literal {
-    Null,
+pub enum LiteralsAndKeywords {
+    Type,
 
-    Integer(i64),
-    Unsigned(u64),
-    Floating(f64),
-    String(String),
-    ByteString(Vec<u8>),
-    Boolean(bool),
+    NullType,
+    Int,
+    Uint,
+    Float,
+    Bool,
+    String,
+    Bytes,
+    Timestamp,
+    Duration,
+
+    NullLit,
+    IntegerLit(i64),
+    UnsignedLit(u64),
+    FloatingLit(f64),
+    StringLit(String),
+    ByteStringLit(Vec<u8>),
+    BooleanLit(bool),
 }

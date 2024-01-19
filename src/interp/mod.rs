@@ -3,8 +3,8 @@ use std::{collections::HashMap, fmt};
 pub use types::{ByteCode, JmpWhen};
 
 use crate::{
-    utils::ScopedCounter, BindContext, CelContext, CelError, CelResult, CelValue, RsCelFunction,
-    RsCelMacro,
+    context::construct_type, utils::ScopedCounter, BindContext, CelContext, CelError, CelResult,
+    CelValue, RsCelFunction, RsCelMacro,
 };
 
 use types::CelStackValue;
@@ -435,7 +435,16 @@ impl<'a> Interpreter<'a> {
                                     )));
                                 }
                             }
-                            _ => return Err(CelError::runtime("only idents are callable")),
+                            CelValue::Type(type_name) => {
+                                let arg_values = self.resolve_args(args)?;
+                                stack.push_val(construct_type(&type_name, &arg_values)?);
+                            }
+                            other => {
+                                return Err(CelError::runtime(&format!(
+                                    "{:?} cannot be called",
+                                    other
+                                )))
+                            }
                         },
                     };
                 }
