@@ -26,7 +26,16 @@ pub enum Token {
     EqualEqual,             // ==
     NotEqual,               // !=
     In,                     // 'in'
+    Int,                    // 'int'
+    Uint,                   // 'uint'
+    Float,                  // 'float'
+    Bool,                   // 'bool'
+    String,                 // 'string'
+    Bytes,                  // 'bytes'
+    NullType,               // 'null_type'
     Type,                   // 'type'
+    Timestamp,              // 'timestamp'
+    Duration,               // 'duration'
     Null,                   // 'null'
     BoolLit(bool),          // true | false
     IntLit(i64),            // [-+]?[0-9]+

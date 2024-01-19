@@ -3,6 +3,7 @@ use std::collections::HashMap;
 mod bind_context;
 mod default_funcs;
 mod default_macros;
+mod type_funcs;
 use crate::{
     cel_error::CelResult,
     compiler::{compiler::CelCompiler, string_tokenizer::StringTokenizer},
@@ -11,6 +12,7 @@ use crate::{
     CelValue,
 };
 pub use bind_context::{BindContext, RsCelFunction, RsCelMacro};
+pub use type_funcs::construct_type;
 
 /// The CelContext is the core context in RsCel. This context contains
 /// Program information as well as the primary entry point for evaluating

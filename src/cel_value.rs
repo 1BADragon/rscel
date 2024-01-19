@@ -124,6 +124,62 @@ impl CelValue {
         }
     }
 
+    pub fn int_type() -> CelValue {
+        CelValue::from_type("int")
+    }
+
+    pub fn uint_type() -> CelValue {
+        CelValue::from_type("uint")
+    }
+
+    pub fn float_type() -> CelValue {
+        CelValue::from_type("float")
+    }
+
+    pub fn bool_type() -> CelValue {
+        CelValue::from_type("bool")
+    }
+
+    pub fn string_type() -> CelValue {
+        CelValue::from_type("string")
+    }
+
+    pub fn bytes_type() -> CelValue {
+        CelValue::from_type("bytes")
+    }
+
+    pub fn list_type() -> CelValue {
+        CelValue::from_type("list")
+    }
+
+    pub fn map_type() -> CelValue {
+        CelValue::from_type("map")
+    }
+
+    pub fn null_type() -> CelValue {
+        CelValue::from_type("null")
+    }
+
+    pub fn ident_type() -> CelValue {
+        CelValue::from_type("ident")
+    }
+
+    pub fn type_type() -> CelValue {
+        CelValue::from_type("type")
+    }
+
+    pub fn timestamp_type() -> CelValue {
+        CelValue::from_type("timestamp")
+    }
+
+    pub fn duration_type() -> CelValue {
+        CelValue::from_type("duration")
+    }
+
+    pub fn bytecode_type() -> CelValue {
+        CelValue::from_type("bytecode")
+    }
+
     pub fn is_truthy(&self) -> bool {
         match self {
             CelValue::Int(i) => *i != 0,
@@ -240,6 +296,8 @@ impl CelValue {
         } else if let (CelValue::Duration(l), CelValue::Duration(r)) = (lhs.as_ref(), rhs.as_ref())
         {
             Ok(CelValue::from_bool(l == r))
+        } else if let (CelValue::Type(l), CelValue::Type(r)) = (lhs.as_ref(), rhs.as_ref()) {
+            Ok(CelValue::from_bool(l == r))
         } else {
             Err(CelError::invalid_op(&format!(
                 "Invalid op '==' between {:?} and {:?}",
@@ -345,10 +403,20 @@ impl CelValue {
                 if let CelValue::String(r) = self {
                     Ok(CelValue::from_bool(m.contains_key(r)))
                 } else {
-                    return Err(CelError::invalid_op(&format!(
+                    Err(CelError::invalid_op(&format!(
                         "Op 'in' invalid between {:?} and {:?}",
                         lhs_type, rhs_type
-                    )));
+                    )))
+                }
+            }
+            CelValue::String(s) => {
+                if let CelValue::String(r) = self {
+                    Ok(CelValue::from_bool(s.contains(r)))
+                } else {
+                    Err(CelError::invalid_op(&format!(
+                        "Op 'in' invalid between {:?} and {:?}",
+                        lhs_type, rhs_type
+                    )))
                 }
             }
             _ => {
@@ -380,20 +448,20 @@ impl CelValue {
 
     pub fn as_type(&self) -> CelValue {
         match self {
-            CelValue::Int(_) => CelValue::from_type("int"),
-            CelValue::UInt(_) => CelValue::from_type("uint"),
-            CelValue::Float(_) => CelValue::from_type("float"),
-            CelValue::Bool(_) => CelValue::from_type("bool"),
-            CelValue::String(_) => CelValue::from_type("string"),
-            CelValue::Bytes(_) => CelValue::from_type("bytes"),
-            CelValue::List(_) => CelValue::from_type("list"),
-            CelValue::Map(_) => CelValue::from_type("map"),
-            CelValue::Null => CelValue::from_type("null_type"),
-            CelValue::Ident(_) => CelValue::from_type("ident"),
-            CelValue::Type(_) => CelValue::from_type("type"),
-            CelValue::TimeStamp(_) => CelValue::from_type("timestamp"),
-            CelValue::Duration(_) => CelValue::from_type("duration"),
-            CelValue::ByteCode(_) => CelValue::from_type("bytecode"),
+            CelValue::Int(_) => CelValue::int_type(),
+            CelValue::UInt(_) => CelValue::uint_type(),
+            CelValue::Float(_) => CelValue::float_type(),
+            CelValue::Bool(_) => CelValue::bool_type(),
+            CelValue::String(_) => CelValue::string_type(),
+            CelValue::Bytes(_) => CelValue::bytes_type(),
+            CelValue::List(_) => CelValue::list_type(),
+            CelValue::Map(_) => CelValue::map_type(),
+            CelValue::Null => CelValue::null_type(),
+            CelValue::Ident(_) => CelValue::ident_type(),
+            CelValue::Type(_) => CelValue::type_type(),
+            CelValue::TimeStamp(_) => CelValue::timestamp_type(),
+            CelValue::Duration(_) => CelValue::duration_type(),
+            CelValue::ByteCode(_) => CelValue::bytecode_type(),
         }
     }
 }

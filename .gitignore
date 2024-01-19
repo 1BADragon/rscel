@@ -10,3 +10,6 @@ target/
 *.pdb
 
 .env/
+
+#mac shit
+.DS_Store
