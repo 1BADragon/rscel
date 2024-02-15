@@ -182,9 +182,9 @@ fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
 }
 
 fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
-    if bytecode.len() != 2 {
+    if !(bytecode.len() == 2 || bytecode.len() == 3) {
         return Err(CelError::argument(
-            "map() macro expects exactly 2 arguments",
+            "map() macro expects exactly 2 or 3 arguments",
         ));
     }
 
@@ -195,13 +195,30 @@ fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelR
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
         let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
 
-        for v in list.into_iter() {
-            // make a copy of the context to make borrow checker happy
-            bindings.bind_param(&ident_name, v.clone());
-            let interp = Interpreter::new(&cel, &bindings);
+        // optimize so we are only checking bytecode's len once
+        if bytecode.len() == 2 {
+            for v in list.into_iter() {
+                // make a copy of the context to make borrow checker happy
+                bindings.bind_param(&ident_name, v.clone());
+                let interp = Interpreter::new(&cel, &bindings);
 
-            mapped_list.push(interp.run_raw(bytecode[1], true)?);
+                // bytecode.len() should either be 2 or 3 at this point
+                mapped_list.push(interp.run_raw(bytecode[1], true)?);
+            }
+        } else if bytecode.len() == 3 {
+            for v in list.into_iter() {
+                // make a copy of the context to make borrow checker happy
+                bindings.bind_param(&ident_name, v.clone());
+                let interp = Interpreter::new(&cel, &bindings);
+
+                if interp.run_raw(bytecode[1], true)?.is_truthy() {
+                    mapped_list.push(interp.run_raw(bytecode[2], true)?);
+                }
+            }
+        } else {
+            return Err(CelError::internal("Bytecode len check failed"));
         }
+
         Ok(mapped_list.into())
     } else {
         Err(CelError::value("map() only available on list"))
