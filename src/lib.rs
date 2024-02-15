@@ -101,6 +101,7 @@ mod test {
     #[test_case("4+2*6-5", 11.into(); "test op order")]
     #[test_case("4-2+5*2", (12).into(); "test op order 2")]
     #[test_case("[1, 2, 3].map(x, x+2)", CelValue::from_list(vec![3.into(), 4.into(), 5.into()]); "test map")]
+    #[test_case("[1, 2, 3].map(x, x % 2 == 1, x + 1)", CelValue::from_list(vec![2.into(), 4.into()]); "test map 2")]
     #[test_case("[1,2,3][1]", 2.into(); "array index")]
     #[test_case("{\"foo\": 3}.foo", 3.into(); "obj dot access")]
     #[test_case("size([1,2,3,4])", 4u64.into(); "test list size")]
