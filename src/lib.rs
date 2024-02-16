@@ -22,7 +22,7 @@
 //! ctx.add_program_str("main", "foo + 3").unwrap();
 //! exec_ctx.bind_param("foo", 3.into()); // 3 converted to CelValue
 //!
-//! let res = ctx.exec("main", &exec_ctx).unwrap(); // ValueCell::Int(6)
+//! let res = ctx.exec("main", &exec_ctx).unwrap(); // CelValue::Int(6)
 //! assert!(TryInto::<i64>::try_into(res).unwrap() == 6);
 //! ```
 
