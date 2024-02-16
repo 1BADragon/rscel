@@ -40,14 +40,16 @@ impl<'a, 'b> InterpStack<'a, 'b> {
                     if let CelValue::Ident(name) = val {
                         if let Some(val) = self.ctx.get_param_by_name(&name) {
                             return Ok(CelStackValue::Value(val.clone()));
-                        } else if let Some(ctx) = self.ctx.cel {
+                        }
+
+                        if let Some(ctx) = self.ctx.cel {
                             // Allow for loaded programs to run as values
                             if let Some(prog) = ctx.get_program(&name) {
                                 return self.ctx.run_raw(prog.bytecode(), true).map(|x| x.into());
                             }
                         }
 
-                        return Err(CelError::binding(&name));
+                        Err(CelError::binding(&name))
                     } else {
                         Ok(val.into())
                     }
@@ -205,6 +207,48 @@ impl<'a> Interpreter<'a> {
 
                     stack.push_val((v1 % v2)?);
                 }
+                ByteCode::Lt => {
+                    let v2 = stack.pop_val()?;
+                    let v1 = stack.pop_val()?;
+
+                    stack.push_val(v1.lt(&v2)?);
+                }
+                ByteCode::Le => {
+                    let v2 = stack.pop_val()?;
+                    let v1 = stack.pop_val()?;
+
+                    stack.push_val(v1.le(&v2)?);
+                }
+                ByteCode::Eq => {
+                    let v2 = stack.pop_val()?;
+                    let v1 = stack.pop_val()?;
+
+                    stack.push_val(v1.eq(&v2)?);
+                }
+                ByteCode::Ne => {
+                    let v2 = stack.pop_val()?;
+                    let v1 = stack.pop_val()?;
+
+                    stack.push_val(v1.neq(&v2)?);
+                }
+                ByteCode::Ge => {
+                    let v2 = stack.pop_val()?;
+                    let v1 = stack.pop_val()?;
+
+                    stack.push_val(v1.ge(&v2)?);
+                }
+                ByteCode::Gt => {
+                    let v2 = stack.pop_val()?;
+                    let v1 = stack.pop_val()?;
+
+                    stack.push_val(v1.gt(&v2)?);
+                }
+                ByteCode::In => {
+                    let rhs = stack.pop_val()?;
+                    let lhs = stack.pop_val()?;
+
+                    stack.push_val(lhs.in_(&rhs)?);
+                }
                 ByteCode::Jmp(dist) => pc = pc + *dist as usize,
                 ByteCode::JmpCond {
                     when,
@@ -251,48 +295,6 @@ impl<'a> Interpreter<'a> {
                     if *leave_val {
                         stack.push_val(v1);
                     }
-                }
-                ByteCode::Lt => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
-
-                    stack.push_val(v1.lt(&v2)?);
-                }
-                ByteCode::Le => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
-
-                    stack.push_val(v1.le(&v2)?);
-                }
-                ByteCode::Eq => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
-
-                    stack.push_val(v1.eq(&v2)?);
-                }
-                ByteCode::Ne => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
-
-                    stack.push_val(v1.neq(&v2)?);
-                }
-                ByteCode::Ge => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
-
-                    stack.push_val(v1.ge(&v2)?);
-                }
-                ByteCode::Gt => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
-
-                    stack.push_val(v1.gt(&v2)?);
-                }
-                ByteCode::In => {
-                    let rhs = stack.pop_val()?;
-                    let lhs = stack.pop_val()?;
-
-                    stack.push_val(lhs.in_(&rhs)?);
                 }
                 ByteCode::MkList(size) => {
                     let mut v = Vec::new();

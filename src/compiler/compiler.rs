@@ -24,14 +24,6 @@ impl<'l> CelCompiler<'l> {
 
         let prog = res.into_program(self.tokenizer.source().to_string(), ast);
 
-        #[cfg(feature = "debug_output")]
-        {
-            println!(
-                "Built program:\n{}",
-                serde_json::to_string_pretty(&prog).unwrap()
-            );
-        }
-
         Ok(prog)
     }
 
@@ -270,7 +262,7 @@ impl<'l> CelCompiler<'l> {
             }
         }
 
-        return Ok((current_node, current_ast));
+        Ok((current_node, current_ast))
     }
 
     fn parse_addition(&mut self) -> CelResult<(ParseResult, AstNode<Addition>)> {
@@ -387,7 +379,7 @@ impl<'l> CelCompiler<'l> {
             }
         }
 
-        return Ok((current_node, current_ast));
+        Ok((current_node, current_ast))
     }
 
     fn parse_unary(&mut self) -> CelResult<(ParseResult, AstNode<Unary>)> {
@@ -552,12 +544,12 @@ impl<'l> CelCompiler<'l> {
 
                 let token = self.tokenizer.next()?;
                 if token != Some(Token::RParen) {
-                    return Err(SyntaxError::from_location(self.tokenizer.location())
+                    Err(SyntaxError::from_location(self.tokenizer.location())
                         .with_message(format!(
                             "Unexpected token {}, expected RPARAN",
                             &token.map_or("NOTHING".to_string(), |x| format!("{:?}", x))
                         ))
-                        .into());
+                        .into())
                 } else {
                     let (child, child_ast) = self.parse_member_prime()?;
                     Ok((
@@ -599,14 +591,12 @@ impl<'l> CelCompiler<'l> {
                             ),
                         ))
                     }
-                    _ => {
-                        return Err(SyntaxError::from_location(self.tokenizer.location())
-                            .with_message(format!(
-                                "Unexpected token {}, expected RPARAN",
-                                &next_token.map_or("NOTHING".to_string(), |x| format!("{:?}", x))
-                            ))
-                            .into())
-                    }
+                    _ => Err(SyntaxError::from_location(self.tokenizer.location())
+                        .with_message(format!(
+                            "Unexpected token {}, expected RPARAN",
+                            &next_token.map_or("NOTHING".to_string(), |x| format!("{:?}", x))
+                        ))
+                        .into()),
                 }
             }
             _ => Ok((
