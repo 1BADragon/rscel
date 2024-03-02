@@ -15,6 +15,7 @@ const DEFAULT_MACROS: &[(&str, &'static RsCelMacro)] = &[
     ("filter", &filter_impl),
     ("map", &map_impl),
     ("reduce", &reduce_impl),
+    ("coalesce", &coalesce_impl),
 ];
 
 pub fn load_default_macros(exec_ctx: &mut BindContext) {
@@ -234,4 +235,24 @@ fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
     } else {
         Err(CelError::value("reduce() only availble on list"))
     }
+}
+
+fn coalesce_impl(
+    ctx: &Interpreter,
+    _this: CelValue,
+    bytecode: &[&[ByteCode]],
+) -> CelResult<CelValue> {
+    for arg in bytecode.iter() {
+        let res = ctx.run_raw(arg, true);
+        match res {
+            Ok(CelValue::Null) => {}
+            Err(err) => match err {
+                CelError::Binding { .. } | CelError::Attribute { .. } => {}
+                _ => return Err(err),
+            },
+            Ok(v) => return Ok(v),
+        };
+    }
+
+    Ok(CelValue::from_null())
 }

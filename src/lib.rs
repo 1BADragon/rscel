@@ -68,7 +68,7 @@ mod test {
     };
     use chrono::{DateTime, TimeZone, Utc};
     use serde_json::Value;
-    use std::{assert, assert_eq, collections::HashMap};
+    use std::{assert, assert_eq, collections::HashMap, str::FromStr};
     use test_case::test_case;
 
     #[test]
@@ -189,6 +189,10 @@ mod test {
     #[test_case("type(true) != double", true.into(); "bool type neq 2")]
     #[test_case("type([1,2,3]) == type([])", true.into(); "list type neq")]
     #[test_case("type({'foo': 3}) == type({})", true.into(); "map type neq")]
+    #[test_case("coalesce()", CelValue::from_null(); "coalesce none")]
+    #[test_case("coalesce(null, 3)", 3.into(); "coalesce explicit null")]
+    #[test_case("coalesce(foo, 4)", 4.into(); "coalesce unbound var")]
+    #[test_case("coalesce(1, 2, 3)", 1.into(); "coalesce first val ok")]
     fn test_equation(prog: &str, res: CelValue) {
         let mut ctx = CelContext::new();
         let exec_ctx = BindContext::new();
@@ -394,6 +398,26 @@ mod test {
             println!("{}:{} == {}", prog.0, res, prog.1);
             assert!(res == prog.1.into());
         }
+    }
+
+    #[test]
+    fn test_coalesce() {
+        let mut ctx = CelContext::new();
+        let mut exec = BindContext::new();
+
+        exec.bind_params_from_json_obj(
+            Value::from_str("{\"foo\": 4, \"bar\":{\"a\": 3}}").unwrap(),
+        )
+        .unwrap();
+
+        ctx.add_program_str("prog1", "coalesce(foo, 3)").unwrap();
+        ctx.add_program_str("prog2", "coalesce(bar.a, 4)").unwrap();
+        ctx.add_program_str("prog3", "coalesce(bar.b, bar.a)")
+            .unwrap();
+
+        assert_eq!(ctx.exec("prog1", &exec).unwrap(), 4.into());
+        assert_eq!(ctx.exec("prog2", &exec).unwrap(), 3.into());
+        assert_eq!(ctx.exec("prog3", &exec).unwrap(), 3.into());
     }
 }
 
