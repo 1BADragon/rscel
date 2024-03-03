@@ -6,10 +6,10 @@ default: build
 build:
 	cargo build $(CARGO_ARGS)
 
-test:
+run-tests:
 	cargo test $(CARGO_ARGS)
 
-test-all: test
+run-all-tests: run-tests
 	cargo test --no-default-features $(CARGO_ARGS)
 
 .env:
