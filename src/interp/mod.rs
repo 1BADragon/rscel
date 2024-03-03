@@ -377,6 +377,16 @@ impl<'a> Interpreter<'a> {
                                     }
                                 },
                             }
+                        } else if let CelValue::Message(msg) = obj {
+                            let desc = msg.descriptor_dyn();
+
+                            if let Some(field) = desc.field_by_name(ident.as_str()) {
+                                stack.push_val(
+                                    field.get_singular_field_or_default(msg.as_ref()).into(),
+                                )
+                            } else {
+                                return Err(CelError::attribute("msg", ident.as_str()));
+                            }
                         } else if let Some(bindings) = self.bindings {
                             if bindings.get_func(ident.as_str()).is_some()
                                 || bindings.get_macro(ident.as_str()).is_some()

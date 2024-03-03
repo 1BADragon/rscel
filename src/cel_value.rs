@@ -1,4 +1,8 @@
 use chrono::{offset::Utc, DateTime, Duration, FixedOffset};
+use protobuf::{
+    reflect::{EnumDescriptor, MessageDescriptor, ReflectValueRef},
+    MessageDyn,
+};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::{
@@ -19,7 +23,7 @@ use crate::{interp::ByteCode, CelError, CelResult};
 /// Houses all possible types and implements most of the valid operations within the
 /// interpreter
 #[serde_as]
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum CelValue {
     Int(i64),
     UInt(u64),
@@ -37,6 +41,13 @@ pub enum CelValue {
     #[serde(skip_serializing, skip_deserializing)]
     Duration(Duration),
     ByteCode(Vec<ByteCode>),
+    #[serde(skip_serializing, skip_deserializing)]
+    Message(Box<dyn MessageDyn>),
+    #[serde(skip_serializing, skip_deserializing)]
+    Enum {
+        descriptor: EnumDescriptor,
+        value: i32,
+    },
 }
 
 impl CelValue {
@@ -98,6 +109,14 @@ impl CelValue {
 
     pub fn from_ident(val: &str) -> CelValue {
         CelValue::Ident(val.to_owned())
+    }
+
+    pub fn from_proto_msg(val: Box<dyn MessageDyn>) -> CelValue {
+        CelValue::Message(val)
+    }
+
+    pub fn from_proto_enum(descriptor: EnumDescriptor, value: i32) -> CelValue {
+        CelValue::Enum { descriptor, value }
     }
 
     pub fn from_type(val: &str) -> CelValue {
@@ -180,6 +199,14 @@ impl CelValue {
         CelValue::from_type("bytecode")
     }
 
+    pub fn message_type(desc: &MessageDescriptor) -> CelValue {
+        CelValue::Type(format!("message-{}", desc.full_name()))
+    }
+
+    pub fn enum_type(desc: &EnumDescriptor) -> CelValue {
+        CelValue::Type(format!("enum-{}", desc.full_name()))
+    }
+
     pub fn is_truthy(&self) -> bool {
         match self {
             CelValue::Int(i) => *i != 0,
@@ -194,6 +221,11 @@ impl CelValue {
             CelValue::Type(_) => true,
             CelValue::TimeStamp(_) => true,
             CelValue::Duration(_) => true,
+            CelValue::Enum {
+                descriptor: _,
+                value,
+            } => *value != 0,
+            CelValue::Message(_) => true,
             _ => false,
         }
     }
@@ -285,9 +317,9 @@ impl CelValue {
             }
         } else if let CelValue::Null = lhs.as_ref() {
             if let CelValue::Null = rhs.as_ref() {
-                return Ok(CelValue::true_());
+                Ok(CelValue::true_())
             } else {
-                return Ok(CelValue::false_());
+                Ok(CelValue::false_())
             }
         } else if let (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) =
             (lhs.as_ref(), rhs.as_ref())
@@ -298,6 +330,37 @@ impl CelValue {
             Ok(CelValue::from_bool(l == r))
         } else if let (CelValue::Type(l), CelValue::Type(r)) = (lhs.as_ref(), rhs.as_ref()) {
             Ok(CelValue::from_bool(l == r))
+        } else if let (CelValue::Message(l), CelValue::Message(r)) = (lhs.as_ref(), rhs.as_ref()) {
+            Ok(CelValue::from_bool(
+                l.descriptor_dyn().eq(l.as_ref(), r.as_ref()),
+            ))
+        } else if let CelValue::Enum {
+            descriptor: l_desc,
+            value: l_value,
+        } = lhs.as_ref()
+        {
+            if let CelValue::Enum {
+                descriptor: r_desc,
+                value: r_value,
+            } = rhs.as_ref()
+            {
+                Ok(CelValue::from_bool(l_value == r_value && l_desc == r_desc))
+            } else if let CelValue::Int(intval) = rhs.as_ref() {
+                Ok(CelValue::from_bool(*intval == (*l_value as i64)))
+            } else if let CelValue::UInt(intval) = rhs.as_ref() {
+                Ok(CelValue::from_bool(*intval == (*l_value as u64)))
+            } else if let CelValue::String(strval) = rhs.as_ref() {
+                if let Some(_) = l_desc.value_by_name(strval) {
+                    Ok(CelValue::true_())
+                } else {
+                    Ok(CelValue::false_())
+                }
+            } else {
+                Err(CelError::invalid_op(&format!(
+                    "Invalid op '==' between {:?} and {:?}",
+                    type1, type2
+                )))
+            }
         } else {
             Err(CelError::invalid_op(&format!(
                 "Invalid op '==' between {:?} and {:?}",
@@ -370,19 +433,19 @@ impl CelValue {
     pub fn or(&self, rhs: &CelValue) -> CelResult<CelValue> {
         if cfg!(feature = "type_prop") {
             return Ok((self.is_truthy() || rhs.is_truthy()).into());
-        } else {
-            if let CelValue::Bool(lhs) = self {
-                if let CelValue::Bool(rhs) = rhs {
-                    return Ok((*lhs || *rhs).into());
-                }
+        }
+
+        if let CelValue::Bool(lhs) = self {
+            if let CelValue::Bool(rhs) = rhs {
+                return Ok((*lhs || *rhs).into());
             }
         }
 
-        return Err(CelError::invalid_op(&format!(
+        Err(CelError::invalid_op(&format!(
             "|| operator invalid for {:?} and {:?}",
             self.as_type(),
             rhs.as_type(),
-        )));
+        )))
     }
 
     pub fn in_(&self, rhs: &CelValue) -> CelResult<CelValue> {
@@ -419,31 +482,29 @@ impl CelValue {
                     )))
                 }
             }
-            _ => {
-                return Err(CelError::invalid_op(&format!(
-                    "Op 'in' invalid between {:?} and {:?}",
-                    lhs_type, rhs_type
-                )));
-            }
+            _ => Err(CelError::invalid_op(&format!(
+                "Op 'in' invalid between {:?} and {:?}",
+                lhs_type, rhs_type
+            ))),
         }
     }
 
     pub fn and(&self, rhs: &CelValue) -> CelResult<CelValue> {
         if cfg!(feature = "type_prop") {
             return Ok((self.is_truthy() && rhs.is_truthy()).into());
-        } else {
-            if let CelValue::Bool(lhs) = self {
-                if let CelValue::Bool(rhs) = rhs {
-                    return Ok((*lhs && *rhs).into());
-                }
+        }
+
+        if let CelValue::Bool(lhs) = self {
+            if let CelValue::Bool(rhs) = rhs {
+                return Ok((*lhs && *rhs).into());
             }
         }
 
-        return Err(CelError::invalid_op(&format!(
+        Err(CelError::invalid_op(&format!(
             "&& operator invalid for {:?} and {:?}",
             self.as_type(),
             rhs.as_type(),
-        )));
+        )))
     }
 
     pub fn as_type(&self) -> CelValue {
@@ -462,6 +523,11 @@ impl CelValue {
             CelValue::TimeStamp(_) => CelValue::timestamp_type(),
             CelValue::Duration(_) => CelValue::duration_type(),
             CelValue::ByteCode(_) => CelValue::bytecode_type(),
+            CelValue::Message(msg) => CelValue::message_type(&msg.descriptor_dyn()),
+            CelValue::Enum {
+                descriptor,
+                value: _value,
+            } => CelValue::enum_type(&descriptor),
         }
     }
 }
@@ -472,9 +538,13 @@ impl From<&Value> for CelValue {
             Value::Number(val) => {
                 if let Some(val) = val.as_i64() {
                     return CelValue::from_int(val);
-                } else if let Some(val) = val.as_u64() {
+                }
+
+                if let Some(val) = val.as_u64() {
                     return CelValue::from_uint(val);
-                } else if let Some(val) = val.as_f64() {
+                }
+
+                if let Some(val) = val.as_f64() {
                     return CelValue::from_float(val);
                 }
 
@@ -506,9 +576,13 @@ impl From<Value> for CelValue {
             Value::Number(val) => {
                 if let Some(val) = val.as_i64() {
                     return CelValue::from_int(val);
-                } else if let Some(val) = val.as_u64() {
+                }
+
+                if let Some(val) = val.as_u64() {
                     return CelValue::from_uint(val);
-                } else if let Some(val) = val.as_f64() {
+                }
+
+                if let Some(val) = val.as_f64() {
                     return CelValue::from_float(val);
                 }
 
@@ -530,6 +604,27 @@ impl From<Value> for CelValue {
 
                 CelValue::from_map(map)
             }
+        }
+    }
+}
+
+impl<'a> From<ReflectValueRef<'a>> for CelValue {
+    fn from(value: ReflectValueRef) -> Self {
+        match value {
+            ReflectValueRef::U32(u) => CelValue::UInt(u as u64),
+            ReflectValueRef::U64(u) => CelValue::UInt(u),
+            ReflectValueRef::I32(i) => CelValue::Int(i as i64),
+            ReflectValueRef::I64(i) => CelValue::Int(i),
+            ReflectValueRef::F32(f) => CelValue::Float(f as f64),
+            ReflectValueRef::F64(f) => CelValue::Float(f),
+            ReflectValueRef::Bool(b) => CelValue::Bool(b),
+            ReflectValueRef::String(s) => CelValue::String(s.to_string()),
+            ReflectValueRef::Bytes(b) => CelValue::Bytes(b.to_owned()),
+            ReflectValueRef::Enum(desc, value) => CelValue::Enum {
+                descriptor: desc,
+                value,
+            },
+            ReflectValueRef::Message(msg) => CelValue::Message(msg.clone_box()),
         }
     }
 }
@@ -566,7 +661,7 @@ impl TryInto<i64> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::internal("Convertion Error"));
+        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -602,7 +697,7 @@ impl TryInto<u64> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::internal("Convertion Error"));
+        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -620,7 +715,7 @@ impl TryInto<f64> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::internal("Convertion Error"));
+        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -638,7 +733,7 @@ impl TryInto<bool> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::internal("Convertion Error"));
+        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -662,7 +757,7 @@ impl TryInto<String> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::internal("Convertion Error"));
+        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -686,7 +781,7 @@ impl TryInto<Vec<u8>> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::internal("Convertion Error"));
+        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -710,7 +805,7 @@ impl TryInto<Vec<CelValue>> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::internal("Convertion Error"));
+        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -728,7 +823,7 @@ impl TryInto<HashMap<String, CelValue>> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::internal("Convertion Error"));
+        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -752,7 +847,7 @@ impl TryInto<DateTime<Utc>> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::internal("Convertion Error"));
+        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -770,7 +865,7 @@ impl TryInto<Duration> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::internal("Convertion Error"));
+        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -788,7 +883,57 @@ impl TryInto<Vec<ByteCode>> for CelValue {
             return Ok(val);
         }
 
-        return Err(CelError::internal("Convertion Error"));
+        Err(CelError::internal("Convertion Error"))
+    }
+}
+
+impl PartialEq for CelValue {
+    fn eq(&self, other: &Self) -> bool {
+        if let (CelValue::Int(lhs), CelValue::Int(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::UInt(lhs), CelValue::UInt(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::Float(lhs), CelValue::Float(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::Bool(lhs), CelValue::Bool(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::String(lhs), CelValue::String(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::Bytes(lhs), CelValue::Bytes(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::List(lhs), CelValue::List(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::Map(lhs), CelValue::Map(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::Null, CelValue::Null) = (self, other) {
+            true
+        } else if let (CelValue::Ident(lhs), CelValue::Ident(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::Type(lhs), CelValue::Type(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::TimeStamp(lhs), CelValue::TimeStamp(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::Duration(lhs), CelValue::Duration(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::ByteCode(lhs), CelValue::ByteCode(rhs)) = (self, other) {
+            lhs == rhs
+        } else if let (CelValue::Message(lhs), CelValue::Message(rhs)) = (self, other) {
+            lhs.descriptor_dyn().eq(lhs.as_ref(), rhs.as_ref())
+        } else if let (
+            CelValue::Enum {
+                descriptor: lhs_descriptor,
+                value: lhs_value,
+            },
+            CelValue::Enum {
+                descriptor: rhs_descriptor,
+                value: rhs_value,
+            },
+        ) = (self, other)
+        {
+            lhs_value == rhs_value && lhs_descriptor == rhs_descriptor
+        } else {
+            false
+        }
     }
 }
 
@@ -1090,6 +1235,14 @@ impl fmt::Display for CelValue {
             TimeStamp(val) => write!(f, "{}", val),
             Duration(val) => write!(f, "{}", val),
             ByteCode(val) => write!(f, "{:?}", val),
+            Message(msg) => write!(f, "{}", msg.as_ref()),
+            Enum { descriptor, value } => {
+                if let Some(v) = descriptor.value_by_number(*value) {
+                    write!(f, "{}::{} ({})", descriptor.full_name(), v.name(), value)
+                } else {
+                    write!(f, "{}::({})", descriptor.full_name(), value)
+                }
+            }
         }
     }
 }
