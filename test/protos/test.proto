@@ -19,4 +19,9 @@ message TestMessage1 {
   MyEnum enum_field = 3;
 
   TestMessage1 nested_field = 4;
+
+  oneof oneof_field {
+    int32 oneof_field1 = 5;
+    string oneof_field2 = 6;
+  }
 }
