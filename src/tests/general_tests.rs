@@ -4,7 +4,7 @@ use crate::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::Value;
-use std::{assert, assert_eq, collections::HashMap, str::FromStr};
+use std::{assert, assert_eq, collections::HashMap, str::FromStr, sync::Arc};
 use test_case::test_case;
 
 #[test]
@@ -352,4 +352,20 @@ fn test_coalesce() {
     assert_eq!(ctx.exec("prog1", &exec).unwrap(), 4.into());
     assert_eq!(ctx.exec("prog2", &exec).unwrap(), 3.into());
     assert_eq!(ctx.exec("prog3", &exec).unwrap(), 3.into());
+}
+
+#[test]
+fn test_dyn_value() {
+    let mut ctx = CelContext::new();
+    let mut exec = BindContext::new();
+
+    ctx.add_program_str("main", "foo.bar")
+        .expect("Failed to compile prog");
+
+    let mut inner_map = HashMap::new();
+    inner_map.insert("bar".to_string(), 5.into());
+    let foo = CelValue::Dyn(Arc::new(CelValue::from_map(inner_map)));
+
+    exec.bind_param("foo", foo);
+    assert_eq!(ctx.exec("main", &exec).unwrap(), 5.into());
 }
