@@ -12,16 +12,20 @@ use std::{
     fmt,
     iter::zip,
     ops::{Add, Div, Mul, Neg, Not, Rem, Sub},
+    rc::Rc,
 };
 
 use serde_json::value::Value;
 
-use crate::{interp::ByteCode, CelError, CelResult};
+use crate::{interp::ByteCode, CelError, CelResult, CelValueDyn};
 
 /// The basic value of the CEL interpreter.
 ///
 /// Houses all possible types and implements most of the valid operations within the
 /// interpreter
+// Only the enum values that are also part of the language are serializable, aka int
+// because int literals can exist. If you can't represent it as part of the language
+// it doesn't need to be serialized
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum CelValue {
@@ -48,6 +52,8 @@ pub enum CelValue {
         descriptor: EnumDescriptor,
         value: i32,
     },
+    #[serde(skip_serializing, skip_deserializing)]
+    Dyn(Rc<dyn CelValueDyn>),
 }
 
 impl CelValue {
@@ -528,6 +534,7 @@ impl CelValue {
                 descriptor,
                 value: _value,
             } => CelValue::enum_type(&descriptor),
+            CelValue::Dyn(obj) => obj.as_type(),
         }
     }
 }
@@ -1243,6 +1250,7 @@ impl fmt::Display for CelValue {
                     write!(f, "{}::({})", descriptor.full_name(), value)
                 }
             }
+            Dyn(val) => write!(f, "{}", val.as_ref()),
         }
     }
 }

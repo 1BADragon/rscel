@@ -55,6 +55,7 @@
 #![cfg_attr(feature = "python", feature(unboxed_closures))]
 mod cel_error;
 mod cel_value;
+mod cel_value_dyn;
 mod compiler;
 mod context;
 mod interp;
@@ -64,6 +65,7 @@ mod program;
 pub mod utils;
 pub use cel_error::{CelError, CelResult};
 pub use cel_value::CelValue;
+pub use cel_value_dyn::CelValueDyn;
 pub use compiler::{
     compiler::CelCompiler, string_tokenizer::StringTokenizer, tokenizer::Tokenizer,
 };
