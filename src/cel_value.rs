@@ -6,13 +6,14 @@ use protobuf::{
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::{
+    any::Any,
     borrow::{Cow, ToOwned},
     cmp::Ordering,
     collections::HashMap,
     fmt,
     iter::zip,
     ops::{Add, Div, Mul, Neg, Not, Rem, Sub},
-    rc::Rc,
+    sync::Arc,
 };
 
 use serde_json::value::Value;
@@ -53,7 +54,7 @@ pub enum CelValue {
         value: i32,
     },
     #[serde(skip_serializing, skip_deserializing)]
-    Dyn(Rc<dyn CelValueDyn>),
+    Dyn(Arc<dyn CelValueDyn>),
 }
 
 impl CelValue {
@@ -213,29 +214,6 @@ impl CelValue {
         CelValue::Type(format!("enum-{}", desc.full_name()))
     }
 
-    pub fn is_truthy(&self) -> bool {
-        match self {
-            CelValue::Int(i) => *i != 0,
-            CelValue::UInt(u) => *u != 0,
-            CelValue::Float(f) => *f != 0.0,
-            CelValue::Bool(b) => *b,
-            CelValue::String(s) => s.len() != 0,
-            CelValue::Bytes(b) => b.len() != 0,
-            CelValue::List(l) => l.len() != 0,
-            CelValue::Map(m) => m.len() != 0,
-            CelValue::Null => false,
-            CelValue::Type(_) => true,
-            CelValue::TimeStamp(_) => true,
-            CelValue::Duration(_) => true,
-            CelValue::Enum {
-                descriptor: _,
-                value,
-            } => *value != 0,
-            CelValue::Message(_) => true,
-            _ => false,
-        }
-    }
-
     pub fn is_null(&self) -> bool {
         if let CelValue::Null = self {
             true
@@ -285,98 +263,8 @@ impl CelValue {
         }
     }
 
-    pub fn eq(&self, rhs_val: &CelValue) -> CelResult<CelValue> {
-        let type1 = self.as_type();
-        let type2 = rhs_val.as_type();
-
-        let (lhs, rhs) = CelValue::type_prop(Cow::Borrowed(self), Cow::Borrowed(rhs_val));
-
-        if let (CelValue::Int(l), CelValue::Int(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            Ok(CelValue::from_bool(l == r))
-        } else if let (CelValue::UInt(l), CelValue::UInt(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            Ok(CelValue::from_bool(l == r))
-        } else if let (CelValue::Float(l), CelValue::Float(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            Ok(CelValue::from_bool(l == r))
-        } else if let (CelValue::Bool(l), CelValue::Bool(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            Ok(CelValue::from_bool(l == r))
-        } else if let (CelValue::String(l), CelValue::String(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            Ok(CelValue::from_bool(l == r))
-        } else if let (CelValue::Bytes(l), CelValue::Bytes(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            Ok(CelValue::from_bool(l == r))
-        } else if let (CelValue::List(l), CelValue::List(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            if l.len() != r.len() {
-                Ok(false.into())
-            } else {
-                for (v1, v2) in zip(l, r) {
-                    match v1.eq(&v2) {
-                        Ok(res_cell) => {
-                            if let CelValue::Bool(res) = res_cell {
-                                if !res {
-                                    return Ok(CelValue::false_());
-                                }
-                            }
-                        }
-                        Err(_) => return Ok(CelValue::false_()),
-                    }
-                }
-                Ok(CelValue::true_())
-            }
-        } else if let CelValue::Null = lhs.as_ref() {
-            if let CelValue::Null = rhs.as_ref() {
-                Ok(CelValue::true_())
-            } else {
-                Ok(CelValue::false_())
-            }
-        } else if let (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) =
-            (lhs.as_ref(), rhs.as_ref())
-        {
-            Ok(CelValue::from_bool(l == r))
-        } else if let (CelValue::Duration(l), CelValue::Duration(r)) = (lhs.as_ref(), rhs.as_ref())
-        {
-            Ok(CelValue::from_bool(l == r))
-        } else if let (CelValue::Type(l), CelValue::Type(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            Ok(CelValue::from_bool(l == r))
-        } else if let (CelValue::Message(l), CelValue::Message(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            Ok(CelValue::from_bool(
-                l.descriptor_dyn().eq(l.as_ref(), r.as_ref()),
-            ))
-        } else if let CelValue::Enum {
-            descriptor: l_desc,
-            value: l_value,
-        } = lhs.as_ref()
-        {
-            if let CelValue::Enum {
-                descriptor: r_desc,
-                value: r_value,
-            } = rhs.as_ref()
-            {
-                Ok(CelValue::from_bool(l_value == r_value && l_desc == r_desc))
-            } else if let CelValue::Int(intval) = rhs.as_ref() {
-                Ok(CelValue::from_bool(*intval == (*l_value as i64)))
-            } else if let CelValue::UInt(intval) = rhs.as_ref() {
-                Ok(CelValue::from_bool(*intval == (*l_value as u64)))
-            } else if let CelValue::String(strval) = rhs.as_ref() {
-                if let Some(_) = l_desc.value_by_name(strval) {
-                    Ok(CelValue::true_())
-                } else {
-                    Ok(CelValue::false_())
-                }
-            } else {
-                Err(CelError::invalid_op(&format!(
-                    "Invalid op '==' between {:?} and {:?}",
-                    type1, type2
-                )))
-            }
-        } else {
-            Err(CelError::invalid_op(&format!(
-                "Invalid op '==' between {:?} and {:?}",
-                type1, type2
-            )))
-        }
-    }
-
     pub fn neq(&self, rhs: &CelValue) -> CelResult<CelValue> {
-        if let CelValue::Bool(res) = self.eq(rhs)? {
+        if let CelValue::Bool(res) = CelValueDyn::eq(self, rhs)? {
             return Ok(CelValue::from_bool(!res));
         }
 
@@ -512,8 +400,10 @@ impl CelValue {
             rhs.as_type(),
         )))
     }
+}
 
-    pub fn as_type(&self) -> CelValue {
+impl CelValueDyn for CelValue {
+    fn as_type(&self) -> CelValue {
         match self {
             CelValue::Int(_) => CelValue::int_type(),
             CelValue::UInt(_) => CelValue::uint_type(),
@@ -536,6 +426,150 @@ impl CelValue {
             } => CelValue::enum_type(&descriptor),
             CelValue::Dyn(obj) => obj.as_type(),
         }
+    }
+
+    fn access(&self, key: &str) -> CelResult<CelValue> {
+        let self_type = self.as_type();
+
+        if let CelValue::Map(ref map) = self {
+            match map.get(key) {
+                Some(val) => Ok(val.clone()),
+                None => Err(CelError::attribute("obj", key)),
+            }
+        } else if let CelValue::Message(msg) = self {
+            let desc = msg.descriptor_dyn();
+
+            if let Some(field) = desc.field_by_name(key) {
+                Ok(field.get_singular_field_or_default(msg.as_ref()).into())
+            } else {
+                Err(CelError::attribute("msg", key))
+            }
+        } else {
+            Err(CelError::invalid_op(&format!(
+                "Access invalid on type {}",
+                self_type
+            )))
+        }
+    }
+
+    fn eq(&self, rhs_val: &CelValue) -> CelResult<CelValue> {
+        let type1 = self.as_type();
+        let type2 = rhs_val.as_type();
+
+        let (lhs, rhs) = CelValue::type_prop(Cow::Borrowed(self), Cow::Borrowed(rhs_val));
+
+        if let (CelValue::Int(l), CelValue::Int(r)) = (lhs.as_ref(), rhs.as_ref()) {
+            Ok(CelValue::from_bool(l == r))
+        } else if let (CelValue::UInt(l), CelValue::UInt(r)) = (lhs.as_ref(), rhs.as_ref()) {
+            Ok(CelValue::from_bool(l == r))
+        } else if let (CelValue::Float(l), CelValue::Float(r)) = (lhs.as_ref(), rhs.as_ref()) {
+            Ok(CelValue::from_bool(l == r))
+        } else if let (CelValue::Bool(l), CelValue::Bool(r)) = (lhs.as_ref(), rhs.as_ref()) {
+            Ok(CelValue::from_bool(l == r))
+        } else if let (CelValue::String(l), CelValue::String(r)) = (lhs.as_ref(), rhs.as_ref()) {
+            Ok(CelValue::from_bool(l == r))
+        } else if let (CelValue::Bytes(l), CelValue::Bytes(r)) = (lhs.as_ref(), rhs.as_ref()) {
+            Ok(CelValue::from_bool(l == r))
+        } else if let (CelValue::List(l), CelValue::List(r)) = (lhs.as_ref(), rhs.as_ref()) {
+            if l.len() != r.len() {
+                Ok(false.into())
+            } else {
+                for (v1, v2) in zip(l, r) {
+                    match CelValueDyn::eq(v1, &v2) {
+                        Ok(res_cell) => {
+                            if let CelValue::Bool(res) = res_cell {
+                                if !res {
+                                    return Ok(CelValue::false_());
+                                }
+                            }
+                        }
+                        Err(_) => return Ok(CelValue::false_()),
+                    }
+                }
+                Ok(CelValue::true_())
+            }
+        } else if let CelValue::Null = lhs.as_ref() {
+            if let CelValue::Null = rhs.as_ref() {
+                Ok(CelValue::true_())
+            } else {
+                Ok(CelValue::false_())
+            }
+        } else if let (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) =
+            (lhs.as_ref(), rhs.as_ref())
+        {
+            Ok(CelValue::from_bool(l == r))
+        } else if let (CelValue::Duration(l), CelValue::Duration(r)) = (lhs.as_ref(), rhs.as_ref())
+        {
+            Ok(CelValue::from_bool(l == r))
+        } else if let (CelValue::Type(l), CelValue::Type(r)) = (lhs.as_ref(), rhs.as_ref()) {
+            Ok(CelValue::from_bool(l == r))
+        } else if let (CelValue::Message(l), CelValue::Message(r)) = (lhs.as_ref(), rhs.as_ref()) {
+            Ok(CelValue::from_bool(
+                l.descriptor_dyn().eq(l.as_ref(), r.as_ref()),
+            ))
+        } else if let CelValue::Enum {
+            descriptor: l_desc,
+            value: l_value,
+        } = lhs.as_ref()
+        {
+            if let CelValue::Enum {
+                descriptor: r_desc,
+                value: r_value,
+            } = rhs.as_ref()
+            {
+                Ok(CelValue::from_bool(l_value == r_value && l_desc == r_desc))
+            } else if let CelValue::Int(intval) = rhs.as_ref() {
+                Ok(CelValue::from_bool(*intval == (*l_value as i64)))
+            } else if let CelValue::UInt(intval) = rhs.as_ref() {
+                Ok(CelValue::from_bool(*intval == (*l_value as u64)))
+            } else if let CelValue::String(strval) = rhs.as_ref() {
+                if let Some(_) = l_desc.value_by_name(strval) {
+                    Ok(CelValue::true_())
+                } else {
+                    Ok(CelValue::false_())
+                }
+            } else {
+                Err(CelError::invalid_op(&format!(
+                    "Invalid op '==' between {:?} and {:?}",
+                    type1, type2
+                )))
+            }
+        } else if let CelValue::Dyn(d) = lhs.as_ref() {
+            d.eq(&rhs)
+        } else {
+            Err(CelError::invalid_op(&format!(
+                "Invalid op '==' between {:?} and {:?}",
+                type1, type2
+            )))
+        }
+    }
+
+    fn is_truthy(&self) -> bool {
+        match self {
+            CelValue::Int(i) => *i != 0,
+            CelValue::UInt(u) => *u != 0,
+            CelValue::Float(f) => *f != 0.0,
+            CelValue::Bool(b) => *b,
+            CelValue::String(s) => s.len() != 0,
+            CelValue::Bytes(b) => b.len() != 0,
+            CelValue::List(l) => l.len() != 0,
+            CelValue::Map(m) => m.len() != 0,
+            CelValue::Null => false,
+            CelValue::Type(_) => true,
+            CelValue::TimeStamp(_) => true,
+            CelValue::Duration(_) => true,
+            CelValue::Enum {
+                descriptor: _,
+                value,
+            } => *value != 0,
+            CelValue::Message(_) => true,
+            CelValue::Dyn(obj) => obj.is_truthy(),
+            _ => false,
+        }
+    }
+
+    fn any_ref<'a>(&'a self) -> &'a dyn Any {
+        self
     }
 }
 

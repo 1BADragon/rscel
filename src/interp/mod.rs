@@ -1,4 +1,5 @@
 mod types;
+use crate::CelValueDyn;
 use std::{collections::HashMap, fmt};
 pub use types::{ByteCode, JmpWhen};
 
@@ -223,7 +224,7 @@ impl<'a> Interpreter<'a> {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.eq(&v2)?);
+                    stack.push_val(CelValueDyn::eq(&v1, &v2)?);
                 }
                 ByteCode::Ne => {
                     let v2 = stack.pop_val()?;
@@ -387,6 +388,8 @@ impl<'a> Interpreter<'a> {
                             } else {
                                 return Err(CelError::attribute("msg", ident.as_str()));
                             }
+                        } else if let CelValue::Dyn(d) = obj {
+                            stack.push_val(d.access(ident.as_str())?);
                         } else if let Some(bindings) = self.bindings {
                             if bindings.get_func(ident.as_str()).is_some()
                                 || bindings.get_macro(ident.as_str()).is_some()

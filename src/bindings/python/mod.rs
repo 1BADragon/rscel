@@ -1,4 +1,4 @@
-use crate::{BindContext, CelContext, CelValue};
+use crate::{BindContext, CelContext, CelError, CelValue, CelValueDyn};
 
 use chrono::{DateTime, Duration, Utc};
 use pyo3::{
@@ -6,7 +6,7 @@ use pyo3::{
     prelude::*,
     types::{PyBool, PyBytes, PyDateTime, PyDelta, PyDict, PyFloat, PyInt, PyList, PyString},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 mod celpycallable;
 
@@ -143,6 +143,70 @@ fn rscel(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
+impl CelValueDyn for PyObject {
+    fn as_type(&self) -> CelValue {
+        Python::with_gil(|py| {
+            let inner = self.as_ref(py);
+            let name = inner.get_type().name().unwrap();
+
+            CelValue::Type(format!("pyobj-{}", name))
+        })
+    }
+
+    fn access(&self, key: &str) -> crate::CelResult<CelValue> {
+        Python::with_gil(|py| {
+            let obj = self.as_ref(py);
+
+            match obj.getattr(key) {
+                Ok(res) => match res.extract() {
+                    Ok(val) => Ok(val),
+                    Err(err) => Err(CelError::Misc(err.to_string())),
+                },
+                Err(err) => Err(CelError::Misc(err.to_string())),
+            }
+        })
+    }
+
+    fn eq(&self, rhs: &CelValue) -> crate::CelResult<CelValue> {
+        let lhs_type = self.as_type();
+        let rhs_type = self.as_type();
+
+        if let CelValue::Dyn(rhs) = rhs {
+            if let Some(rhs_obj) = rhs.any_ref().downcast_ref::<PyObject>() {
+                return Python::with_gil(|py| {
+                    let lhs_obj = self.as_ref(py);
+                    let rhs_obj = rhs_obj.as_ref(py);
+
+                    match lhs_obj.eq(rhs_obj) {
+                        Ok(res) => Ok(CelValue::from_bool(res)),
+                        Err(err) => Err(CelError::Misc(err.to_string())),
+                    }
+                });
+            }
+        }
+
+        Err(CelError::invalid_op(&format!(
+            "Invalid op == between {} and {}",
+            lhs_type, rhs_type
+        )))
+    }
+
+    fn is_truthy(&self) -> bool {
+        Python::with_gil(|py| {
+            let inner = self.as_ref(py);
+
+            match inner.is_true() {
+                Ok(res) => res,
+                Err(_) => false, // this is just going to have to work. Basically is the equiv of calling bool(obj) and it throwing
+            }
+        })
+    }
+
+    fn any_ref<'a>(&'a self) -> &'a dyn std::any::Any {
+        self
+    }
+}
+
 impl<'source> FromPyObject<'source> for CelValue {
     fn extract(ob: &'source PyAny) -> PyResult<Self> {
         match ob.get_type().name() {
@@ -179,10 +243,7 @@ impl<'source> FromPyObject<'source> for CelValue {
                     .into()),
                 "timedelta" => Ok(ob.downcast::<PyDelta>()?.extract::<Duration>()?.into()),
                 "NoneType" => Ok(CelValue::from_null()),
-                other => Err(PyValueError::new_err(format!(
-                    "{} is not a compatable rscel type",
-                    other
-                ))),
+                _ => Ok(CelValue::Dyn(Arc::<PyObject>::new(ob.into()))),
             },
             Err(_) => PyResult::Err(PyValueError::new_err(format!(
                 "Failed to get type from {:?}",

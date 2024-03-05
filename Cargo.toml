@@ -13,7 +13,7 @@ inherits = "release"
 debug = true
 
 [features]
-default = ["type_prop"]
+default = ["type_prop", "python"]
 ast_ser = []
 debug_output = []
 type_prop = []

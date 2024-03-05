@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::{CelError, CelResult, CelValue};
+use crate::{CelError, CelResult, CelValue, CelValueDyn};
 
 pub fn construct_type(type_name: &str, args: &[CelValue]) -> CelResult<CelValue> {
     match type_name {

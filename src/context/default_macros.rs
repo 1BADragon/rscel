@@ -2,7 +2,7 @@ use crate::{
     cel_error::{CelError, CelResult},
     interp::Interpreter,
     utils::eval_ident,
-    BindContext, ByteCode, CelContext, CelValue,
+    BindContext, ByteCode, CelContext, CelValue, CelValueDyn,
 };
 
 use super::bind_context::RsCelMacro;
