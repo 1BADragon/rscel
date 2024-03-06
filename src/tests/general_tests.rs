@@ -358,14 +358,24 @@ fn test_coalesce() {
 fn test_dyn_value() {
     let mut ctx = CelContext::new();
     let mut exec = BindContext::new();
+    let mut exec2 = BindContext::new();
 
     ctx.add_program_str("main", "foo.bar")
         .expect("Failed to compile prog");
+    ctx.add_program_str("prog2", "foo[\"bar\"]")
+        .expect("Failed to compile prog2");
 
     let mut inner_map = HashMap::new();
     inner_map.insert("bar".to_string(), 5.into());
     let foo = CelValue::Dyn(Arc::new(CelValue::from_map(inner_map)));
-
     exec.bind_param("foo", foo);
+
+    let mut inner_map = HashMap::new();
+    inner_map.insert("bar".to_string(), 5.into());
+    let foo = CelValue::from_map(inner_map);
+
+    exec2.bind_param("foo", foo);
     assert_eq!(ctx.exec("main", &exec).unwrap(), 5.into());
+    assert_eq!(ctx.exec("prog2", &exec).unwrap(), 5.into());
+    assert_eq!(ctx.exec("prog2", &exec2).unwrap(), 5.into());
 }

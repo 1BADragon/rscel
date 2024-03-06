@@ -278,6 +278,13 @@ impl ToPyObject for CelValue {
             TimeStamp(ts) => ts.to_object(py),
             Duration(d) => d.to_object(py),
             Null => py.None(),
+            Dyn(d) => match d.any_ref().downcast_ref::<PyObject>() {
+                Some(obj) => obj.clone(),
+                // This *should* never happen. If this downcase were to fail that would
+                // mean that the data in this dyn isn't a PyObject which should be impossible
+                // for these bidnings
+                None => py.None(),
+            },
             _ => py.None(),
         }
     }

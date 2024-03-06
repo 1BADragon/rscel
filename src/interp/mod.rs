@@ -352,6 +352,10 @@ impl<'a> Interpreter<'a> {
                                 }
                             }
                         }
+                    } else if let CelValue::Dyn(d) = obj {
+                        if let CelValue::String(index) = index {
+                            stack.push_val(d.access(&index)?);
+                        }
                     } else {
                         return Err(CelError::value(&format!(
                             "Index operator invalid between {:?} and {:?}",
