@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use protobuf::MessageDyn;
 use serde_json::Value;
@@ -9,8 +9,8 @@ use crate::{
     CelError, CelValue,
 };
 
-use super::default_funcs::load_default_funcs;
 use super::default_macros::load_default_macros;
+use super::{default_funcs::load_default_funcs, type_funcs::load_default_types};
 
 /// Prototype for a function binding.
 ///
@@ -62,6 +62,7 @@ pub struct BindContext<'a> {
     params: HashMap<String, CelValue>,
     funcs: HashMap<String, &'a RsCelFunction>,
     macros: HashMap<String, &'a RsCelMacro>,
+    types: HashMap<String, CelValue>,
 }
 
 impl<'a> BindContext<'a> {
@@ -71,10 +72,12 @@ impl<'a> BindContext<'a> {
             params: HashMap::new(),
             funcs: HashMap::new(),
             macros: HashMap::new(),
+            types: HashMap::new(),
         };
 
         load_default_macros(&mut ctx);
         load_default_funcs(&mut ctx);
+        load_default_types(&mut ctx);
         ctx
     }
 
@@ -131,5 +134,13 @@ impl<'a> BindContext<'a> {
         self.params.contains_key(name)
             || self.funcs.contains_key(name)
             || self.macros.contains_key(name)
+    }
+
+    pub(crate) fn add_type(&mut self, name: &str, r#type: CelValue) {
+        self.types.insert(name.to_string(), r#type);
+    }
+
+    pub(crate) fn get_type(&self, name: &str) -> Option<&CelValue> {
+        self.types.get(name)
     }
 }

@@ -98,33 +98,10 @@ impl<'l> StringTokenizer<'l> {
                     _ => Err(SyntaxError::from_location(self.scanner.location())
                         .with_message("Token & is not supported".to_string())),
                 },
-                'b' => self.parse_keywords_or_ident(
-                    "b",
-                    &[("bool", Token::Bool), ("bytes", Token::Bytes)],
-                ),
-                'd' => self.parse_keywords_or_ident(
-                    "d",
-                    &[("duration", Token::Duration), ("double", Token::Float)],
-                ),
-                'f' => self.parse_keywords_or_ident(
-                    "f",
-                    &[("float", Token::Float), ("false", Token::BoolLit(false))],
-                ),
-                'i' => self.parse_keywords_or_ident("i", &[("int", Token::Int), ("in", Token::In)]),
-                'n' => self.parse_keywords_or_ident(
-                    "n",
-                    &[("null_type", Token::NullType), ("null", Token::Null)],
-                ),
-                'u' => self.parse_keywords_or_ident("u", &[("uint", Token::Uint)]),
-                's' => self.parse_keywords_or_ident("s", &[("string", Token::String)]),
-                't' => self.parse_keywords_or_ident(
-                    "t",
-                    &[
-                        ("type", Token::Type),
-                        ("true", Token::BoolLit(true)),
-                        ("timestamp", Token::Timestamp),
-                    ],
-                ),
+                'f' => self.parse_keywords_or_ident("f", &[("false", Token::BoolLit(false))]),
+                'i' => self.parse_keywords_or_ident("i", &[("in", Token::In)]),
+                'n' => self.parse_keywords_or_ident("n", &[("null", Token::Null)]),
+                't' => self.parse_keywords_or_ident("t", &[("true", Token::BoolLit(true))]),
                 '0'..='9' => self.parse_number_or_token(
                     input_char.encode_utf8(&mut tmp),
                     Token::IntLit(input_char as i64 - '0' as i64),

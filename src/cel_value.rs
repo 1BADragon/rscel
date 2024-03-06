@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::{
     any::Any,
-    borrow::{Cow, ToOwned},
+    borrow::Cow,
     cmp::Ordering,
     collections::HashMap,
     fmt,

@@ -145,7 +145,7 @@ impl<'a> TryInto<CelValue> for CelStackValue<'a> {
         if let CelStackValue::Value(val) = self {
             Ok(val)
         } else {
-            Err(CelError::internal("Expected value"))
+            Err(CelError::internal("Expected value 2"))
         }
     }
 }
