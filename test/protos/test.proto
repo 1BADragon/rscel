@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+import "google/protobuf/descriptor.proto";
+
+message Point {
+  int32 x = 1;
+  int32 y = 2;
+}
+
+enum MyEnum {
+  FIELD1 = 0;
+  FIELD2 = 1;
+}
+
+message TestMessage1 {
+  int32 initialized_field = 1;
+  int32 unitialized_field = 2;
+
+  MyEnum enum_field = 3;
+
+  TestMessage1 nested_field = 4;
+
+  oneof oneof_field {
+    int32 oneof_field1 = 5;
+    string oneof_field2 = 6;
+  }
+}

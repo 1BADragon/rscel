@@ -1,4 +1,5 @@
 mod types;
+use crate::CelValueDyn;
 use std::{collections::HashMap, fmt};
 pub use types::{ByteCode, JmpWhen};
 
@@ -223,7 +224,7 @@ impl<'a> Interpreter<'a> {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.eq(&v2)?);
+                    stack.push_val(CelValueDyn::eq(&v1, &v2)?);
                 }
                 ByteCode::Ne => {
                     let v2 = stack.pop_val()?;
@@ -351,6 +352,10 @@ impl<'a> Interpreter<'a> {
                                 }
                             }
                         }
+                    } else if let CelValue::Dyn(d) = obj {
+                        if let CelValue::String(index) = index {
+                            stack.push_val(d.access(&index)?);
+                        }
                     } else {
                         return Err(CelError::value(&format!(
                             "Index operator invalid between {:?} and {:?}",
@@ -377,6 +382,18 @@ impl<'a> Interpreter<'a> {
                                     }
                                 },
                             }
+                        } else if let CelValue::Message(msg) = obj {
+                            let desc = msg.descriptor_dyn();
+
+                            if let Some(field) = desc.field_by_name(ident.as_str()) {
+                                stack.push_val(
+                                    field.get_singular_field_or_default(msg.as_ref()).into(),
+                                )
+                            } else {
+                                return Err(CelError::attribute("msg", ident.as_str()));
+                            }
+                        } else if let CelValue::Dyn(d) = obj {
+                            stack.push_val(d.access(ident.as_str())?);
                         } else if let Some(bindings) = self.bindings {
                             if bindings.get_func(ident.as_str()).is_some()
                                 || bindings.get_macro(ident.as_str()).is_some()

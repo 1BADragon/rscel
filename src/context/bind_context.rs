@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use protobuf::MessageDyn;
 use serde_json::Value;
 
 use crate::{
@@ -94,6 +95,11 @@ impl<'a> BindContext<'a> {
             self.params.insert(key, CelValue::from(value));
         }
         Ok(())
+    }
+
+    pub fn bind_param_proto_msg(&mut self, name: &str, msg: Box<dyn MessageDyn>) {
+        self.params
+            .insert(name.to_owned(), CelValue::from_proto_msg(msg));
     }
 
     /// Bind a function to the bind context, can be new or overwrite an existing (including default)
