@@ -1,4 +1,4 @@
-use wasm_bindgen::{prelude::*, JsValue};
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 extern "C" {

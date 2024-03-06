@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::{CelError, CelResult, CelValue, CelValueDyn};
+use crate::{BindContext, CelError, CelResult, CelValue, CelValueDyn};
 
 pub fn construct_type(type_name: &str, args: &[CelValue]) -> CelResult<CelValue> {
     match type_name {
@@ -19,6 +19,19 @@ pub fn construct_type(type_name: &str, args: &[CelValue]) -> CelResult<CelValue>
             type_name
         ))),
     }
+}
+
+pub fn load_default_types(bind_ctx: &mut BindContext) {
+    bind_ctx.add_type("bool", CelValue::bool_type());
+    bind_ctx.add_type("int", CelValue::int_type());
+    bind_ctx.add_type("uint", CelValue::uint_type());
+    bind_ctx.add_type("float", CelValue::float_type());
+    bind_ctx.add_type("double", CelValue::float_type());
+    bind_ctx.add_type("string", CelValue::string_type());
+    bind_ctx.add_type("type", CelValue::type_type());
+    bind_ctx.add_type("timestamp", CelValue::timestamp_type());
+    bind_ctx.add_type("duration", CelValue::duration_type());
+    bind_ctx.add_type("null_type", CelValue::null_type());
 }
 
 fn bool_impl(_: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
