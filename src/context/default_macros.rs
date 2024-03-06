@@ -2,7 +2,7 @@ use crate::{
     cel_error::{CelError, CelResult},
     interp::Interpreter,
     utils::eval_ident,
-    BindContext, ByteCode, CelContext, CelValue,
+    BindContext, ByteCode, CelContext, CelValue, CelValueDyn,
 };
 
 use super::bind_context::RsCelMacro;
@@ -15,6 +15,7 @@ const DEFAULT_MACROS: &[(&str, &'static RsCelMacro)] = &[
     ("filter", &filter_impl),
     ("map", &map_impl),
     ("reduce", &reduce_impl),
+    ("coalesce", &coalesce_impl),
 ];
 
 pub fn load_default_macros(exec_ctx: &mut BindContext) {
@@ -46,13 +47,7 @@ fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelR
         ));
     }
 
-    let ident_prog = ctx.run_raw(bytecode[0], false)?;
-    let ident_name = if let CelValue::Ident(ident) = ident_prog {
-        ident
-    } else {
-        return Err(CelError::argument("all() predicate must be ident"));
-    };
-
+    let ident_name = eval_ident(bytecode[0])?;
     if let CelValue::List(list) = this {
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
         let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
@@ -64,14 +59,12 @@ fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelR
 
             let res = interp.run_raw(bytecode[1], true)?;
 
-            if let CelValue::Bool(b) = res {
-                if !b {
-                    return Ok(false.into());
-                }
+            if !res.is_truthy() {
+                return Ok(false.into());
             }
         }
 
-        return Ok(true.into());
+        Ok(true.into())
     } else {
         Err(CelError::value("all() only available on list"))
     }
@@ -85,7 +78,6 @@ fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
     }
 
     let ident_name = eval_ident(bytecode[0])?;
-
     if let CelValue::List(list) = this {
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
         let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
@@ -96,14 +88,12 @@ fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
 
             let res = interp.run_raw(bytecode[1], true)?;
 
-            if let CelValue::Bool(b) = res {
-                if b {
-                    return Ok(true.into());
-                }
+            if res.is_truthy() {
+                return Ok(true.into());
             }
         }
 
-        return Ok(false.into());
+        Ok(false.into())
     } else {
         Err(CelError::value("exists() only available on list"))
     }
@@ -133,18 +123,16 @@ fn exists_one_impl(
 
             let res = interp.run_raw(bytecode[1], true)?;
 
-            if let CelValue::Bool(b) = res {
-                if b {
-                    count += 1;
+            if res.is_truthy() {
+                count += 1;
 
-                    if count > 1 {
-                        return Ok(false.into());
-                    }
+                if count > 1 {
+                    return Ok(false.into());
                 }
             }
         }
 
-        return Ok((count == 1).into());
+        Ok((count == 1).into())
     } else {
         Err(CelError::value("exists_one() only available on list"))
     }
@@ -169,10 +157,8 @@ fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
             bindings.bind_param(&ident_name, v.clone());
             let interp = Interpreter::new(&cel, &bindings);
 
-            if let CelValue::Bool(b) = interp.run_raw(bytecode[1], true)? {
-                if b {
-                    filtered_list.push(v.clone());
-                }
+            if interp.run_raw(bytecode[1], true)?.is_truthy() {
+                filtered_list.push(v.clone());
             }
         }
         Ok(filtered_list.into())
@@ -182,9 +168,9 @@ fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
 }
 
 fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
-    if bytecode.len() != 2 {
+    if !(bytecode.len() == 2 || bytecode.len() == 3) {
         return Err(CelError::argument(
-            "map() macro expects exactly 2 arguments",
+            "map() macro expects exactly 2 or 3 arguments",
         ));
     }
 
@@ -193,15 +179,30 @@ fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelR
     if let CelValue::List(list) = this {
         let mut mapped_list: Vec<CelValue> = Vec::new();
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
+        // make a copy of the context to make borrow checker happy
         let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
 
-        for v in list.into_iter() {
-            // make a copy of the context to make borrow checker happy
-            bindings.bind_param(&ident_name, v.clone());
-            let interp = Interpreter::new(&cel, &bindings);
+        // optimize so we are only checking bytecode's len once
+        if bytecode.len() == 2 {
+            for v in list.into_iter() {
+                bindings.bind_param(&ident_name, v.clone());
+                let interp = Interpreter::new(&cel, &bindings);
 
-            mapped_list.push(interp.run_raw(bytecode[1], true)?);
+                mapped_list.push(interp.run_raw(bytecode[1], true)?);
+            }
+        } else if bytecode.len() == 3 {
+            for v in list.into_iter() {
+                bindings.bind_param(&ident_name, v.clone());
+                let interp = Interpreter::new(&cel, &bindings);
+
+                if interp.run_raw(bytecode[1], true)?.is_truthy() {
+                    mapped_list.push(interp.run_raw(bytecode[2], true)?);
+                }
+            }
+        } else {
+            return Err(CelError::internal("Bytecode len check failed"));
         }
+
         Ok(mapped_list.into())
     } else {
         Err(CelError::value("map() only available on list"))
@@ -234,4 +235,24 @@ fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
     } else {
         Err(CelError::value("reduce() only availble on list"))
     }
+}
+
+fn coalesce_impl(
+    ctx: &Interpreter,
+    _this: CelValue,
+    bytecode: &[&[ByteCode]],
+) -> CelResult<CelValue> {
+    for arg in bytecode.iter() {
+        let res = ctx.run_raw(arg, true);
+        match res {
+            Ok(CelValue::Null) => {}
+            Err(err) => match err {
+                CelError::Binding { .. } | CelError::Attribute { .. } => {}
+                _ => return Err(err),
+            },
+            Ok(v) => return Ok(v),
+        };
+    }
+
+    Ok(CelValue::from_null())
 }
