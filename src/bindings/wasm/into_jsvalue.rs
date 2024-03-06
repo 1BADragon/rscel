@@ -62,6 +62,7 @@ impl Into<JsValue> for CelValue {
                 obj.into()
             }
             CelValue::ByteCode(_) => js_sys::Object::new().into(),
+            _ => unimplemented!(),
         }
     }
 }
