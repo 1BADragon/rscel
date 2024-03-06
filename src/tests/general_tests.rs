@@ -367,7 +367,7 @@ fn test_dyn_value() {
 
     let mut inner_map = HashMap::new();
     inner_map.insert("bar".to_string(), 5.into());
-    let foo = CelValue::Dyn(Arc::new(CelValue::from_map(inner_map)));
+    let foo = CelValue::from_dyn(Arc::new(CelValue::from_map(inner_map)));
     exec.bind_param("foo", foo);
 
     let mut inner_map = HashMap::new();

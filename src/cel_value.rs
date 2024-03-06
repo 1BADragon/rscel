@@ -142,6 +142,10 @@ impl CelValue {
         CelValue::ByteCode(val.to_owned())
     }
 
+    pub fn from_dyn(val: Arc<dyn CelValueDyn>) -> CelValue {
+        CelValue::Dyn(val)
+    }
+
     pub fn is_true(&self) -> bool {
         if let CelValue::Bool(val) = self {
             *val
