@@ -39,6 +39,10 @@ impl<'a, 'b> InterpStack<'a, 'b> {
             Some(stack_val) => {
                 if let CelStackValue::Value(val) = stack_val {
                     if let CelValue::Ident(name) = val {
+                        if let Some(val) = self.ctx.get_type_by_name(&name) {
+                            return Ok(CelStackValue::Value(val.clone()));
+                        }
+
                         if let Some(val) = self.ctx.get_param_by_name(&name) {
                             return Ok(CelStackValue::Value(val.clone()));
                         }
@@ -447,6 +451,11 @@ impl<'a> Interpreter<'a> {
                                         &args,
                                         macro_,
                                     )?);
+                                } else if let Some(CelValue::Type(type_name)) =
+                                    self.get_type_by_name(&func_name)
+                                {
+                                    let arg_values = self.resolve_args(args)?;
+                                    stack.push_val(construct_type(type_name, &arg_values)?);
                                 } else {
                                     return Err(CelError::runtime(&format!(
                                         "{} is not callable",
@@ -523,6 +532,10 @@ impl<'a> Interpreter<'a> {
 
     fn get_macro_by_name(&self, name: &str) -> Option<&'a RsCelMacro> {
         self.bindings?.get_macro(name)
+    }
+
+    fn get_type_by_name(&self, name: &str) -> Option<&'a CelValue> {
+        self.bindings?.get_type(name)
     }
 
     fn callable_by_name(&self, name: &str) -> CelResult<RsCallable> {

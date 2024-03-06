@@ -1,6 +1,6 @@
 use crate::{
     compiler::{compiler::CelCompiler, string_tokenizer::StringTokenizer},
-    BindContext, CelContext, CelValue, Program,
+    BindContext, CelContext, CelError, CelValue, Program,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::Value;
@@ -378,4 +378,28 @@ fn test_dyn_value() {
     assert_eq!(ctx.exec("main", &exec).unwrap(), 5.into());
     assert_eq!(ctx.exec("prog2", &exec).unwrap(), 5.into());
     assert_eq!(ctx.exec("prog2", &exec2).unwrap(), 5.into());
+}
+
+#[test]
+fn test_keywords_as_access_idents() {
+    let mut ctx = CelContext::new();
+
+    ctx.add_program_str("main", "foo.timestamp")
+        .expect("Failed to compile program");
+
+    let mut exec1 = BindContext::new();
+    let mut map1 = HashMap::new();
+    map1.insert("timestamp".to_string(), 4.into());
+    exec1.bind_param("foo", map1.into());
+
+    assert_eq!(ctx.exec("main", &exec1).unwrap(), 4.into());
+
+    let mut exec2 = BindContext::new();
+    let map2 = HashMap::new();
+    exec2.bind_param("foo", map2.into());
+
+    match ctx.exec("main", &exec2) {
+        Err(CelError::Attribute { .. }) => {}
+        _ => panic!(),
+    }
 }
