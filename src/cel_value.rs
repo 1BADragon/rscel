@@ -460,7 +460,16 @@ impl CelValueDyn for CelValue {
         let type1 = self.as_type();
         let type2 = rhs_val.as_type();
 
-        let (lhs, rhs) = CelValue::type_prop(Cow::Borrowed(self), Cow::Borrowed(rhs_val));
+        let rhs = if let CelValue::Dyn(d) = rhs_val {
+            match d.any_ref().downcast_ref::<CelValue>() {
+                Some(v) => v,
+                None => rhs_val,
+            }
+        } else {
+            rhs_val
+        };
+
+        let (lhs, rhs) = CelValue::type_prop(Cow::Borrowed(self), Cow::Borrowed(rhs));
 
         if let (CelValue::Int(l), CelValue::Int(r)) = (lhs.as_ref(), rhs.as_ref()) {
             Ok(CelValue::from_bool(l == r))

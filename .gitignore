@@ -17,3 +17,5 @@ Cargo.lock
 
 #mac shit
 .DS_Store
+
+__pycache__

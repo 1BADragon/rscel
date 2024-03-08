@@ -6,15 +6,10 @@ default: build
 build:
 	cargo build $(CARGO_ARGS)
 
-run-tests:
-	cargo test $(CARGO_ARGS)
-
-run-all-tests: run-tests
-	cargo test --no-default-features $(CARGO_ARGS)
 
 .env:
 	python3 -m venv .env
-	source .env/bin/activate && pip install maturin
+	source .env/bin/activate && pip install maturin && pip install pytest
 
 wasm-binding:
 	RUSTFLAGS="-C opt-level=s" wasm-pack build --target web --features wasm $(CARGO_ARGS)
@@ -36,3 +31,17 @@ wasm-example-release: wasm-binding-release
 
 .PHONY: all
 all: wasm-binding python-binding build
+
+run-tests:
+	cargo test -q $(CARGO_ARGS)
+
+run-no-feature-tests:
+	cargo test -q --no-default-features $(CARGO_ARGS)
+
+run-python-tests: .env python-binding
+	source .env/bin/activate && \
+	pip install --force-reinstall target/wheels/$(shell ls target/wheels) && \
+	python -m pytest test/
+	
+.PHONY: run-all-tests
+run-all-tests: run-tests run-no-feature-tests run-python-tests
