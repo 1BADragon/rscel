@@ -1,12 +1,16 @@
 use crate::{BindContext, CelContext, CelError, CelValue, CelValueDyn};
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, FixedOffset, Local, Utc};
+use chrono_tz::Tz;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
-    types::{PyBool, PyBytes, PyDateTime, PyDelta, PyDict, PyFloat, PyInt, PyList, PyString},
+    types::{
+        timezone_utc, PyBool, PyBytes, PyDateTime, PyDelta, PyDict, PyFloat, PyInt, PyList,
+        PyString, PyTuple,
+    },
 };
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Borrow, collections::HashMap, ops::Deref, sync::Arc};
 
 mod celpycallable;
 
@@ -237,10 +241,22 @@ impl<'source> FromPyObject<'source> for CelValue {
 
                     Ok(map.into())
                 }
-                "datetime" => Ok(ob
-                    .downcast::<PyDateTime>()?
-                    .extract::<DateTime<Utc>>()?
-                    .into()),
+                "datetime" => {
+                    let py_utc_dt = Python::with_gil(|py| {
+                        let utc = timezone_utc(py);
+                        let py_astimezone = ob.getattr("astimezone")?;
+
+                        let args = PyTuple::new(py, [utc]);
+
+                        py_astimezone.call1(args)
+                    })?;
+
+                    let dt = py_utc_dt
+                        .downcast::<PyDateTime>()?
+                        .extract::<DateTime<Utc>>()?;
+
+                    Ok(dt.with_timezone(&Utc).into())
+                }
                 "timedelta" => Ok(ob.downcast::<PyDelta>()?.extract::<Duration>()?.into()),
                 "NoneType" => Ok(CelValue::from_null()),
                 _ => Ok(CelValue::Dyn(Arc::<PyObject>::new(ob.into()))),

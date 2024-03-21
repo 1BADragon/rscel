@@ -1,3 +1,5 @@
+import datetime as dt
+from zoneinfo import ZoneInfo
 import rscel
 
 
@@ -43,3 +45,13 @@ def test_callable_arg():
 
     assert rscel.eval("f()", {"f": func}) == None
     assert called
+
+
+def test_datetime_converstion():
+    d = dt.datetime.now(tz=ZoneInfo("America/Los_Angeles"))
+    res = rscel.eval("d", {"d": d})
+    assert res == d
+
+    d = dt.datetime.now()
+    res = rscel.eval("d", {"d": d})
+    assert res == d.astimezone(dt.timezone.utc)
