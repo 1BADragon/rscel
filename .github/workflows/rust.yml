@@ -19,6 +19,24 @@ jobs:
     - name: Build
       run: cargo build --verbose
 
+  build-python-bindings:
+    runs-on: ubunut-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build
+      run: make python-bindings-release
+
+  build-python-bindings:
+    runs-on: ubunut-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build
+      run: make wasm-bindings
+
   test-all:
     runs-on: ubuntu-latest
 
