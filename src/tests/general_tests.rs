@@ -364,11 +364,15 @@ fn test_dyn_value() {
         .expect("Failed to compile prog");
     ctx.add_program_str("prog2", "foo[\"bar\"]")
         .expect("Failed to compile prog2");
+    ctx.add_program_str("prog3", "e == e")
+        .expect("Failed to compile prog 3");
 
     let mut inner_map = HashMap::new();
     inner_map.insert("bar".to_string(), 5.into());
     let foo = CelValue::from_dyn(Arc::new(CelValue::from_map(inner_map)));
     exec.bind_param("foo", foo);
+
+    exec.bind_param("e", CelValue::from_dyn(Arc::new(CelValue::from_int(4))));
 
     let mut inner_map = HashMap::new();
     inner_map.insert("bar".to_string(), 5.into());
@@ -378,6 +382,7 @@ fn test_dyn_value() {
     assert_eq!(ctx.exec("main", &exec).unwrap(), 5.into());
     assert_eq!(ctx.exec("prog2", &exec).unwrap(), 5.into());
     assert_eq!(ctx.exec("prog2", &exec2).unwrap(), 5.into());
+    assert_eq!(ctx.exec("prog3", &exec).unwrap(), true.into());
 }
 
 #[test]
