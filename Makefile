@@ -39,7 +39,7 @@ run-no-feature-tests:
 	cargo test -q --no-default-features $(CARGO_ARGS)
 
 run-python-tests: .env python-binding
-	source .env/bin/activate && \
+	. .env/bin/activate && \
 	pip install --force-reinstall target/wheels/$(shell ls target/wheels) && \
 	python -m pytest test/
 	
