@@ -19,7 +19,7 @@ jobs:
     - name: Build
       run: cargo build --verbose
 
-  test_default:
+  test-all:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,6 +29,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Run tests
+      shell: bash
       run: make run-all-tests
       env:
         RSCEL_TEST_PROTO: 1
