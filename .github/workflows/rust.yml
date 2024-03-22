@@ -24,7 +24,7 @@ jobs:
       run: make build
 
   build-python-bindings:
-    runs-on: ubunut-latest
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
@@ -33,7 +33,7 @@ jobs:
       run: make python-bindings-release
 
   build-wasm-bindings:
-    runs-on: ubunut-latest
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
