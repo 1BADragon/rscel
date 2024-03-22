@@ -1,18 +1,14 @@
 use crate::{BindContext, CelContext, CelError, CelValue, CelValueDyn};
 
-use chrono::{DateTime, Duration, FixedOffset, Local, Utc};
-use chrono_tz::Tz;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
-    types::{
-        timezone_utc, PyBool, PyBytes, PyDateTime, PyDelta, PyDict, PyFloat, PyInt, PyList,
-        PyString, PyTuple,
-    },
+    types::{PyDict, PyString},
 };
-use std::{borrow::Borrow, collections::HashMap, ops::Deref, sync::Arc};
+use std::collections::HashMap;
 
 mod celpycallable;
+mod frompyobject;
 
 use celpycallable::CelPyCallable;
 
@@ -208,64 +204,6 @@ impl CelValueDyn for PyObject {
 
     fn any_ref<'a>(&'a self) -> &'a dyn std::any::Any {
         self
-    }
-}
-
-impl<'source> FromPyObject<'source> for CelValue {
-    fn extract(ob: &'source PyAny) -> PyResult<Self> {
-        match ob.get_type().name() {
-            Ok(type_name) => match type_name {
-                "int" => Ok(ob.downcast::<PyInt>()?.extract::<i64>()?.into()),
-                "float" => Ok(ob.downcast::<PyFloat>()?.extract::<f64>()?.into()),
-                "bool" => Ok(ob.downcast::<PyBool>()?.extract::<bool>()?.into()),
-                "str" => Ok(ob.downcast::<PyString>()?.extract::<String>()?.into()),
-                "bytes" => Ok(ob.downcast::<PyBytes>()?.extract::<Vec<u8>>()?.into()),
-                "list" => {
-                    let mut vec: Vec<CelValue> = Vec::new();
-
-                    for val in ob.downcast::<PyList>()?.iter() {
-                        vec.push(val.extract()?)
-                    }
-
-                    Ok(vec.into())
-                }
-                "dict" => {
-                    let mut map: HashMap<String, CelValue> = HashMap::new();
-
-                    let mapobj = ob.downcast::<PyDict>()?;
-                    for keyobj in mapobj.keys().iter() {
-                        let key = keyobj.downcast::<PyString>()?.to_string();
-
-                        map.insert(key, mapobj.get_item(keyobj).unwrap().unwrap().extract()?);
-                    }
-
-                    Ok(map.into())
-                }
-                "datetime" => {
-                    let py_utc_dt = Python::with_gil(|py| {
-                        let utc = timezone_utc(py);
-                        let py_astimezone = ob.getattr("astimezone")?;
-
-                        let args = PyTuple::new(py, [utc]);
-
-                        py_astimezone.call1(args)
-                    })?;
-
-                    let dt = py_utc_dt
-                        .downcast::<PyDateTime>()?
-                        .extract::<DateTime<Utc>>()?;
-
-                    Ok(dt.with_timezone(&Utc).into())
-                }
-                "timedelta" => Ok(ob.downcast::<PyDelta>()?.extract::<Duration>()?.into()),
-                "NoneType" => Ok(CelValue::from_null()),
-                _ => Ok(CelValue::Dyn(Arc::<PyObject>::new(ob.into()))),
-            },
-            Err(_) => PyResult::Err(PyValueError::new_err(format!(
-                "Failed to get type from {:?}",
-                ob,
-            ))),
-        }
     }
 }
 
