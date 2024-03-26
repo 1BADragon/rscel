@@ -52,7 +52,17 @@ impl<'l> StringTokenizer<'l> {
                     }
                     _ => Ok(Some(Token::Not)),
                 },
-                '.' => Ok(Some(Token::Dot)),
+                '.' => {
+                    if let Some(v) = self.scanner.peek() {
+                        if v >= '0' && v <= '9' {
+                            self.parse_number_or_token(input_char.encode_utf8(&mut tmp), Token::Dot)
+                        } else {
+                            Ok(Some(Token::Dot))
+                        }
+                    } else {
+                        Ok(Some(Token::Dot))
+                    }
+                }
                 ',' => Ok(Some(Token::Comma)),
                 '[' => Ok(Some(Token::LBracket)),
                 ']' => Ok(Some(Token::RBracket)),
@@ -205,7 +215,7 @@ impl<'l> StringTokenizer<'l> {
         _starting_token: Token,
     ) -> Result<Option<Token>, SyntaxError> {
         let mut working = starting.to_owned();
-        let mut is_float = false;
+        let mut is_float = starting.contains(".");
         let mut is_unsigned = false;
 
         'outer: loop {
@@ -316,6 +326,7 @@ mod test {
     #[test_case("true", vec![Token::BoolLit(true)]; "keyword true")]
     #[test_case("100", vec![Token::IntLit(100)]; "int literal")]
     #[test_case("3+4", vec![Token::IntLit(3), Token::Add, Token::IntLit(4)]; "parse addition")]
+    #[test_case(".4", vec![Token::FloatLit(0.4)]; "parse float 2")]
     #[test_case(r#""test\"123""#, vec![Token::StringLit("test\"123".to_string())]; "string literal")]
     fn test_tokenizer(input: &str, expected: Vec<Token>) {
         let tokens = _tokenize(input).unwrap();
