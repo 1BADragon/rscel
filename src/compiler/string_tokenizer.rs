@@ -328,6 +328,8 @@ mod test {
     #[test_case("3+4", vec![Token::IntLit(3), Token::Add, Token::IntLit(4)]; "parse addition")]
     #[test_case(".4", vec![Token::FloatLit(0.4)]; "parse float 2")]
     #[test_case(r#""test\"123""#, vec![Token::StringLit("test\"123".to_string())]; "string literal")]
+    #[test_case("-0.4", vec![Token::Minus, Token::FloatLit(0.4)]; "parse neg float")]
+    #[test_case("-.4", vec![Token::Minus, Token::FloatLit(0.4)]; "parse neg float 2")]
     fn test_tokenizer(input: &str, expected: Vec<Token>) {
         let tokens = _tokenize(input).unwrap();
 

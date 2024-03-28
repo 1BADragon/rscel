@@ -130,6 +130,8 @@ fn test_contains() {
 #[test_case("coalesce(foo, 4)", 4.into(); "coalesce unbound var")]
 #[test_case("coalesce(1, 2, 3)", 1.into(); "coalesce first val ok")]
 #[test_case(".1", 0.1.into(); "dot leading floating point")]
+#[test_case("-.1", (-0.1).into(); "neg dot leading floating point")]
+#[test_case("2+3 in [5]", true.into(); "check in binding")]
 fn test_equation(prog: &str, res: CelValue) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
