@@ -373,8 +373,8 @@ impl<'a> Interpreter<'a> {
 
                     if let CelValue::Ident(ident) = index.as_value()? {
                         let obj = stack.pop()?.into_value()?;
-                        if let CelValue::Map(ref map) = obj {
-                            match map.get(ident.as_str()) {
+                        match obj {
+                            CelValue::Map(ref map) => match map.get(ident.as_str()) {
                                 Some(val) => stack.push_val(val.clone()),
                                 None => match self.callable_by_name(ident.as_str()) {
                                     Ok(callable) => stack.push(CelStackValue::BoundCall {
@@ -385,34 +385,40 @@ impl<'a> Interpreter<'a> {
                                         return Err(CelError::attribute("obj", ident.as_str()));
                                     }
                                 },
-                            }
-                        } else if let CelValue::Message(msg) = obj {
-                            let desc = msg.descriptor_dyn();
+                            },
+                            #[cfg(protobuf)]
+                            CelValue::Message(msg) => {
+                                let desc = msg.descriptor_dyn();
 
-                            if let Some(field) = desc.field_by_name(ident.as_str()) {
-                                stack.push_val(
-                                    field.get_singular_field_or_default(msg.as_ref()).into(),
-                                )
-                            } else {
-                                return Err(CelError::attribute("msg", ident.as_str()));
+                                if let Some(field) = desc.field_by_name(ident.as_str()) {
+                                    stack.push_val(
+                                        field.get_singular_field_or_default(msg.as_ref()).into(),
+                                    )
+                                } else {
+                                    return Err(CelError::attribute("msg", ident.as_str()));
+                                }
                             }
-                        } else if let CelValue::Dyn(d) = obj {
-                            stack.push_val(d.access(ident.as_str())?);
-                        } else if let Some(bindings) = self.bindings {
-                            if bindings.get_func(ident.as_str()).is_some()
-                                || bindings.get_macro(ident.as_str()).is_some()
-                            {
-                                stack.push(CelStackValue::BoundCall {
-                                    callable: self.callable_by_name(ident.as_str())?,
-                                    value: obj,
-                                });
-                            } else {
-                                return Err(CelError::attribute("obj", ident.as_str()));
+                            CelValue::Dyn(d) => {
+                                stack.push_val(d.access(ident.as_str())?);
                             }
-                        } else {
-                            return Err(CelError::Runtime(
-                                "Invalid state: no bindings".to_string(),
-                            ));
+                            _ => {
+                                if let Some(bindings) = self.bindings {
+                                    if bindings.get_func(ident.as_str()).is_some()
+                                        || bindings.get_macro(ident.as_str()).is_some()
+                                    {
+                                        stack.push(CelStackValue::BoundCall {
+                                            callable: self.callable_by_name(ident.as_str())?,
+                                            value: obj,
+                                        });
+                                    } else {
+                                        return Err(CelError::attribute("obj", ident.as_str()));
+                                    }
+                                } else {
+                                    return Err(CelError::Runtime(
+                                        "Invalid state: no bindings".to_string(),
+                                    ));
+                                }
+                            }
                         }
                     } else {
                         let obj = stack.pop()?;

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+#[cfg(protobuf)]
 use protobuf::MessageDyn;
 use serde_json::Value;
 
@@ -100,6 +101,7 @@ impl<'a> BindContext<'a> {
         Ok(())
     }
 
+    #[cfg(protobuf)]
     pub fn bind_param_proto_msg(&mut self, name: &str, msg: Box<dyn MessageDyn>) {
         self.params
             .insert(name.to_owned(), CelValue::from_proto_msg(msg));

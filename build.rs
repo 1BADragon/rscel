@@ -5,6 +5,7 @@ fn main() {
 
     if let Ok(_) = env::var("RSCEL_TEST_PROTO") {
         println!("cargo:rustc-cfg=test_protos");
+        println!("cargo:rustc-cfg=protobuf");
         protobuf_codegen::Codegen::new()
             .protoc()
             .include("test/protos")
