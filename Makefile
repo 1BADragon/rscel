@@ -1,4 +1,5 @@
 CARGO_ARGS?=
+PYTEST_ARGS?=
 
 .PHONY: default
 default: build
@@ -41,7 +42,8 @@ run-no-feature-tests:
 run-python-tests: .env python-binding
 	. .env/bin/activate && \
 	pip install --force-reinstall target/wheels/$(shell ls target/wheels) && \
-	python -m pytest test/
+	cd test && \
+	python -m pytest test_rscel.py test_cel_spec.py $(PYTEST_ARGS)
 	
 .PHONY: run-all-tests
 run-all-tests: run-tests run-no-feature-tests run-python-tests

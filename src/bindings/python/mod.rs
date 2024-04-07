@@ -30,7 +30,7 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &PyDict) -> PyResult<PyObjec
     let mut ctx = CelContext::new();
     let mut exec_ctx = BindContext::new();
 
-    ctx.add_program_str("entry", &prog_str).unwrap();
+    ctx.add_program_str("entry", &prog_str)?;
 
     for keyobj in bindings.keys().iter() {
         let key = keyobj.downcast::<PyString>()?;
@@ -241,5 +241,11 @@ impl ToPyObject for CelValue {
             },
             _ => py.None(),
         }
+    }
+}
+
+impl From<CelError> for PyErr {
+    fn from(err: CelError) -> PyErr {
+        PyErr::new::<PyRuntimeError, _>(format!("{}", err))
     }
 }

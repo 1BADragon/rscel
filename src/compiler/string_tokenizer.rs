@@ -111,12 +111,23 @@ impl<'l> StringTokenizer<'l> {
                 'f' => self.parse_keywords_or_ident("f", &[("false", Token::BoolLit(false))]),
                 'i' => self.parse_keywords_or_ident("i", &[("in", Token::In)]),
                 'n' => self.parse_keywords_or_ident("n", &[("null", Token::Null)]),
+                'r' => {
+                    if let Some('\'') = self.scanner.peek() {
+                        self.scanner.next();
+                        self.parse_string_literal('\'', true)
+                    } else if let Some('"') = self.scanner.peek() {
+                        self.scanner.next();
+                        self.parse_string_literal('"', true)
+                    } else {
+                        self.parse_keywords_or_ident("r", &[])
+                    }
+                }
                 't' => self.parse_keywords_or_ident("t", &[("true", Token::BoolLit(true))]),
                 '0'..='9' => self.parse_number_or_token(
                     input_char.encode_utf8(&mut tmp),
                     Token::IntLit(input_char as i64 - '0' as i64),
                 ),
-                '\'' | '"' => self.parse_string_literal(input_char),
+                '\'' | '"' => self.parse_string_literal(input_char, false),
                 '_' | 'A'..='Z' | 'a'..='z' => {
                     return self.parse_keywords_or_ident(&input_char.to_string(), &[]);
                 }
@@ -144,7 +155,11 @@ impl<'l> StringTokenizer<'l> {
         res
     }
 
-    fn parse_string_literal(&mut self, starting: char) -> Result<Option<Token>, SyntaxError> {
+    fn parse_string_literal(
+        &mut self,
+        starting: char,
+        is_raw: bool,
+    ) -> Result<Option<Token>, SyntaxError> {
         let mut working = String::new();
 
         'outer: loop {
@@ -156,7 +171,7 @@ impl<'l> StringTokenizer<'l> {
 
             if curr == starting {
                 break 'outer;
-            } else if curr == '\\' {
+            } else if curr == '\\' && !is_raw {
                 let escaped = if let Some(curr) = self.scanner.next() {
                     curr
                 } else {
@@ -165,9 +180,13 @@ impl<'l> StringTokenizer<'l> {
                 };
 
                 match escaped {
+                    'a' => working.push(0x07 as char),
+                    'b' => working.push(0x08 as char),
+                    'f' => working.push(0x0c as char),
                     'n' => working.push('\n'),
                     'r' => working.push('\r'),
                     't' => working.push('\t'),
+                    'v' => working.push(0x0b as char),
                     '\\' => working.push('\\'),
                     '\'' => working.push('\''),
                     '"' => working.push('"'),
@@ -216,21 +235,49 @@ impl<'l> StringTokenizer<'l> {
     ) -> Result<Option<Token>, SyntaxError> {
         let mut working = starting.to_owned();
         let mut is_float = starting.contains(".");
+        let mut is_exp = false;
         let mut is_unsigned = false;
+        let mut base = 10;
 
         'outer: loop {
             if let Some(next) = self.scanner.peek() {
                 match next {
-                    '0'..='9' => working.push(next),
+                    '0' => {
+                        working.push(next);
+                        self.scanner.next();
+                    }
+                    '1'..='9' => {
+                        working.push(next);
+                        self.scanner.next();
+                    }
                     'e' | 'E' | '.' => {
-                        if is_float {
+                        if next == '.' && is_float {
+                            break 'outer;
+                        } else if is_exp {
                             break 'outer;
                         }
 
                         is_float = true;
+
+                        if next == 'e' || next == 'E' {
+                            is_exp = true;
+                        }
                         working.push(next);
+
+                        self.scanner.next();
+                        if let Some(p) = self.scanner.peek() {
+                            match p {
+                                '+' | '-' => {
+                                    self.scanner.next();
+                                    working.push(p);
+                                }
+                                _ => {
+                                    continue 'outer;
+                                }
+                            }
+                        }
                     }
-                    'u' => {
+                    'u' | 'U' => {
                         if is_float {
                             break 'outer;
                         }
@@ -239,17 +286,30 @@ impl<'l> StringTokenizer<'l> {
                         self.scanner.next();
                         break 'outer;
                     }
+                    'x' | 'X' => {
+                        if working == "0" && base == 10 {
+                            working.push('x');
+                            self.scanner.next();
+                            base = 16;
+                        } else {
+                            break 'outer;
+                        }
+                    }
                     _ => break 'outer,
                 };
-
-                self.scanner.next();
             } else {
                 break 'outer;
             }
         }
 
+        let fixedup_str = match base {
+            10 => &working,
+            16 => working.trim_start_matches("0x"),
+            _ => return Err(SyntaxError::from_location(self.scanner.location())),
+        };
+
         if is_unsigned {
-            match working.parse::<u64>() {
+            match u64::from_str_radix(fixedup_str, base) {
                 Ok(value) => Ok(Some(Token::UIntLit(value))),
                 Err(_) => Err(SyntaxError::from_location(self.scanner.location())
                     .with_message(format!("Failed to parse unsigned value: {}", working))),
@@ -261,7 +321,7 @@ impl<'l> StringTokenizer<'l> {
                     .with_message(format!("Failed to parse floating point value: {}", working))),
             }
         } else {
-            match working.parse::<i64>() {
+            match i64::from_str_radix(fixedup_str, base) {
                 Ok(value) => Ok(Some(Token::IntLit(value))),
                 Err(_) => Err(SyntaxError::from_location(self.scanner.location())
                     .with_message(format!("Failed to parse integer: {}", working))),
@@ -330,6 +390,9 @@ mod test {
     #[test_case(r#""test\"123""#, vec![Token::StringLit("test\"123".to_string())]; "string literal")]
     #[test_case("-0.4", vec![Token::Minus, Token::FloatLit(0.4)]; "parse neg float")]
     #[test_case("-.4", vec![Token::Minus, Token::FloatLit(0.4)]; "parse neg float 2")]
+    #[test_case("0e+0", vec![Token::FloatLit(0.0)]; "parse exp with pos sign")]
+    #[test_case("0x0", vec![Token::IntLit(0)]; "parse hex value")]
+    #[test_case("-2.3e+1", vec![Token::Minus, Token::FloatLit(23.0)]; "parse neg float exp")]
     fn test_tokenizer(input: &str, expected: Vec<Token>) {
         let tokens = _tokenize(input).unwrap();
 
