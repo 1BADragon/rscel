@@ -434,7 +434,7 @@ impl<'l> CelCompiler<'l> {
 
     fn parse_not_list(&mut self) -> CelResult<(ParseResult, AstNode<NotList>)> {
         let start_loc = self.tokenizer.location();
-        let _res = ParseResult::new();
+        let _res = ParseResult::empty();
 
         match self.tokenizer.peek()? {
             Some(Token::Not) => {
@@ -452,7 +452,7 @@ impl<'l> CelCompiler<'l> {
                 ))
             }
             _ => Ok((
-                ParseResult::new(),
+                ParseResult::empty(),
                 AstNode::new(NotList::EmptyList, start_loc, self.tokenizer.location()),
             )),
         }
@@ -460,7 +460,7 @@ impl<'l> CelCompiler<'l> {
 
     fn parse_neg_list(&mut self) -> CelResult<(ParseResult, AstNode<NegList>)> {
         let start_loc = self.tokenizer.location();
-        let _res = ParseResult::new();
+        let _res = ParseResult::empty();
 
         match self.tokenizer.peek()? {
             Some(Token::Minus) => {
@@ -478,7 +478,7 @@ impl<'l> CelCompiler<'l> {
                 ))
             }
             _ => Ok((
-                ParseResult::new(),
+                ParseResult::empty(),
                 AstNode::new(NegList::EmptyList, start_loc, self.tokenizer.location()),
             )),
         }
@@ -600,7 +600,7 @@ impl<'l> CelCompiler<'l> {
                 }
             }
             _ => Ok((
-                ParseResult::new(),
+                ParseResult::empty(),
                 AstNode::new(MemberPrime::Empty, start_loc, self.tokenizer.location()),
             )),
         }

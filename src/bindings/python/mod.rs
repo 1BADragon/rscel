@@ -3,7 +3,7 @@ use crate::{BindContext, CelContext, CelError, CelValue, CelValueDyn};
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
-    types::{PyDict, PyString},
+    types::{PyBytes, PyDict, PyString},
 };
 use std::collections::HashMap;
 
@@ -218,7 +218,7 @@ impl ToPyObject for CelValue {
             Float(f) => f.to_object(py),
             Bool(b) => b.to_object(py),
             String(s) => s.to_object(py),
-            Bytes(s) => s.to_object(py),
+            Bytes(s) => PyBytes::new(py, &s).into(),
             List(l) => l
                 .into_iter()
                 .map(|x| x.to_object(py))

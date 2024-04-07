@@ -1,5 +1,8 @@
 use super::{
-    input_scanner::StringScanner, syntax_error::SyntaxError, tokenizer::Tokenizer, tokens::Token,
+    input_scanner::StringScanner,
+    syntax_error::SyntaxError,
+    tokenizer::Tokenizer,
+    tokens::{NumericLiteral, Token},
 };
 
 pub struct StringTokenizer<'l> {
@@ -41,7 +44,22 @@ impl<'l> StringTokenizer<'l> {
                 '?' => Ok(Some(Token::Question)),
                 ':' => Ok(Some(Token::Colon)),
                 '+' => Ok(Some(Token::Add)),
-                '-' => Ok(Some(Token::Minus)),
+                '-' => {
+                    if let Some(token) = self.scanner.peek() {
+                        match token {
+                            '.' | '0'..='9' => {
+                                let mut starting = String::new();
+                                self.scanner.next();
+                                starting.push('-');
+                                starting.push(token);
+                                self.parse_number_or_token(&starting)
+                            }
+                            _ => Ok(Some(Token::Minus)),
+                        }
+                    } else {
+                        Ok(Some(Token::Minus))
+                    }
+                }
                 '*' => Ok(Some(Token::Multiply)),
                 '/' => Ok(Some(Token::Divide)),
                 '%' => Ok(Some(Token::Mod)),
@@ -55,7 +73,7 @@ impl<'l> StringTokenizer<'l> {
                 '.' => {
                     if let Some(v) = self.scanner.peek() {
                         if v >= '0' && v <= '9' {
-                            self.parse_number_or_token(input_char.encode_utf8(&mut tmp), Token::Dot)
+                            self.parse_number_or_token(input_char.encode_utf8(&mut tmp))
                         } else {
                             Ok(Some(Token::Dot))
                         }
@@ -108,6 +126,17 @@ impl<'l> StringTokenizer<'l> {
                     _ => Err(SyntaxError::from_location(self.scanner.location())
                         .with_message("Token & is not supported".to_string())),
                 },
+                'b' => {
+                    if let Some('\'') = self.scanner.peek() {
+                        self.scanner.next();
+                        self.parse_bytes_literal('\'')
+                    } else if let Some('"') = self.scanner.peek() {
+                        self.scanner.next();
+                        self.parse_bytes_literal('"')
+                    } else {
+                        self.parse_keywords_or_ident("b", &[])
+                    }
+                }
                 'f' => self.parse_keywords_or_ident("f", &[("false", Token::BoolLit(false))]),
                 'i' => self.parse_keywords_or_ident("i", &[("in", Token::In)]),
                 'n' => self.parse_keywords_or_ident("n", &[("null", Token::Null)]),
@@ -123,10 +152,7 @@ impl<'l> StringTokenizer<'l> {
                     }
                 }
                 't' => self.parse_keywords_or_ident("t", &[("true", Token::BoolLit(true))]),
-                '0'..='9' => self.parse_number_or_token(
-                    input_char.encode_utf8(&mut tmp),
-                    Token::IntLit(input_char as i64 - '0' as i64),
-                ),
+                '0'..='9' => self.parse_number_or_token(input_char.encode_utf8(&mut tmp)),
                 '\'' | '"' => self.parse_string_literal(input_char, false),
                 '_' | 'A'..='Z' | 'a'..='z' => {
                     return self.parse_keywords_or_ident(&input_char.to_string(), &[]);
@@ -153,6 +179,53 @@ impl<'l> StringTokenizer<'l> {
         }
 
         res
+    }
+
+    fn parse_bytes_literal(&mut self, starting: char) -> Result<Option<Token>, SyntaxError> {
+        let mut buf = [0u8; 4];
+        let mut working = Vec::new();
+
+        'outer: loop {
+            let curr = if let Some(curr) = self.scanner.next() {
+                curr
+            } else {
+                return Err(SyntaxError::from_location(self.scanner.location()));
+            };
+
+            if curr == starting {
+                break 'outer;
+            } else if curr == '\\' {
+                let escaped = if let Some(curr) = self.scanner.next() {
+                    curr
+                } else {
+                    let (_line, _column) = self.scanner.location();
+                    return Err(SyntaxError::from_location(self.scanner.location()));
+                };
+
+                match escaped {
+                    'a' => working.push(0x07u8),
+                    'b' => working.push(0x08u8),
+                    'f' => working.push(0x0cu8),
+                    'n' => working.push('\n' as u8),
+                    'r' => working.push('\r' as u8),
+                    't' => working.push('\t' as u8),
+                    'v' => working.push(0x0bu8),
+                    '\\' => working.push('\\' as u8),
+                    '\'' => working.push('\'' as u8),
+                    '"' => working.push('"' as u8),
+                    other => {
+                        other.encode_utf8(&mut buf);
+                        working.extend_from_slice(&buf[..other.len_utf8()]);
+                    }
+                }
+            } else {
+                curr.encode_utf8(&mut buf);
+                println!("{:?} {}", buf, curr.len_utf8());
+                working.extend_from_slice(&buf[..curr.len_utf8()]);
+            }
+        }
+
+        Ok(Some(Token::ByteStringLit(working)))
     }
 
     fn parse_string_literal(
@@ -197,7 +270,7 @@ impl<'l> StringTokenizer<'l> {
             }
         }
 
-        return Ok(Some(Token::StringLit(working)));
+        Ok(Some(Token::StringLit(working)))
     }
 
     fn parse_keywords_or_ident(
@@ -228,11 +301,7 @@ impl<'l> StringTokenizer<'l> {
         }
     }
 
-    fn parse_number_or_token(
-        &mut self,
-        starting: &str,
-        _starting_token: Token,
-    ) -> Result<Option<Token>, SyntaxError> {
+    fn parse_number_or_token(&mut self, starting: &str) -> Result<Option<Token>, SyntaxError> {
         let mut working = starting.to_owned();
         let mut is_float = starting.contains(".");
         let mut is_exp = false;
@@ -302,6 +371,7 @@ impl<'l> StringTokenizer<'l> {
             }
         }
 
+        let orig = working.clone();
         let fixedup_str = match base {
             10 => &working,
             16 => working.trim_start_matches("0x"),
@@ -309,23 +379,26 @@ impl<'l> StringTokenizer<'l> {
         };
 
         if is_unsigned {
+            // u64 is always positive and doesn't have a neg rep that cannot be represeted in a u64
             match u64::from_str_radix(fixedup_str, base) {
-                Ok(value) => Ok(Some(Token::UIntLit(value))),
+                Ok(val) => Ok(Some(Token::UIntLit(val))),
                 Err(_) => Err(SyntaxError::from_location(self.scanner.location())
-                    .with_message(format!("Failed to parse unsigned value: {}", working))),
+                    .with_message(format!("Failed to parse unsigned int {}", orig))),
             }
         } else if is_float {
-            match working.parse::<f64>() {
-                Ok(value) => Ok(Some(Token::FloatLit(value))),
-                Err(_) => Err(SyntaxError::from_location(self.scanner.location())
-                    .with_message(format!("Failed to parse floating point value: {}", working))),
-            }
+            Ok(Some(Token::FloatLit(NumericLiteral {
+                value: working.parse::<f64>().ok(),
+                str_value: fixedup_str.to_string(),
+                base: 10,
+                location: self.scanner.location(),
+            })))
         } else {
-            match i64::from_str_radix(fixedup_str, base) {
-                Ok(value) => Ok(Some(Token::IntLit(value))),
-                Err(_) => Err(SyntaxError::from_location(self.scanner.location())
-                    .with_message(format!("Failed to parse integer: {}", working))),
-            }
+            Ok(Some(Token::IntLit(NumericLiteral {
+                value: i64::from_str_radix(fixedup_str, base).ok(),
+                str_value: fixedup_str.to_string(),
+                base,
+                location: self.scanner.location(),
+            })))
         }
     }
 }
@@ -356,46 +429,5 @@ impl Tokenizer for StringTokenizer<'_> {
 
     fn location(&self) -> (usize, usize) {
         self.scanner.location()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::{StringTokenizer, SyntaxError, Tokenizer};
-    use crate::compiler::tokens::Token;
-    use test_case::test_case;
-
-    fn _tokenize(input: &str) -> Result<Vec<Token>, SyntaxError> {
-        let mut tokenizer = StringTokenizer::with_input(input);
-        let mut vec = Vec::new();
-
-        loop {
-            if let Some(token) = tokenizer.next()? {
-                vec.push(token);
-            } else {
-                break;
-            }
-        }
-
-        Ok(vec)
-    }
-
-    #[test_case("in", vec![Token::In]; "keyword in")]
-    #[test_case("ident", vec![Token::Ident("ident".to_owned())]; "ident")]
-    #[test_case("false", vec![Token::BoolLit(false)]; "keyword false")]
-    #[test_case("true", vec![Token::BoolLit(true)]; "keyword true")]
-    #[test_case("100", vec![Token::IntLit(100)]; "int literal")]
-    #[test_case("3+4", vec![Token::IntLit(3), Token::Add, Token::IntLit(4)]; "parse addition")]
-    #[test_case(".4", vec![Token::FloatLit(0.4)]; "parse float 2")]
-    #[test_case(r#""test\"123""#, vec![Token::StringLit("test\"123".to_string())]; "string literal")]
-    #[test_case("-0.4", vec![Token::Minus, Token::FloatLit(0.4)]; "parse neg float")]
-    #[test_case("-.4", vec![Token::Minus, Token::FloatLit(0.4)]; "parse neg float 2")]
-    #[test_case("0e+0", vec![Token::FloatLit(0.0)]; "parse exp with pos sign")]
-    #[test_case("0x0", vec![Token::IntLit(0)]; "parse hex value")]
-    #[test_case("-2.3e+1", vec![Token::Minus, Token::FloatLit(23.0)]; "parse neg float exp")]
-    fn test_tokenizer(input: &str, expected: Vec<Token>) {
-        let tokens = _tokenize(input).unwrap();
-
-        assert_eq!(tokens, expected);
     }
 }

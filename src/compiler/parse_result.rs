@@ -2,22 +2,32 @@ use crate::{interp::JmpWhen, program::ProgramDetails, ByteCode, Program};
 
 use super::{ast_node::AstNode, grammar::Expr};
 
+enum ParseConstExpr {
+    CelValue(CelValue),
+    ParseNode(Token),
+}
+
+enum ParseResultInner {
+    Bytecode(Vec<ByteCode>),
+    ConstExpr(ParseConstExpr),
+}
+
 pub struct ParseResult {
-    bytecode: Vec<ByteCode>,
+    inner: ParseResultInner,
     details: ProgramDetails,
 }
 
 impl ParseResult {
-    pub fn new() -> ParseResult {
+    pub fn empty() -> ParseResult {
         ParseResult {
-            bytecode: Vec::new(),
+            inner: ParseResultInner::Bytecode(Vec::new()),
             details: ProgramDetails::new(),
         }
     }
 
     pub fn with_bytecode(bytecode: Vec<ByteCode>) -> ParseResult {
         ParseResult {
-            bytecode,
+            inner: ParseResultInner::Bytecode(bytecode),
             details: ProgramDetails::new(),
         }
     }
