@@ -1,6 +1,6 @@
-use crate::{interp::JmpWhen, program::ProgramDetails, ByteCode, Program};
+use crate::{interp::JmpWhen, program::ProgramDetails, ByteCode, CelValue, CelValueDyn, Program};
 
-use super::{ast_node::AstNode, grammar::Expr};
+use super::{ast_node::AstNode, grammar::Expr, tokenizer::SyntaxError, tokens::Token};
 
 enum ParseConstExpr {
     CelValue(CelValue),
@@ -22,6 +22,13 @@ impl ParseResult {
         ParseResult {
             inner: ParseResultInner::Bytecode(Vec::new()),
             details: ProgramDetails::new(),
+        }
+    }
+
+    pub fn is_const(&self) -> bool {
+        match self.inner {
+            ParseResultInner::Bytecode(_) => false,
+            ParseResultInner::ConstExpr(_) => true,
         }
     }
 
@@ -68,7 +75,7 @@ impl ParseResult {
         new_bytecode.append(&mut self.bytecode);
 
         ParseResult {
-            bytecode: new_bytecode,
+            inner: ParseResultInner::Bytecode(new_bytecode),
             details: new_details,
         }
     }
@@ -85,8 +92,17 @@ impl ParseResult {
         new_bytecode.append(&mut self.bytecode);
 
         ParseResult {
-            bytecode: new_bytecode,
+            inner: ParseResultInner::Bytecode(new_bytecode),
             details: new_details,
+        }
+    }
+
+    pub fn resolve(&self) -> Option<Result<CelValue, SyntaxError>> {
+        if let Some(ParseResultInner::ConstExpr(c)) = self.inner {
+            match c {
+                ParseConstExpr::CelValue(v) => Some(Ok(v)),
+                ParseConstExpr::ParseNode(n) => n.resolve(false),
+            }
         }
     }
 
@@ -94,15 +110,19 @@ impl ParseResult {
         mut self,
         true_clause: ParseResult,
         false_clause: ParseResult,
-    ) -> ParseResult {
+    ) -> Result<ParseResult, SyntaxError> {
+        self.details.union_from(true_clause.details);
+        self.details.union_from(false_clause.details);
+
+        if self.is_const() {
+            if self.resolve().unwrap()?.is_truthy() {}
+        }
+
         self.bytecode.push(ByteCode::JmpCond {
             when: JmpWhen::False,
             dist: (true_clause.bytecode().len() as u32) + 1, // +1 to jmp over the next jump
             leave_val: false,
         });
-
-        self.details.union_from(true_clause.details);
-        self.details.union_from(false_clause.details);
 
         self.bytecode.extend(true_clause.bytecode.into_iter());
         self.bytecode

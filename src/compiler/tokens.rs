@@ -79,3 +79,19 @@ pub enum Token {
     ByteStringLit(Vec<u8>),        // b('|")[^\n]('|")
     Ident(String),                 // [_A-Za-z][_A-Za-z0-9]*
 }
+
+impl Token {
+    pub fn resolve(&self, is_neg: bool) -> Option<Result<CelValue, SyntaxError>> {
+        match self {
+            Token::IntLit(n) => Some(match n.resolve(is_neg) {
+                Ok(v) => Ok(v.into()),
+                Err(e) => Err(e),
+            }),
+            Token::FloatLit(n) => Some(match n.resolve(is_neg) {
+                Ok(v) => Ok(v.into()),
+                Err(e) => Err(e),
+            }),
+            _ => None,
+        }
+    }
+}
