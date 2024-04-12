@@ -59,6 +59,8 @@ pub enum CelValue {
     },
     #[serde(skip_serializing, skip_deserializing)]
     Dyn(Arc<dyn CelValueDyn>),
+    // Error values are now encapsulated.
+    Err(CelError),
 }
 
 impl CelValue {
@@ -155,6 +157,14 @@ impl CelValue {
     pub fn is_true(&self) -> bool {
         if let CelValue::Bool(val) = self {
             *val
+        } else {
+            false
+        }
+    }
+
+    pub fn is_err(&self) -> bool {
+        if let CelValue::Err(_) = self {
+            true
         } else {
             false
         }
@@ -337,6 +347,12 @@ impl CelValue {
     }
 
     pub fn or(&self, rhs: &CelValue) -> CelResult<CelValue> {
+        if self.is_err() {
+            if rhs.is_truthy() {
+                return Ok(CelValue::true_());
+            }
+        }
+
         if cfg!(feature = "type_prop") {
             return Ok((self.is_truthy() || rhs.is_truthy()).into());
         }
@@ -588,6 +604,7 @@ impl CelValueDyn for CelValue {
             #[cfg(protobuf)]
             CelValue::Message(_) => true,
             CelValue::Dyn(obj) => obj.is_truthy(),
+            CelValue::Err(_) => false,
             _ => false,
         }
     }

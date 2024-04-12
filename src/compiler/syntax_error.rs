@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::fmt;
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SyntaxError {
     pub line: usize,
     pub column: usize,

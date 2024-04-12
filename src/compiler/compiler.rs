@@ -1,6 +1,11 @@
 use super::{
-    ast_node::AstNode, grammar::*, parse_result::ParseResult, syntax_error::SyntaxError,
-    tokenizer::Tokenizer, tokens::Token,
+    ast_node::AstNode,
+    compiled_node::{CompiledNode, CompiledNodeTrait},
+    grammar::*,
+    parse_result::ParseResult,
+    syntax_error::SyntaxError,
+    tokenizer::Tokenizer,
+    tokens::Token,
 };
 use crate::{interp::JmpWhen, ByteCode, CelResult, CelValue, Program};
 
@@ -14,7 +19,7 @@ impl<'l> CelCompiler<'l> {
     }
 
     pub fn compile(mut self) -> CelResult<Program> {
-        let (res, ast) = self.parse_expression()?;
+        let compiled = self.parse_expression()?;
 
         if !self.tokenizer.peek()?.is_none() {
             return Err(SyntaxError::from_location(self.tokenizer.location())
@@ -22,12 +27,12 @@ impl<'l> CelCompiler<'l> {
                 .into());
         }
 
-        let prog = res.into_program(self.tokenizer.source().to_string(), ast);
+        let prog = compiled.into_program(self.tokenizer.source().to_string());
 
         Ok(prog)
     }
 
-    fn parse_expression(&mut self) -> CelResult<(ParseResult, AstNode<Expr>)> {
+    fn parse_expression(&mut self) -> CelResult<CompiledNode<Expr>> {
         let start_location = self.tokenizer.location();
         let (lhs, lhs_ast) = self.parse_conditional_or()?;
 
@@ -606,119 +611,110 @@ impl<'l> CelCompiler<'l> {
         }
     }
 
-    fn parse_primary(&mut self) -> CelResult<(ParseResult, AstNode<Primary>)> {
+    fn parse_primary(&mut self) -> CelResult<CompiledNode<Primary>> {
         let start_loc = self.tokenizer.location();
 
         match self.tokenizer.peek()? {
             Some(Token::Ident(val)) => {
                 self.tokenizer.next()?;
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::from_ident(&val))])
-                        .add_ident(&val),
-                    AstNode::new(
-                        Primary::Ident(Ident(val)),
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                Ok(
+                    CompiledNode::with_bytecode(vec![ByteCode::Push(CelValue::from_ident(&val))])
+                        .add_ident(&val)
+                        .add_ast(AstNode::new(
+                            Primary::Ident(Ident(val)),
+                            start_loc,
+                            self.tokenizer.location(),
+                        )),
+                )
             }
             Some(Token::LParen) => {
                 self.tokenizer.next()?;
-                let (child, expr_ast) = self.parse_expression()?;
+                let expr = self.parse_expression()?;
+
                 if let Some(Token::RParen) = self.tokenizer.peek()? {
                     self.tokenizer.next()?;
                 }
 
-                Ok((
-                    child,
-                    AstNode::new(
-                        Primary::Parens(expr_ast),
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                let new_ast = AstNode::new(
+                    Primary::Parens(expr.ast()),
+                    start_loc,
+                    self.tokenizer.location(),
+                );
+
+                Ok(expr.add_ast(new_ast))
             }
             Some(Token::LBracket) => {
                 self.tokenizer.next()?;
-                let (children, expr_list_ast) = self.parse_expression_list(Token::RBracket)?;
+                let expr_list = self.parse_expression_list(Token::RBracket)?;
 
                 if let Some(Token::RBracket) = self.tokenizer.peek()? {
                     self.tokenizer.next()?;
                 }
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::MkList(children.len() as u32)])
-                        .consume_children(children),
-                    AstNode::new(
-                        Primary::ListConstruction(expr_list_ast),
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                let new_ast = AstNode::new(
+                    Primary::ListConstruction(expr_list.ast()),
+                    start_loc,
+                    self.tokenizer.location(),
+                );
+
+                Ok(
+                    CompiledNode::with_bytecode(vec![ByteCode::MkList(children.len() as u32)])
+                        .consume_children(children, None)?
+                        .add_ast(new_ast),
+                )
             }
             Some(Token::LBrace) => {
                 self.tokenizer.next()?;
-                let (children, obj_inits_ast) = self.parse_obj_inits()?;
+                let obj_init = self.parse_obj_inits()?;
 
                 if let Some(Token::RBrace) = self.tokenizer.peek()? {
                     self.tokenizer.next()?;
                 }
 
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::MkDict(children.len() as u32 / 2)])
-                        .consume_children(children),
-                    AstNode::new(
-                        Primary::ObjectInit(obj_inits_ast),
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                let new_ast = AstNode::new(
+                    Primary::ObjectInit(obj_inits.ast()),
+                    start_loc,
+                    self.tokenizer.location(),
+                );
+
+                Ok(
+                    CompiledNode::with_bytecode(vec![ByteCode::MkDict(children.len() as u32 / 2)])
+                        .consume_children(children, None)
+                        .add_ast(new_ast),
+                )
             }
             Some(Token::UIntLit(val)) => {
                 self.tokenizer.next()?;
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::from_uint(val))]),
-                    AstNode::new(
-                        Primary::Literal(LiteralsAndKeywords::UnsignedLit(val)),
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+
+                Ok(CompiledNode::with_const(val.into()).add_ast(AstNode::new(
+                    Primary::Literal(LiteralsAndKeywords::UnsignedLit(val)),
+                    start_loc,
+                    self.tokenizer.location(),
+                )))
             }
             Some(Token::IntLit(val)) => {
                 self.tokenizer.next()?;
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::from_int(val))]),
-                    AstNode::new(
-                        Primary::Literal(LiteralsAndKeywords::IntegerLit(val)),
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                Ok(CompiledNode::with_const(val.into()).add_ast(AstNode::new(
+                    Primary::Literal(LiteralsAndKeywords::IntegerLit(val)),
+                    start_loc,
+                    self.tokenizer.location(),
+                )))
             }
             Some(Token::FloatLit(val)) => {
                 self.tokenizer.next()?;
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::from_float(val))]),
-                    AstNode::new(
-                        Primary::Literal(LiteralsAndKeywords::FloatingLit(val)),
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                Ok(CompiledNode::with_const(val.into()).add_ast(AstNode::new(
+                    Primary::Literal(LiteralsAndKeywords::FloatingLit(val)),
+                    start_loc,
+                    self.tokenizer.location(),
+                )))
             }
             Some(Token::StringLit(val)) => {
                 self.tokenizer.next()?;
-                Ok((
-                    ParseResult::with_bytecode(vec![ByteCode::Push(CelValue::from_string(
-                        val.clone(),
-                    ))]),
-                    AstNode::new(
-                        Primary::Literal(LiteralsAndKeywords::StringLit(val)),
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                Ok(CompiledNode::with_const(val.into()).add_ast(AstNode::new(
+                    Primary::Literal(LiteralsAndKeywords::StringLit(val)),
+                    start_loc,
+                    self.tokenizer.location(),
+                )))
             }
             Some(Token::ByteStringLit(val)) => {
                 self.tokenizer.next()?;
@@ -761,12 +757,9 @@ impl<'l> CelCompiler<'l> {
         }
     }
 
-    fn parse_expression_list(
-        &mut self,
-        ending: Token,
-    ) -> CelResult<(Vec<ParseResult>, AstNode<ExprList>)> {
+    fn parse_expression_list(&mut self, ending: Token) -> CelResult<CompiledNode<ExprList>> {
         let start_loc = self.tokenizer.location();
-        let mut vec = Vec::new();
+        let mut bytecode = Vec::new();
         let mut ast = Vec::new();
 
         'outer: loop {
@@ -779,9 +772,9 @@ impl<'l> CelCompiler<'l> {
                 None => {}
             }
 
-            let (expr_res, expr_ast) = self.parse_expression()?;
-            vec.push(expr_res);
-            ast.push(expr_ast);
+            let compiled = self.parse_expression()?;
+            ast.push(compiled.ast().expect("Internal error, no ast"));
+            bytecode.push(compiled.value().into_bytecode());
 
             match self.tokenizer.peek()? {
                 Some(Token::Comma) => {
@@ -793,7 +786,7 @@ impl<'l> CelCompiler<'l> {
         }
 
         Ok((
-            vec,
+            bytecode,
             AstNode::new(
                 ExprList { exprs: ast },
                 start_loc,
@@ -802,7 +795,7 @@ impl<'l> CelCompiler<'l> {
         ))
     }
 
-    fn parse_obj_inits(&mut self) -> CelResult<(Vec<ParseResult>, AstNode<ObjInits>)> {
+    fn parse_obj_inits(&mut self) -> CelResult<CompiledNode<ObjInits>> {
         let start_loc = self.tokenizer.location();
         let mut vec = Vec::new();
         let mut ast = Vec::new();
@@ -813,7 +806,7 @@ impl<'l> CelCompiler<'l> {
                 break 'outer;
             }
 
-            let (key_res, key_ast) = self.parse_expression()?;
+            let compiled_key = self.parse_expression()?;
 
             let next_token = self.tokenizer.next()?;
             if next_token != Some(Token::Colon) {
@@ -822,9 +815,11 @@ impl<'l> CelCompiler<'l> {
                     .into());
             }
             // MkDict expects value then key
-            let (value_res, value_ast) = self.parse_expression()?;
-            vec.push(value_res);
-            vec.push(key_res);
+            let compiled_value = self.parse_expression()?;
+
+            // TODO: refactor this to build map if everything is const
+            vec.push(compiled_value.value().into_bytecode());
+            vec.push(compiled_key.value().into_bytecode());
 
             ast.push(AstNode::new(
                 ObjInit {
@@ -844,14 +839,7 @@ impl<'l> CelCompiler<'l> {
             }
         }
 
-        Ok((
-            vec,
-            AstNode::new(
-                ObjInits { inits: ast },
-                start_loc,
-                self.tokenizer.location(),
-            ),
-        ))
+        Ok(CompiledNode::with_bytecode(vec).add_ast(ast))
     }
 }
 

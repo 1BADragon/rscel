@@ -4,7 +4,7 @@ use serde::Serialize;
 
 use crate::compiler::syntax_error::SyntaxError;
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum CelError {
     Misc(String),
     Syntax(SyntaxError),

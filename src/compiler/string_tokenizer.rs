@@ -1,8 +1,5 @@
 use super::{
-    input_scanner::StringScanner,
-    syntax_error::SyntaxError,
-    tokenizer::Tokenizer,
-    tokens::{NumericLiteral, Token},
+    input_scanner::StringScanner, syntax_error::SyntaxError, tokenizer::Tokenizer, tokens::Token,
 };
 
 pub struct StringTokenizer<'l> {
@@ -44,22 +41,7 @@ impl<'l> StringTokenizer<'l> {
                 '?' => Ok(Some(Token::Question)),
                 ':' => Ok(Some(Token::Colon)),
                 '+' => Ok(Some(Token::Add)),
-                '-' => {
-                    if let Some(token) = self.scanner.peek() {
-                        match token {
-                            '.' | '0'..='9' => {
-                                let mut starting = String::new();
-                                self.scanner.next();
-                                starting.push('-');
-                                starting.push(token);
-                                self.parse_number_or_token(&starting)
-                            }
-                            _ => Ok(Some(Token::Minus)),
-                        }
-                    } else {
-                        Ok(Some(Token::Minus))
-                    }
-                }
+                '-' => Ok(Some(Token::Minus)),
                 '*' => Ok(Some(Token::Multiply)),
                 '/' => Ok(Some(Token::Divide)),
                 '%' => Ok(Some(Token::Mod)),
@@ -394,7 +376,7 @@ impl<'l> StringTokenizer<'l> {
             })))
         } else {
             Ok(Some(Token::IntLit(NumericLiteral {
-                value: i64::from_str_radix(fixedup_str, base).ok(),
+                value: u64::from_str_radix(fixedup_str, base).ok(),
                 str_value: fixedup_str.to_string(),
                 base,
                 location: self.scanner.location(),
