@@ -50,7 +50,7 @@
 //! assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), 7.into());
 //!   
 //! ```
-
+#![feature(try_trait_v2)]
 #![cfg_attr(feature = "python", feature(fn_traits))]
 #![cfg_attr(feature = "python", feature(unboxed_closures))]
 mod cel_error;

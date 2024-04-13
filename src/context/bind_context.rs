@@ -38,7 +38,7 @@ use super::{default_funcs::load_default_funcs, type_funcs::load_default_types};
 ///     }
 /// }
 /// ```
-pub type RsCelFunction = dyn Fn(CelValue, &[CelValue]) -> CelResult<CelValue>;
+pub type RsCelFunction = dyn Fn(CelValue, &[CelValue]) -> CelValue;
 
 /// Prototype for a macro binding.
 ///
@@ -48,8 +48,7 @@ pub type RsCelFunction = dyn Fn(CelValue, &[CelValue]) -> CelResult<CelValue>;
 /// argument is the resolved value the macro is being run on (i.e `my_list.map()`) however
 /// all arguents passed to the macro are left unresolved bytecode. An additional argument,
 /// the Interpreter context, is provided to the macro for bytecode resolution.
-pub type RsCelMacro =
-    dyn for<'a, 'b> Fn(&'a Interpreter<'a>, CelValue, &[&[ByteCode]]) -> CelResult<CelValue>;
+pub type RsCelMacro = dyn for<'a, 'b> Fn(&'a Interpreter<'a>, CelValue, &[&[ByteCode]]) -> CelValue;
 
 /// Bindings context for a cel evaluation.
 ///

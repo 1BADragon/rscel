@@ -164,95 +164,95 @@ impl<'a> Interpreter<'a> {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.or(&v2)?)
+                    stack.push_val(v1.or(&v2))
                 }
                 ByteCode::And => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.and(&v2)?)
+                    stack.push_val(v1.and(&v2))
                 }
                 ByteCode::Not => {
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val((!v1)?);
+                    stack.push_val(!v1);
                 }
                 ByteCode::Neg => {
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val((-v1)?);
+                    stack.push_val(-v1);
                 }
                 ByteCode::Add => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val((v1 + v2)?);
+                    stack.push_val(v1 + v2);
                 }
                 ByteCode::Sub => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val((v1 - v2)?);
+                    stack.push_val(v1 - v2);
                 }
                 ByteCode::Mul => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val((v1 * v2)?);
+                    stack.push_val(v1 * v2);
                 }
                 ByteCode::Div => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val((v1 / v2)?);
+                    stack.push_val(v1 / v2);
                 }
                 ByteCode::Mod => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val((v1 % v2)?);
+                    stack.push_val(v1 % v2);
                 }
                 ByteCode::Lt => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.lt(&v2)?);
+                    stack.push_val(v1.lt(&v2));
                 }
                 ByteCode::Le => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.le(&v2)?);
+                    stack.push_val(v1.le(&v2));
                 }
                 ByteCode::Eq => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(CelValueDyn::eq(&v1, &v2)?);
+                    stack.push_val(CelValueDyn::eq(&v1, &v2));
                 }
                 ByteCode::Ne => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.neq(&v2)?);
+                    stack.push_val(v1.neq(&v2));
                 }
                 ByteCode::Ge => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.ge(&v2)?);
+                    stack.push_val(v1.ge(&v2));
                 }
                 ByteCode::Gt => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.gt(&v2)?);
+                    stack.push_val(v1.gt(&v2));
                 }
                 ByteCode::In => {
                     let rhs = stack.pop_val()?;
                     let lhs = stack.pop_val()?;
 
-                    stack.push_val(lhs.in_(&rhs)?);
+                    stack.push_val(lhs.in_(&rhs));
                 }
                 ByteCode::Jmp(dist) => pc = pc + *dist as usize,
                 ByteCode::JmpCond {
@@ -358,7 +358,7 @@ impl<'a> Interpreter<'a> {
                         }
                     } else if let CelValue::Dyn(d) = obj {
                         if let CelValue::String(index) = index {
-                            stack.push_val(d.access(&index)?);
+                            stack.push_val(d.access(&index));
                         }
                     } else {
                         return Err(CelError::value(&format!(
@@ -382,7 +382,13 @@ impl<'a> Interpreter<'a> {
                                         value: obj,
                                     }),
                                     Err(_) => {
-                                        return Err(CelError::attribute("obj", ident.as_str()));
+                                        stack.push(
+                                            CelValue::from_err(CelError::attribute(
+                                                "obj",
+                                                ident.as_str(),
+                                            ))
+                                            .into(),
+                                        );
                                     }
                                 },
                             },
@@ -399,7 +405,7 @@ impl<'a> Interpreter<'a> {
                                 }
                             }
                             CelValue::Dyn(d) => {
-                                stack.push_val(d.access(ident.as_str())?);
+                                stack.push_val(d.access(ident.as_str()));
                             }
                             _ => {
                                 if let Some(bindings) = self.bindings {
@@ -411,7 +417,13 @@ impl<'a> Interpreter<'a> {
                                             value: obj,
                                         });
                                     } else {
-                                        return Err(CelError::attribute("obj", ident.as_str()));
+                                        stack.push(
+                                            CelValue::from_err(CelError::attribute(
+                                                "obj",
+                                                ident.as_str(),
+                                            ))
+                                            .into(),
+                                        );
                                     }
                                 } else {
                                     return Err(CelError::Runtime(
@@ -421,12 +433,15 @@ impl<'a> Interpreter<'a> {
                             }
                         }
                     } else {
-                        let obj = stack.pop()?;
-                        return Err(CelError::value(&format!(
-                            "Index operator invalid between {:?} and {:?}",
-                            index.into_value()?.as_type(),
-                            obj.into_value()?.as_type()
-                        )));
+                        let obj_type = stack.pop()?.into_value()?.as_type();
+                        stack.push(
+                            CelValue::from_err(CelError::value(&format!(
+                                "Index operator invalid between {:?} and {:?}",
+                                index.into_value()?.as_type(),
+                                obj_type
+                            )))
+                            .into(),
+                        );
                     }
                 }
                 ByteCode::Call(n_args) => {
@@ -473,12 +488,13 @@ impl<'a> Interpreter<'a> {
                                 let arg_values = self.resolve_args(args)?;
                                 stack.push_val(construct_type(&type_name, &arg_values)?);
                             }
-                            other => {
-                                return Err(CelError::runtime(&format!(
+                            other => stack.push_val(
+                                CelValue::from_err(CelError::runtime(&format!(
                                     "{:?} cannot be called",
                                     other
                                 )))
-                            }
+                                .into(),
+                            ),
                         },
                     };
                 }
@@ -487,12 +503,18 @@ impl<'a> Interpreter<'a> {
 
         if resolve {
             match stack.pop() {
-                Ok(val) => val.try_into(),
+                Ok(val) => {
+                    let cel: CelValue = val.try_into()?;
+                    cel.into_result()
+                }
                 Err(err) => Err(err),
             }
         } else {
             match stack.pop_tryresolve() {
-                Ok(val) => val.try_into(),
+                Ok(val) => {
+                    let cel: CelValue = val.try_into()?;
+                    cel.into_result()
+                }
                 Err(err) => Err(err),
             }
         }

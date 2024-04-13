@@ -7,8 +7,8 @@ use crate::{CelResult, CelValue};
 // slowly move towards the whole CelValue's set of operations
 pub trait CelValueDyn: fmt::Debug + fmt::Display + Send + Sync {
     fn as_type(&self) -> CelValue;
-    fn access(&self, key: &str) -> CelResult<CelValue>;
-    fn eq(&self, rhs: &CelValue) -> CelResult<CelValue>;
+    fn access(&self, key: &str) -> CelValue;
+    fn eq(&self, rhs: &CelValue) -> CelValue;
     fn is_truthy(&self) -> bool;
     fn any_ref<'a>(&'a self) -> &'a dyn Any;
 }

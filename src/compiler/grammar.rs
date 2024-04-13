@@ -161,6 +161,9 @@ pub struct ObjInits {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NoAst {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum LiteralsAndKeywords {
     Type,
 

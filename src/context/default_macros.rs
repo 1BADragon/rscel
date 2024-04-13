@@ -1,8 +1,6 @@
 use crate::{
-    cel_error::{CelError, CelResult},
-    interp::Interpreter,
-    utils::eval_ident,
-    BindContext, ByteCode, CelContext, CelValue, CelValueDyn,
+    cel_error::CelError, interp::Interpreter, utils::eval_ident, BindContext, ByteCode, CelContext,
+    CelValue, CelValueDyn,
 };
 
 use super::bind_context::RsCelMacro;
@@ -24,25 +22,25 @@ pub fn load_default_macros(exec_ctx: &mut BindContext) {
     }
 }
 
-fn has_impl(ctx: &Interpreter, _this: CelValue, exprlist: &[&[ByteCode]]) -> CelResult<CelValue> {
+fn has_impl(ctx: &Interpreter, _this: CelValue, exprlist: &[&[ByteCode]]) -> CelValue {
     if exprlist.len() != 1 {
-        return Err(CelError::argument("has() macro expects exactly 1 argument"));
+        return CelValue::from_err(CelError::argument("has() macro expects exactly 1 argument"));
     }
 
     let res = ctx.run_raw(&exprlist[0], true);
     match res {
-        Ok(_) => Ok(CelValue::true_()),
+        Ok(_) => CelValue::true_(),
         Err(err) => match err {
-            CelError::Binding { .. } => Ok(CelValue::false_()),
-            CelError::Attribute { .. } => Ok(CelValue::false_()),
-            _ => Err(err),
+            CelError::Binding { .. } => CelValue::false_(),
+            CelError::Attribute { .. } => CelValue::false_(),
+            _ => CelValue::from_err(err),
         },
     }
 }
 
-fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
+fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
     if bytecode.len() != 2 {
-        return Err(CelError::argument(
+        return CelValue::from_err(CelError::argument(
             "all() macro expects exactly 2 arguments",
         ));
     }
@@ -60,19 +58,19 @@ fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelR
             let res = interp.run_raw(bytecode[1], true)?;
 
             if !res.is_truthy() {
-                return Ok(false.into());
+                return false.into();
             }
         }
 
-        Ok(true.into())
+        true.into()
     } else {
-        Err(CelError::value("all() only available on list"))
+        CelValue::from_err(CelError::value("all() only available on list"))
     }
 }
 
-fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
+fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
     if bytecode.len() != 2 {
-        return Err(CelError::argument(
+        return CelValue::from_err(CelError::argument(
             "exists() macro expects exactly 2 arguments",
         ));
     }
@@ -89,23 +87,19 @@ fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
             let res = interp.run_raw(bytecode[1], true)?;
 
             if res.is_truthy() {
-                return Ok(true.into());
+                return true.into();
             }
         }
 
-        Ok(false.into())
+        false.into()
     } else {
-        Err(CelError::value("exists() only available on list"))
+        CelValue::from_err(CelError::value("exists() only available on list"))
     }
 }
 
-fn exists_one_impl(
-    ctx: &Interpreter,
-    this: CelValue,
-    bytecode: &[&[ByteCode]],
-) -> CelResult<CelValue> {
+fn exists_one_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
     if bytecode.len() != 2 {
-        return Err(CelError::argument(
+        return CelValue::from_err(CelError::argument(
             "exists_one() macro expects exactly 2 arguments",
         ));
     }
@@ -127,20 +121,20 @@ fn exists_one_impl(
                 count += 1;
 
                 if count > 1 {
-                    return Ok(false.into());
+                    return false.into();
                 }
             }
         }
 
-        Ok((count == 1).into())
+        (count == 1).into()
     } else {
-        Err(CelError::value("exists_one() only available on list"))
+        CelValue::from_err(CelError::value("exists_one() only available on list"))
     }
 }
 
-fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
+fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
     if bytecode.len() != 2 {
-        return Err(CelError::argument(
+        return CelValue::from_err(CelError::argument(
             "filter() macro expects exactly 2 arguments",
         ));
     }
@@ -161,15 +155,15 @@ fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
                 filtered_list.push(v.clone());
             }
         }
-        Ok(filtered_list.into())
+        filtered_list.into()
     } else {
-        Err(CelError::value("filter() only available on list"))
+        CelValue::from_err(CelError::value("filter() only available on list"))
     }
 }
 
-fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
+fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
     if !(bytecode.len() == 2 || bytecode.len() == 3) {
-        return Err(CelError::argument(
+        return CelValue::from_err(CelError::argument(
             "map() macro expects exactly 2 or 3 arguments",
         ));
     }
@@ -200,19 +194,19 @@ fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelR
                 }
             }
         } else {
-            return Err(CelError::internal("Bytecode len check failed"));
+            return CelValue::from_err(CelError::internal("Bytecode len check failed"));
         }
 
-        Ok(mapped_list.into())
+        mapped_list.into()
     } else {
-        Err(CelError::value("map() only available on list"))
+        CelValue::from_err(CelError::value("map() only available on list"))
     }
 }
 
 // reduce [].reduce(curr, next, expression, starting)
-fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelResult<CelValue> {
+fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
     if bytecode.len() != 4 {
-        return Err(CelError::argument("reduce() macro expects 4 arguments"));
+        return CelValue::from_err(CelError::argument("reduce() macro expects 4 arguments"));
     }
 
     let curr_name = eval_ident(bytecode[0])?;
@@ -231,28 +225,24 @@ fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
             cur_value = interp.run_raw(bytecode[2], true)?;
         }
 
-        Ok(cur_value)
+        cur_value
     } else {
-        Err(CelError::value("reduce() only availble on list"))
+        CelValue::from_err(CelError::value("reduce() only availble on list"))
     }
 }
 
-fn coalesce_impl(
-    ctx: &Interpreter,
-    _this: CelValue,
-    bytecode: &[&[ByteCode]],
-) -> CelResult<CelValue> {
+fn coalesce_impl(ctx: &Interpreter, _this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
     for arg in bytecode.iter() {
         let res = ctx.run_raw(arg, true);
         match res {
             Ok(CelValue::Null) => {}
             Err(err) => match err {
                 CelError::Binding { .. } | CelError::Attribute { .. } => {}
-                _ => return Err(err),
+                _ => return CelValue::from_err(err),
             },
-            Ok(v) => return Ok(v),
+            Ok(v) => return v,
         };
     }
 
-    Ok(CelValue::from_null())
+    CelValue::from_null()
 }

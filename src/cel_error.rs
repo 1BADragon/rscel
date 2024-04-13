@@ -1,6 +1,6 @@
 use std::{error, fmt};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::compiler::syntax_error::SyntaxError;
 

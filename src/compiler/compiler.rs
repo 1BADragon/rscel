@@ -2,12 +2,11 @@ use super::{
     ast_node::AstNode,
     compiled_node::{CompiledNode, CompiledNodeTrait},
     grammar::*,
-    parse_result::ParseResult,
     syntax_error::SyntaxError,
     tokenizer::Tokenizer,
     tokens::Token,
 };
-use crate::{interp::JmpWhen, ByteCode, CelResult, CelValue, Program};
+use crate::{interp::JmpWhen, ByteCode, CelResult, CelValue, CelValueDyn, Program};
 
 pub struct CelCompiler<'l> {
     tokenizer: &'l mut dyn Tokenizer,
@@ -27,19 +26,23 @@ impl<'l> CelCompiler<'l> {
                 .into());
         }
 
-        let prog = compiled.into_program(self.tokenizer.source().to_string());
+        let prog =
+            CompiledNode::<Expr>::into_program(compiled, self.tokenizer.source().to_string());
 
         Ok(prog)
     }
 
     fn parse_expression(&mut self) -> CelResult<CompiledNode<Expr>> {
         let start_location = self.tokenizer.location();
-        let (lhs, lhs_ast) = self.parse_conditional_or()?;
+        let mut lhs_node = self.parse_conditional_or()?;
+
+        let lhs_ast = lhs_node.yank_ast();
 
         match self.tokenizer.peek()? {
             Some(Token::Question) => {
                 self.tokenizer.next()?;
-                let (true_clause, tc_ast) = self.parse_conditional_or()?;
+                let mut true_clause_node = self.parse_conditional_or()?;
+                let true_clause_ast = true_clause_node.yank_ast();
 
                 let next = self.tokenizer.next()?;
                 if next != Some(Token::Colon) {
@@ -48,466 +51,495 @@ impl<'l> CelCompiler<'l> {
                         .into());
                 }
 
-                let (false_clause, fc_ast) = self.parse_expression()?;
+                let mut false_clause_node = self.parse_expression()?;
+                let false_clause_ast = false_clause_node.yank_ast();
 
-                Ok((
-                    lhs.into_turnary(true_clause, false_clause),
-                    AstNode::new(
+                Ok(lhs_node
+                    .into_turnary(true_clause_node, false_clause_node)
+                    .add_ast(AstNode::new(
                         Expr::Ternary {
                             condition: Box::new(lhs_ast),
-                            true_clause: Box::new(tc_ast),
-                            false_clause: Box::new(fc_ast),
+                            true_clause: Box::new(true_clause_ast),
+                            false_clause: Box::new(false_clause_ast),
                         },
                         start_location,
                         self.tokenizer.location(),
-                    ),
-                ))
+                    )))
             }
-            _ => Ok((
-                lhs,
-                AstNode::new(
-                    Expr::Unary(Box::new(lhs_ast)),
-                    start_location,
-                    self.tokenizer.location(),
-                ),
-            )),
+            _ => Ok(CompiledNode::from_node(lhs_node).add_ast(AstNode::new(
+                Expr::Unary(Box::new(lhs_ast)),
+                start_location,
+                self.tokenizer.location(),
+            ))),
         }
     }
 
-    fn parse_conditional_or(&mut self) -> CelResult<(ParseResult, AstNode<ConditionalOr>)> {
+    fn parse_conditional_or(&mut self) -> CelResult<CompiledNode<ConditionalOr>> {
         let start_loc = self.tokenizer.location();
-        let (mut current_node, lhs_ast) = self.parse_conditional_and()?;
-
-        let (lhs_start, lhs_end) = (lhs_ast.start(), lhs_ast.end());
-        let mut current_ast = AstNode::new(ConditionalOr::Unary(lhs_ast), lhs_start, lhs_end);
+        let mut current_node = self.parse_conditional_and()?.convert_with_ast(|lhs_ast| {
+            AstNode::new(
+                ConditionalOr::Unary(lhs_ast),
+                start_loc,
+                self.tokenizer.location(),
+            )
+        });
+        let mut current_ast = current_node.yank_ast();
 
         loop {
             if let Some(Token::OrOr) = self.tokenizer.peek()? {
                 self.tokenizer.next()?;
-                let (rhs, rhs_ast) = self.parse_conditional_and()?;
-                let jmp = ParseResult::with_bytecode(vec![ByteCode::JmpCond {
+                let mut rhs_node = self.parse_conditional_and()?;
+
+                let jmp_node = CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::JmpCond {
                     when: JmpWhen::True,
-                    dist: rhs.bytecode().len() as u32 + 1,
+                    dist: rhs_node.bytecode_len() as u32 + 1,
                     leave_val: true,
                 }]);
-                current_node = ParseResult::with_bytecode(vec![ByteCode::Or])
-                    .consume_children(vec![current_node, jmp, rhs]);
+
                 current_ast = AstNode::new(
                     ConditionalOr::Binary {
                         lhs: Box::new(current_ast),
-                        rhs: rhs_ast,
+                        rhs: rhs_node.yank_ast(),
                     },
                     start_loc,
                     self.tokenizer.location(),
+                );
+                current_node = CompiledNode::with_bytecode(vec![ByteCode::Or]).consume_children3(
+                    current_node,
+                    jmp_node,
+                    rhs_node,
+                    |lhs, rhs| lhs.or(&rhs),
                 );
             } else {
                 break;
             }
         }
-        Ok((current_node, current_ast))
+
+        Ok(current_node.add_ast(current_ast))
     }
 
-    fn parse_conditional_and(&mut self) -> CelResult<(ParseResult, AstNode<ConditionalAnd>)> {
+    fn parse_conditional_and(&mut self) -> CelResult<CompiledNode<ConditionalAnd>> {
         let start_loc = self.tokenizer.location();
-        let (mut current_node, lhs_ast) = self.parse_relation()?;
+        let mut current_node = self.parse_relation()?.convert_with_ast(|ast| {
+            AstNode::new(
+                ConditionalAnd::Unary(ast),
+                start_loc,
+                self.tokenizer.location(),
+            )
+        });
 
-        let (lhs_start, lhs_end) = (lhs_ast.start(), lhs_ast.end());
-        let mut current_ast = AstNode::new(ConditionalAnd::Unary(lhs_ast), lhs_start, lhs_end);
+        let mut current_ast = current_node.yank_ast();
 
         loop {
             if let Some(Token::AndAnd) = self.tokenizer.peek()? {
                 self.tokenizer.next()?;
-                let (rhs, rhs_ast) = self.parse_relation()?;
-                let jmp = ParseResult::with_bytecode(vec![ByteCode::JmpCond {
+                let mut rhs_node = self.parse_relation()?;
+                let jmp_node = CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::JmpCond {
                     when: JmpWhen::False,
-                    dist: rhs.bytecode().len() as u32 + 1,
+                    dist: rhs_node.bytecode_len() as u32 + 1,
                     leave_val: true,
                 }]);
 
-                current_node = ParseResult::with_bytecode(vec![ByteCode::And])
-                    .consume_children(vec![current_node, jmp, rhs]);
                 current_ast = AstNode::new(
                     ConditionalAnd::Binary {
                         lhs: Box::new(current_ast),
-                        rhs: rhs_ast,
+                        rhs: rhs_node.yank_ast(),
                     },
                     start_loc,
                     self.tokenizer.location(),
+                );
+                current_node = CompiledNode::with_bytecode(vec![ByteCode::And]).consume_children3(
+                    current_node,
+                    jmp_node,
+                    rhs_node,
+                    |lhs, rhs| lhs.and(&rhs),
                 );
             } else {
                 break;
             }
         }
-        Ok((current_node, current_ast))
+        Ok(current_node.add_ast(current_ast))
     }
 
-    fn parse_relation(&mut self) -> CelResult<(ParseResult, AstNode<Relation>)> {
+    fn parse_relation(&mut self) -> CelResult<CompiledNode<Relation>> {
         let start_loc = self.tokenizer.location();
-        let (mut current_node, lhs_ast) = self.parse_addition()?;
-
-        let (lhs_start, lhs_end) = (lhs_ast.start(), lhs_ast.end());
-        let mut current_ast = AstNode::new(Relation::Unary(lhs_ast), lhs_start, lhs_end);
+        let mut current_node = self.parse_addition()?.convert_with_ast(|ast| {
+            AstNode::new(Relation::Unary(ast), start_loc, self.tokenizer.location())
+        });
+        let mut current_ast = current_node.yank_ast();
 
         loop {
             match self.tokenizer.peek()? {
                 Some(Token::LessThan) => {
                     self.tokenizer.next()?;
 
-                    let (rhs, rhs_ast) = self.parse_addition()?;
+                    let mut rhs_node = self.parse_addition()?;
 
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::Lt])
-                        .consume_children(vec![current_node, rhs]);
                     current_ast = AstNode::new(
                         Relation::Binary {
                             lhs: Box::new(current_ast),
                             op: Relop::Lt,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Lt])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.lt(&rhs));
                 }
                 Some(Token::LessEqual) => {
                     self.tokenizer.next()?;
-                    let (rhs, rhs_ast) = self.parse_addition()?;
+                    let rhs_node = self.parse_addition()?;
 
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::Le])
-                        .consume_children(vec![current_node, rhs]);
                     current_ast = AstNode::new(
                         Relation::Binary {
                             lhs: Box::new(current_ast),
                             op: Relop::Le,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Le])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.le(&rhs));
                 }
                 Some(Token::EqualEqual) => {
                     self.tokenizer.next()?;
-                    let (rhs, rhs_ast) = self.parse_addition()?;
+                    let mut rhs_node = self.parse_addition()?;
 
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::Eq])
-                        .consume_children(vec![current_node, rhs]);
                     current_ast = AstNode::new(
                         Relation::Binary {
                             lhs: Box::new(current_ast),
                             op: Relop::Eq,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Eq])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| {
+                            CelValueDyn::eq(&lhs, &rhs)
+                        });
                 }
                 Some(Token::NotEqual) => {
                     self.tokenizer.next()?;
-                    let (rhs, rhs_ast) = self.parse_addition()?;
+                    let mut rhs_node = self.parse_addition()?;
 
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::Ne])
-                        .consume_children(vec![current_node, rhs]);
                     current_ast = AstNode::new(
                         Relation::Binary {
                             lhs: Box::new(current_ast),
                             op: Relop::Ne,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Ne])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.neq(&rhs));
                 }
                 Some(Token::GreaterEqual) => {
                     self.tokenizer.next()?;
-                    let (rhs, rhs_ast) = self.parse_addition()?;
+                    let mut rhs_node = self.parse_addition()?;
 
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::Ge])
-                        .consume_children(vec![current_node, rhs]);
                     current_ast = AstNode::new(
                         Relation::Binary {
                             lhs: Box::new(current_ast),
                             op: Relop::Ge,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Ge])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.ge(&rhs));
                 }
                 Some(Token::GreaterThan) => {
                     self.tokenizer.next()?;
-                    let (rhs, rhs_ast) = self.parse_addition()?;
+                    let mut rhs_node = self.parse_addition()?;
 
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::Gt])
-                        .consume_children(vec![current_node, rhs]);
                     current_ast = AstNode::new(
                         Relation::Binary {
                             lhs: Box::new(current_ast),
                             op: Relop::Gt,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Gt])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.ge(&rhs));
                 }
                 Some(Token::In) => {
                     self.tokenizer.next()?;
-                    let (rhs, rhs_ast) = self.parse_addition()?;
+                    let mut rhs_node = self.parse_addition()?;
 
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::In])
-                        .consume_children(vec![current_node, rhs]);
                     current_ast = AstNode::new(
                         Relation::Binary {
                             lhs: Box::new(current_ast),
                             op: Relop::In,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::In])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.in_(&rhs));
                 }
                 _ => break,
             }
         }
 
-        Ok((current_node, current_ast))
+        Ok(current_node.add_ast(current_ast))
     }
 
-    fn parse_addition(&mut self) -> CelResult<(ParseResult, AstNode<Addition>)> {
+    fn parse_addition(&mut self) -> CelResult<CompiledNode<Addition>> {
         let start_loc = self.tokenizer.location();
-        let (mut current_node, lhs_ast) = self.parse_multiplication()?;
-
-        let (lhs_start, lhs_end) = (lhs_ast.start(), lhs_ast.end());
-        let mut current_ast = AstNode::new(Addition::Unary(lhs_ast), lhs_start, lhs_end);
+        let mut current_node = self.parse_multiplication()?.convert_with_ast(|ast| {
+            AstNode::new(Addition::Unary(ast), start_loc, self.tokenizer.location())
+        });
+        let mut current_ast = current_node.yank_ast();
 
         loop {
             match self.tokenizer.peek()? {
                 Some(Token::Add) => {
                     self.tokenizer.next()?;
 
-                    let (rhs, rhs_ast) = self.parse_multiplication()?;
+                    let mut rhs_node = self.parse_multiplication()?;
 
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::Add])
-                        .consume_children(vec![current_node, rhs]);
                     current_ast = AstNode::new(
                         Addition::Binary {
                             lhs: Box::new(current_ast),
                             op: AddOp::Add,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Add])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs + rhs);
                 }
                 Some(Token::Minus) => {
                     self.tokenizer.next()?;
 
-                    let (rhs, rhs_ast) = self.parse_multiplication()?;
+                    let mut rhs_node = self.parse_multiplication()?;
 
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::Sub])
-                        .consume_children(vec![current_node, rhs]);
                     current_ast = AstNode::new(
                         Addition::Binary {
                             lhs: Box::new(current_ast),
                             op: AddOp::Sub,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Sub])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs - rhs);
                 }
                 _ => break,
             }
         }
 
-        Ok((current_node, current_ast))
+        Ok(current_node.add_ast(current_ast))
     }
 
-    fn parse_multiplication(&mut self) -> CelResult<(ParseResult, AstNode<Multiplication>)> {
+    fn parse_multiplication(&mut self) -> CelResult<CompiledNode<Multiplication>> {
         let start_loc = self.tokenizer.location();
-        let (mut current_node, lhs_ast) = self.parse_unary()?;
-
-        let (lhs_start, lhs_end) = (lhs_ast.start(), lhs_ast.end());
-        let mut current_ast = AstNode::new(Multiplication::Unary(lhs_ast), lhs_start, lhs_end);
+        let mut current_node = self.parse_unary()?.convert_with_ast(|ast| {
+            AstNode::new(
+                Multiplication::Unary(ast),
+                start_loc,
+                self.tokenizer.location(),
+            )
+        });
+        let mut current_ast = current_node.yank_ast();
 
         loop {
             match self.tokenizer.peek()? {
                 Some(Token::Multiply) => {
                     self.tokenizer.next()?;
 
-                    let (rhs, rhs_ast) = self.parse_unary()?;
-
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::Mul])
-                        .consume_children(vec![current_node, rhs]);
+                    let mut rhs_node = self.parse_unary()?;
                     current_ast = AstNode::new(
                         Multiplication::Binary {
                             lhs: Box::new(current_ast),
                             op: MultOp::Mult,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Mul])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs * rhs);
                 }
                 Some(Token::Divide) => {
                     self.tokenizer.next()?;
 
-                    let (rhs, rhs_ast) = self.parse_unary()?;
+                    let mut rhs_node = self.parse_unary()?;
 
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::Div])
-                        .consume_children(vec![current_node, rhs]);
                     current_ast = AstNode::new(
                         Multiplication::Binary {
                             lhs: Box::new(current_ast),
                             op: MultOp::Div,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Div])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs / rhs);
                 }
                 Some(Token::Mod) => {
                     self.tokenizer.next()?;
 
-                    let (rhs, rhs_ast) = self.parse_unary()?;
+                    let mut rhs_node = self.parse_unary()?;
 
-                    current_node = ParseResult::with_bytecode(vec![ByteCode::Mod])
-                        .consume_children(vec![current_node, rhs]);
                     current_ast = AstNode::new(
                         Multiplication::Binary {
                             lhs: Box::new(current_ast),
                             op: MultOp::Mod,
-                            rhs: rhs_ast,
+                            rhs: rhs_node.yank_ast(),
                         },
                         start_loc,
                         self.tokenizer.location(),
                     );
+
+                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Mod])
+                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs % rhs);
                 }
                 _ => break,
             }
         }
 
-        Ok((current_node, current_ast))
+        Ok(current_node.add_ast(current_ast))
     }
 
-    fn parse_unary(&mut self) -> CelResult<(ParseResult, AstNode<Unary>)> {
+    fn parse_unary(&mut self) -> CelResult<CompiledNode<Unary>> {
         let start_loc = self.tokenizer.location();
         match self.tokenizer.peek()? {
             Some(Token::Not) => {
-                let (not_res, not_ast) = self.parse_not_list()?;
-                let (member_res, member_ast) = self.parse_member()?;
+                let mut not = self.parse_not_list()?;
+                let not_ast = not.yank_ast();
+                let mut member = self.parse_member()?;
+                let member_ast = member.yank_ast();
 
-                Ok((
-                    member_res.append_result(not_res),
-                    AstNode::new(
-                        Unary::NotMember {
-                            nots: not_ast,
-                            member: member_ast,
-                        },
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                Ok(member.append_result(not).add_ast(AstNode::new(
+                    Unary::NotMember {
+                        nots: not_ast,
+                        member: member_ast,
+                    },
+                    start_loc,
+                    self.tokenizer.location(),
+                )))
             }
             Some(Token::Minus) => {
-                let (neg_res, neg_ast) = self.parse_neg_list()?;
-                let (member_res, member_ast) = self.parse_member()?;
+                let mut neg = self.parse_neg_list()?;
+                let neg_ast = neg.yank_ast();
+                let mut member = self.parse_member()?;
+                let member_ast = member.yank_ast();
 
-                Ok((
-                    member_res.append_result(neg_res),
-                    AstNode::new(
-                        Unary::NegMember {
-                            negs: neg_ast,
-                            member: member_ast,
-                        },
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                Ok(member.append_result(neg).add_ast(AstNode::new(
+                    Unary::NegMember {
+                        negs: neg_ast,
+                        member: member_ast,
+                    },
+                    start_loc,
+                    self.tokenizer.location(),
+                )))
             }
             _ => {
-                let (member, member_ast) = self.parse_member()?;
+                let member = self.parse_member()?;
 
-                Ok((
-                    member,
-                    AstNode::new(
-                        Unary::Member(member_ast),
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                Ok(member.convert_with_ast(|ast| {
+                    AstNode::new(Unary::Member(ast), start_loc, self.tokenizer.location())
+                }))
             }
         }
     }
 
-    fn parse_not_list(&mut self) -> CelResult<(ParseResult, AstNode<NotList>)> {
+    fn parse_not_list(&mut self) -> CelResult<CompiledNode<NotList>> {
         let start_loc = self.tokenizer.location();
-        let _res = ParseResult::empty();
 
         match self.tokenizer.peek()? {
             Some(Token::Not) => {
                 self.tokenizer.next()?;
-                let (nxt, ast) = self.parse_not_list()?;
-                Ok((
-                    nxt.append_result(ParseResult::with_bytecode(vec![ByteCode::Not])),
-                    AstNode::new(
-                        NotList::List {
-                            tail: Box::new(ast),
-                        },
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                let nxt_node = self.parse_not_list()?;
+                Ok(nxt_node
+                    .append_result(CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::Not]))
+                    .convert_with_ast(|ast| {
+                        AstNode::new(
+                            NotList::List {
+                                tail: Box::new(ast),
+                            },
+                            start_loc,
+                            self.tokenizer.location(),
+                        )
+                    }))
             }
-            _ => Ok((
-                ParseResult::empty(),
-                AstNode::new(NotList::EmptyList, start_loc, self.tokenizer.location()),
-            )),
+            _ => Ok(CompiledNode::empty().add_ast(AstNode::new(
+                NotList::EmptyList,
+                start_loc,
+                self.tokenizer.location(),
+            ))),
         }
     }
 
-    fn parse_neg_list(&mut self) -> CelResult<(ParseResult, AstNode<NegList>)> {
+    fn parse_neg_list(&mut self) -> CelResult<CompiledNode<NegList>> {
         let start_loc = self.tokenizer.location();
-        let _res = ParseResult::empty();
 
         match self.tokenizer.peek()? {
             Some(Token::Minus) => {
                 self.tokenizer.next()?;
-                let (nxt, ast) = self.parse_neg_list()?;
-                Ok((
-                    nxt.append_result(ParseResult::with_bytecode(vec![ByteCode::Neg])),
-                    AstNode::new(
-                        NegList::List {
-                            tail: Box::new(ast),
-                        },
-                        start_loc,
-                        self.tokenizer.location(),
-                    ),
-                ))
+                let nxt_node = self.parse_neg_list()?;
+                Ok(nxt_node
+                    .append_result(CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::Neg]))
+                    .convert_with_ast(|ast| {
+                        AstNode::new(
+                            NegList::List {
+                                tail: Box::new(ast),
+                            },
+                            start_loc,
+                            self.tokenizer.location(),
+                        )
+                    }))
             }
-            _ => Ok((
-                ParseResult::empty(),
-                AstNode::new(NegList::EmptyList, start_loc, self.tokenizer.location()),
-            )),
+            _ => Ok(CompiledNode::empty().add_ast(AstNode::new(
+                NegList::EmptyList,
+                start_loc,
+                self.tokenizer.location(),
+            ))),
         }
     }
 
-    fn parse_member(&mut self) -> CelResult<(ParseResult, AstNode<Member>)> {
+    fn parse_member(&mut self) -> CelResult<CompiledNode<Member>> {
         let start_loc = self.tokenizer.location();
-        let (primary, primary_ast) = self.parse_primary()?;
-        let (member_prime, member_prime_ast) = self.parse_member_prime()?;
+        let primary = self.parse_primary()?;
+        let mut member_prime = self.parse_member_prime()?;
 
-        Ok((
-            primary.append_result(member_prime),
+        let member_prime_ast = member_prime.yank_ast();
+
+        Ok(primary.append_result(member_prime).convert_with_ast(|ast| {
             AstNode::new(
                 Member {
-                    primary: primary_ast,
-                    member: member_prime_ast,
+                    primary: ast,
+                    member: member_prime_ast.clone(),
                 },
                 start_loc,
                 self.tokenizer.location(),
-            ),
-        ))
+            )
+        }))
     }
 
-    fn parse_member_prime(&mut self) -> CelResult<(ParseResult, AstNode<MemberPrime>)> {
+    fn parse_member_prime(&mut self) -> CelResult<CompiledNode<MemberPrime>> {
         let start_loc = self.tokenizer.location();
 
         match self.tokenizer.peek()? {
@@ -515,24 +547,25 @@ impl<'l> CelCompiler<'l> {
                 self.tokenizer.next()?;
                 match self.tokenizer.next()? {
                     Some(Token::Ident(ident)) => {
-                        let res = ParseResult::with_bytecode(vec![
+                        let res = CompiledNode::with_bytecode(vec![
                             ByteCode::Push(CelValue::from_ident(&ident)),
                             ByteCode::Access,
                         ]);
 
                         let ident_end = self.tokenizer.location();
-                        let (child_res, child_ast) = self.parse_member_prime()?;
-                        Ok((
-                            res.append_result(child_res),
+                        let mut child_res = self.parse_member_prime()?;
+                        let child_res_ast = child_res.yank_ast();
+
+                        Ok(res.append_result(child_res).convert_with_ast(|_ast| {
                             AstNode::new(
                                 MemberPrime::MemberAccess {
                                     ident: AstNode::new(Ident(ident), start_loc, ident_end),
-                                    tail: Box::new(child_ast),
+                                    tail: Box::new(child_res_ast),
                                 },
                                 start_loc,
                                 self.tokenizer.location(),
-                            ),
-                        ))
+                            )
+                        }))
                     }
                     Some(other) => Err(SyntaxError::from_location(self.tokenizer.location())
                         .with_message(format!("Expected ident got {:?}", other))
@@ -545,7 +578,7 @@ impl<'l> CelCompiler<'l> {
             Some(Token::LParen) => {
                 self.tokenizer.next()?;
 
-                let (args, args_ast) = self.parse_expression_list(Token::RParen)?;
+                let node = self.parse_expression_list(Token::RParen)?;
 
                 let token = self.tokenizer.next()?;
                 if token != Some(Token::RParen) {
@@ -556,45 +589,42 @@ impl<'l> CelCompiler<'l> {
                         ))
                         .into())
                 } else {
-                    let (child, child_ast) = self.parse_member_prime()?;
-                    Ok((
-                        ParseResult::with_bytecode(vec![ByteCode::Call(args.len() as u32)])
-                            .consume_call_children(args)
-                            .append_result(child),
-                        AstNode::new(
-                            MemberPrime::Call {
-                                call: args_ast,
-                                tail: Box::new(child_ast),
-                            },
-                            start_loc,
-                            self.tokenizer.location(),
-                        ),
-                    ))
+                    Ok(
+                        CompiledNode::with_bytecode(vec![ByteCode::Call(args.len() as u32)])
+                            .consume_call_children(node)
+                            .append_result(child_node)
+                            .add_ast(AstNode::new(
+                                MemberPrime::Call {
+                                    call: args_ast,
+                                    tail: Box::new(child_ast),
+                                },
+                                start_loc,
+                                self.tokenizer.location(),
+                            )),
+                    )
                 }
             }
             Some(Token::LBracket) => {
                 self.tokenizer.next()?;
 
-                let (index, index_ast) = self.parse_expression()?;
+                let index_node = self.parse_expression()?;
 
                 let next_token = self.tokenizer.next()?;
                 match next_token {
                     Some(Token::RBracket) => {
                         let (child, child_ast) = self.parse_member_prime()?;
 
-                        Ok((
-                            index
-                                .append_result(ParseResult::with_bytecode(vec![ByteCode::Index]))
-                                .append_result(child),
-                            AstNode::new(
+                        Ok(index_node
+                            .append_result(CompiledNode::with_bytecode(vec![ByteCode::Index]))
+                            .append_result(child)
+                            .add_ast(AstNode::new(
                                 MemberPrime::ArrayAccess {
                                     access: index_ast,
                                     tail: Box::new(child_ast),
                                 },
                                 start_loc,
                                 self.tokenizer.location(),
-                            ),
-                        ))
+                            )))
                     }
                     _ => Err(SyntaxError::from_location(self.tokenizer.location())
                         .with_message(format!(
@@ -604,10 +634,12 @@ impl<'l> CelCompiler<'l> {
                         .into()),
                 }
             }
-            _ => Ok((
-                ParseResult::empty(),
-                AstNode::new(MemberPrime::Empty, start_loc, self.tokenizer.location()),
-            )),
+
+            _ => Ok(CompiledNode::empty().add_ast(AstNode::new(
+                MemberPrime::Empty,
+                start_loc,
+                self.tokenizer.location(),
+            ))),
         }
     }
 
