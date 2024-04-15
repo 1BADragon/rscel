@@ -1,6 +1,6 @@
 [package]
 name = "rscel"
-version = "0.11.1"
+version = "0.11.2"
 edition = "2021"
 description = "Cel interpreter in rust"
 license = "MIT"
@@ -13,7 +13,7 @@ inherits = "release"
 debug = true
 
 [features]
-default = ["type_prop"]
+default = ["type_prop", "wasm"]
 ast_ser = []
 debug_output = []
 type_prop = []
@@ -29,22 +29,22 @@ protobuf-codegen = "3.4.0"
 protoc-bin-vendored = "3.0.0"
 
 [dependencies]
-test-case = "3.2.1"
-regex = "1.10.2"
-serde = { version = "1.0.190", features = ["derive", "rc"] }
-serde_with = { version = "3.4.0", features = ["chrono"] }
-serde_json = { version = "1.0.108", features = ["raw_value"] }
-chrono = { version = "0.4.31", features = ["serde"] }
-duration-str = "0.7.0"
-num = "0.4.1"
+test-case = "3.3.1"
+regex = "1.10.4"
+serde = { version = "1.0.197", features = ["derive", "rc"] }
+serde_with = { version = "3.7.0", features = ["chrono"] }
+serde_json = { version = "1.0.115", features = ["raw_value"] }
+chrono = { version = "0.4.38", features = ["serde"] }
+duration-str = "0.7.1"
+num = "0.4.2"
 protobuf = { version = "3.4.0" }
+chrono-tz = "0.9.0"
 
 # Dependencies for python bindings
 pyo3 = { version = "0.20.0", optional = true, features = ["extension-module", "chrono"] }
 
 # Dependencies for wasm bindings
-wasm-bindgen = { version = "0.2.87", optional = true}
+wasm-bindgen = { version = "0.2.92", optional = true}
 console_error_panic_hook = { version = "0.1.7", optional = true }
-serde-wasm-bindgen = { version = "0.6.1", optional = true }
-js-sys = { version = "0.3.64", optional = true }
-chrono-tz = "0.8.5"
+serde-wasm-bindgen = { version = "0.6.5", optional = true }
+js-sys = { version = "0.3.68", optional = true }
