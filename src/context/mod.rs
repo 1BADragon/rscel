@@ -104,6 +104,6 @@ mod test {
 
         let res = ctx.exec("test_main", &exec_ctx).unwrap();
 
-        assert!(TryInto::<i64>::try_into(res).unwrap() == 7)
+        assert!(res == 7.into())
     }
 }

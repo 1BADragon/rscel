@@ -132,6 +132,7 @@ fn test_contains() {
 #[test_case(".1", 0.1.into(); "dot leading floating point")]
 #[test_case("-.1", (-0.1).into(); "neg dot leading floating point")]
 #[test_case("2+3 in [5]", true.into(); "check in binding")]
+#[test_case("foo.b || true", true.into(); "Error bypassing")]
 fn test_equation(prog: &str, res: CelValue) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

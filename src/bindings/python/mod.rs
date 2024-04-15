@@ -153,21 +153,21 @@ impl CelValueDyn for PyObject {
         })
     }
 
-    fn access(&self, key: &str) -> crate::CelResult<CelValue> {
+    fn access(&self, key: &str) -> CelValue {
         Python::with_gil(|py| {
             let obj = self.as_ref(py);
 
             match obj.getattr(key) {
                 Ok(res) => match res.extract() {
-                    Ok(val) => Ok(val),
-                    Err(err) => Err(CelError::Misc(err.to_string())),
+                    Ok(val) => val,
+                    Err(err) => CelValue::from_err(CelError::Misc(err.to_string())),
                 },
-                Err(err) => Err(CelError::Misc(err.to_string())),
+                Err(err) => CelValue::from_err(CelError::Misc(err.to_string())),
             }
         })
     }
 
-    fn eq(&self, rhs: &CelValue) -> crate::CelResult<CelValue> {
+    fn eq(&self, rhs: &CelValue) -> CelValue {
         let lhs_type = self.as_type();
         let rhs_type = self.as_type();
 
@@ -178,14 +178,14 @@ impl CelValueDyn for PyObject {
                     let rhs_obj = rhs_obj.as_ref(py);
 
                     match lhs_obj.eq(rhs_obj) {
-                        Ok(res) => Ok(CelValue::from_bool(res)),
-                        Err(err) => Err(CelError::Misc(err.to_string())),
+                        Ok(res) => CelValue::from_bool(res),
+                        Err(err) => CelValue::from_err(CelError::Misc(err.to_string())),
                     }
                 });
             }
         }
 
-        Err(CelError::invalid_op(&format!(
+        CelValue::from_err(CelError::invalid_op(&format!(
             "Invalid op == between {} and {}",
             lhs_type, rhs_type
         )))

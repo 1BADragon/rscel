@@ -1366,7 +1366,7 @@ impl Not for CelValue {
 
         match self {
             CelValue::Bool(val1) => {
-                return Ok(CelValue::from(!val1));
+                return CelValue::from(!val1);
             }
             _ => {}
         }

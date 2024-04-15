@@ -54,7 +54,7 @@ impl<'a, 'b> InterpStack<'a, 'b> {
                             }
                         }
 
-                        Err(CelError::binding(&name))
+                        Ok(CelValue::from_err(CelError::binding(&name)).into())
                     } else {
                         Ok(val.into())
                     }
@@ -268,6 +268,8 @@ impl<'a> Interpreter<'a> {
                                     v1 = CelValue::true_();
                                     pc += *dist as usize
                                 }
+                            } else if let CelValue::Err(ref _e) = v1 {
+                                // do nothing
                             } else if let CelValue::Bool(v) = v1 {
                                 if v {
                                     pc += *dist as usize
@@ -455,7 +457,7 @@ impl<'a> Interpreter<'a> {
                         CelStackValue::BoundCall { callable, value } => match callable {
                             RsCallable::Function(func) => {
                                 let arg_values = self.resolve_args(args)?;
-                                stack.push_val(func(value, &arg_values)?);
+                                stack.push_val(func(value, &arg_values));
                             }
                             RsCallable::Macro(macro_) => {
                                 stack.push_val(self.call_macro(&value, &args, macro_)?);
@@ -465,7 +467,7 @@ impl<'a> Interpreter<'a> {
                             CelValue::Ident(func_name) => {
                                 if let Some(func) = self.get_func_by_name(&func_name) {
                                     let arg_values = self.resolve_args(args)?;
-                                    stack.push_val(func(CelValue::from_null(), &arg_values)?);
+                                    stack.push_val(func(CelValue::from_null(), &arg_values));
                                 } else if let Some(macro_) = self.get_macro_by_name(&func_name) {
                                     stack.push_val(self.call_macro(
                                         &CelValue::from_null(),
@@ -476,7 +478,7 @@ impl<'a> Interpreter<'a> {
                                     self.get_type_by_name(&func_name)
                                 {
                                     let arg_values = self.resolve_args(args)?;
-                                    stack.push_val(construct_type(type_name, &arg_values)?);
+                                    stack.push_val(construct_type(type_name, &arg_values));
                                 } else {
                                     return Err(CelError::runtime(&format!(
                                         "{} is not callable",
@@ -486,7 +488,7 @@ impl<'a> Interpreter<'a> {
                             }
                             CelValue::Type(type_name) => {
                                 let arg_values = self.resolve_args(args)?;
-                                stack.push_val(construct_type(&type_name, &arg_values)?);
+                                stack.push_val(construct_type(&type_name, &arg_values));
                             }
                             other => stack.push_val(
                                 CelValue::from_err(CelError::runtime(&format!(
@@ -505,6 +507,7 @@ impl<'a> Interpreter<'a> {
             match stack.pop() {
                 Ok(val) => {
                     let cel: CelValue = val.try_into()?;
+                    println!("{:?}", cel);
                     cel.into_result()
                 }
                 Err(err) => Err(err),
@@ -534,7 +537,7 @@ impl<'a> Interpreter<'a> {
                 return Err(CelError::internal("macro args must be bytecode"));
             }
         }
-        let res = macro_(self, this.clone(), &v)?;
+        let res = macro_(self, this.clone(), &v);
         Ok(res)
     }
 

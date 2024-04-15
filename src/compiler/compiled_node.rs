@@ -1,6 +1,4 @@
-use crate::{
-    interp::JmpWhen, program::ProgramDetails, ByteCode, CelResult, CelValue, CelValueDyn, Program,
-};
+use crate::{interp::JmpWhen, program::ProgramDetails, ByteCode, CelValue, CelValueDyn, Program};
 
 use super::{
     ast_node::AstNode,
@@ -16,11 +14,6 @@ pub struct CompiledNode<T: Clone> {
     inner: NodeValue,
     details: ProgramDetails,
     ast: Option<AstNode<T>>,
-}
-
-pub trait CompiledNodeTrait {
-    fn value(&self) -> &NodeValue;
-    fn details(&self) -> &ProgramDetails;
 }
 
 impl<T: Clone> CompiledNode<T> {
@@ -58,12 +51,12 @@ impl<T: Clone> CompiledNode<T> {
 
     pub fn convert_with_ast<F, O: Clone>(self, ast_builder: F) -> CompiledNode<O>
     where
-        F: Fn(AstNode<T>) -> AstNode<O>,
+        F: FnOnce(Option<AstNode<T>>) -> AstNode<O>,
     {
         CompiledNode {
             inner: self.inner,
             details: self.details,
-            ast: self.ast.map(ast_builder),
+            ast: Some(ast_builder(self.ast)),
         }
     }
 
@@ -107,8 +100,14 @@ impl<T: Clone> CompiledNode<T> {
         }
     }
 
-    pub fn consume_child<T1: Clone>(self, child: CompiledNode<T1>) -> CompiledNode<T> {
-        self.append_result(child)
+    pub fn consume_child<T1: Clone>(mut self, child: CompiledNode<T1>) -> CompiledNode<T> {
+        let mut ast = None;
+        std::mem::swap(&mut ast, &mut self.ast);
+
+        let mut r = self.append_result(child);
+
+        r.ast = ast;
+        r
     }
 
     pub fn consume_children2<T1: Clone, T2: Clone, F>(
@@ -118,7 +117,7 @@ impl<T: Clone> CompiledNode<T> {
         resolve_const: F,
     ) -> CompiledNode<T>
     where
-        F: Fn(CelValue, CelValue) -> CelValue,
+        F: FnOnce(CelValue, CelValue) -> CelValue,
     {
         let mut new_details = self.details;
 
@@ -155,7 +154,7 @@ impl<T: Clone> CompiledNode<T> {
         resolve_const: F,
     ) -> CompiledNode<T>
     where
-        F: Fn(CelValue, CelValue) -> CelValue,
+        F: FnOnce(CelValue, CelValue) -> CelValue,
     {
         let mut new_details = self.details;
 
@@ -186,19 +185,47 @@ impl<T: Clone> CompiledNode<T> {
         }
     }
 
-    pub fn consume_children<O: Clone>(
+    pub fn consume_children<O: Clone, T1: Clone>(
         self,
-        children: Vec<Box<dyn CompiledNodeTrait>>,
+        children: CompiledNode<T1>,
         resolve_expr: Option<&dyn Fn(Vec<CelValue>) -> CelValue>,
-    ) -> CelResult<CompiledNode<O>> {
-        todo!()
+    ) -> CompiledNode<O> {
+        let new_bytecode: Vec<ByteCode> = children
+            .inner
+            .into_bytecode()
+            .into_iter()
+            .chain(self.inner.into_bytecode().into_iter())
+            .collect();
+
+        let mut new_details = self.details;
+        new_details.union_from(children.details);
+
+        CompiledNode {
+            inner: NodeValue::Bytecode(new_bytecode),
+            details: new_details,
+            ast: None,
+        }
     }
 
     pub fn consume_call_children<O: Clone>(
         self,
         children: CompiledNode<ExprList>,
     ) -> CompiledNode<O> {
-        todo!()
+        let new_bytecode: Vec<ByteCode> = children
+            .inner
+            .into_bytecode()
+            .into_iter()
+            .chain(self.inner.into_bytecode().into_iter())
+            .collect();
+
+        let mut new_details = self.details;
+        new_details.union_from(children.details);
+
+        CompiledNode {
+            inner: NodeValue::Bytecode(new_bytecode),
+            details: new_details,
+            ast: None,
+        }
     }
 
     pub fn into_turnary(
@@ -251,11 +278,6 @@ impl<T: Clone> CompiledNode<T> {
     }
 
     #[inline]
-    pub fn ast(&self) -> AstNode<T> {
-        (*self.ast.as_ref().expect("Internal error, no ast")).clone()
-    }
-
-    #[inline]
     pub fn yank_ast(&mut self) -> AstNode<T> {
         let mut moved_ast = None;
         std::mem::swap(&mut moved_ast, &mut self.ast);
@@ -269,6 +291,10 @@ impl<T: Clone> CompiledNode<T> {
             NodeValue::Bytecode(ref b) => b.len(),
             NodeValue::ConstExpr(_) => 1,
         }
+    }
+
+    pub fn into_bytecode(self) -> Vec<ByteCode> {
+        self.inner.into_bytecode()
     }
 }
 
@@ -285,15 +311,5 @@ impl NodeValue {
             NodeValue::Bytecode(b) => b,
             NodeValue::ConstExpr(c) => [ByteCode::Push(c)].to_vec(),
         }
-    }
-}
-
-impl<T: Clone> CompiledNodeTrait for CompiledNode<T> {
-    fn value(&self) -> &NodeValue {
-        &self.inner
-    }
-
-    fn details(&self) -> &ProgramDetails {
-        &self.details
     }
 }

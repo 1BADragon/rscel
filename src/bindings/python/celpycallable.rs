@@ -1,6 +1,6 @@
 use pyo3::{types::PyTuple, Py, PyAny, PyObject, Python, ToPyObject};
 
-use crate::{CelError, CelResult, CelValue};
+use crate::{CelError, CelValue};
 
 pub struct CelPyCallable {
     func: Py<PyAny>,
@@ -13,7 +13,7 @@ impl CelPyCallable {
 }
 
 impl FnOnce<(CelValue, &[CelValue])> for CelPyCallable {
-    type Output = CelResult<CelValue>;
+    type Output = CelValue;
 
     extern "rust-call" fn call_once(self, args: (CelValue, &[CelValue])) -> Self::Output {
         Python::with_gil(|py| {
@@ -30,8 +30,8 @@ impl FnOnce<(CelValue, &[CelValue])> for CelPyCallable {
                 ),
                 None,
             ) {
-                Ok(val) => Ok(val.extract(py).unwrap()),
-                Err(val) => Err(CelError::runtime(&val.to_string())),
+                Ok(val) => val.extract(py).unwrap(),
+                Err(val) => CelValue::from_err(CelError::runtime(&val.to_string())),
             }
         })
     }
@@ -53,8 +53,8 @@ impl FnMut<(CelValue, &[CelValue])> for CelPyCallable {
                 ),
                 None,
             ) {
-                Ok(val) => Ok(val.extract(py).unwrap()),
-                Err(val) => Err(CelError::runtime(&val.to_string())),
+                Ok(val) => val.extract(py).unwrap(),
+                Err(val) => CelValue::from_err(CelError::runtime(&val.to_string())),
             }
         })
     }
@@ -76,8 +76,8 @@ impl Fn<(CelValue, &[CelValue])> for CelPyCallable {
                 ),
                 None,
             ) {
-                Ok(val) => Ok(val.extract(py).unwrap()),
-                Err(val) => Err(CelError::runtime(&val.to_string())),
+                Ok(val) => val.extract(py).unwrap(),
+                Err(val) => CelValue::from_err(CelError::runtime(&val.to_string())),
             }
         })
     }

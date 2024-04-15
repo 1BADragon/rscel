@@ -368,19 +368,17 @@ impl<'l> StringTokenizer<'l> {
                     .with_message(format!("Failed to parse unsigned int {}", orig))),
             }
         } else if is_float {
-            Ok(Some(Token::FloatLit(NumericLiteral {
-                value: working.parse::<f64>().ok(),
-                str_value: fixedup_str.to_string(),
-                base: 10,
-                location: self.scanner.location(),
-            })))
+            match working.parse::<f64>() {
+                Ok(v) => Ok(Some(Token::FloatLit(v))),
+                Err(_) => Err(SyntaxError::from_location(self.scanner.location())
+                    .with_message(format!("Failed to parse float {}", orig))),
+            }
         } else {
-            Ok(Some(Token::IntLit(NumericLiteral {
-                value: u64::from_str_radix(fixedup_str, base).ok(),
-                str_value: fixedup_str.to_string(),
-                base,
-                location: self.scanner.location(),
-            })))
+            match u64::from_str_radix(fixedup_str, base) {
+                Ok(val) => Ok(Some(Token::IntLit(val))),
+                Err(_) => Err(SyntaxError::from_location(self.scanner.location())
+                    .with_message(format!("Failed to parse unsigned int {}", orig))),
+            }
         }
     }
 }

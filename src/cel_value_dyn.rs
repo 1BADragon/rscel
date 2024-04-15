@@ -1,6 +1,6 @@
 use std::{any::Any, fmt};
 
-use crate::{CelResult, CelValue};
+use crate::CelValue;
 
 // unsure how much i want to support with this...
 // im thinking I allow object like things only for the first iteration and
