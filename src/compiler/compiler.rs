@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use super::{
     ast_node::AstNode, compiled_node::CompiledNode, grammar::*, syntax_error::SyntaxError,
     tokenizer::Tokenizer, tokens::Token,
 };
-use crate::{interp::JmpWhen, ByteCode, CelResult, CelValue, CelValueDyn, Program};
+use crate::{interp::JmpWhen, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program};
 
 pub struct CelCompiler<'l> {
     tokenizer: &'l mut dyn Tokenizer,
@@ -532,9 +534,10 @@ impl<'l> CelCompiler<'l> {
 
     fn parse_member(&mut self) -> CelResult<CompiledNode<Member>> {
         let inital_start = self.tokenizer.location();
-        let primary_node = self.parse_primary()?;
+        let mut primary_node = self.parse_primary()?;
+        let primary_ast = primary_node.yank_ast();
 
-        let mut member_prime_node = CompiledNode::<Member>::empty();
+        let mut member_prime_node = CompiledNode::<Member>::from_node(primary_node);
         let mut member_prime_ast: Vec<AstNode<MemberPrime>> = Vec::new();
 
         loop {
@@ -656,18 +659,14 @@ impl<'l> CelCompiler<'l> {
             }
         }
 
-        Ok(primary_node
-            .consume_child(member_prime_node)
-            .convert_with_ast(|ast| {
-                AstNode::new(
-                    Member {
-                        primary: ast.expect("Internal Error: no ast"),
-                        member: member_prime_ast,
-                    },
-                    inital_start,
-                    self.tokenizer.location(),
-                )
-            }))
+        Ok(member_prime_node.add_ast(AstNode::new(
+            Member {
+                primary: primary_ast,
+                member: member_prime_ast,
+            },
+            inital_start,
+            self.tokenizer.location(),
+        )))
     }
 
     fn parse_primary(&mut self) -> CelResult<CompiledNode<Primary>> {
@@ -705,53 +704,57 @@ impl<'l> CelCompiler<'l> {
             Some(Token::LBracket) => {
                 // list construction
                 self.tokenizer.next()?;
-                let expr_list = self.parse_expression_list(Token::RBracket)?;
+                let mut expr_list = self.parse_expression_list(Token::RBracket)?;
                 let expr_list_len = expr_list.len();
+                let expr_list_ast = expr_list.iter_mut().map(|e| e.yank_ast()).collect();
 
                 if let Some(Token::RBracket) = self.tokenizer.peek()? {
                     self.tokenizer.next()?;
                 }
 
-                let mut children_node = CompiledNode::<ExprList>::empty();
-                let mut children_ast = Vec::new();
-                for mut expr in expr_list.into_iter() {
-                    children_ast.push(expr.yank_ast());
-                    children_node = children_node.append_result(expr);
-                }
-
-                Ok(CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::MkList(
-                    expr_list_len as u32,
-                )])
-                .consume_children::<NoAst, _>(children_node)
-                .convert_with_ast(move |_ast| {
-                    AstNode::new(
-                        Primary::ListConstruction(AstNode::new(
-                            ExprList {
-                                exprs: children_ast,
-                            },
-                            start_loc,
-                            self.tokenizer.location(),
-                        )),
+                Ok(CompiledNode::from_children_w_bytecode(
+                    expr_list,
+                    vec![ByteCode::MkList(expr_list_len as u32)],
+                    |c| c.into(),
+                )
+                .add_ast(AstNode::new(
+                    Primary::ListConstruction(AstNode::new(
+                        ExprList {
+                            exprs: expr_list_ast,
+                        },
                         start_loc,
                         self.tokenizer.location(),
-                    )
-                }))
+                    )),
+                    start_loc,
+                    self.tokenizer.location(),
+                )))
             }
             Some(Token::LBrace) => {
                 // Dictionary construction
                 self.tokenizer.next()?;
-                let obj_init = self.parse_obj_inits()?;
+                let mut obj_init = self.parse_obj_inits()?;
                 let obj_init_len = obj_init.len();
                 let mut init_asts = Vec::new();
 
-                if let Some(Token::RBrace) = self.tokenizer.peek()? {
-                    self.tokenizer.next()?;
+                for i in (0..obj_init.len()).step_by(2) {
+                    let key_ast = obj_init[i].yank_ast();
+                    let val_ast = obj_init[i + 1].yank_ast();
+
+                    let start = key_ast.start();
+                    let end = val_ast.end();
+
+                    init_asts.push(AstNode::new(
+                        ObjInit {
+                            key: key_ast,
+                            value: val_ast,
+                        },
+                        start,
+                        end,
+                    ));
                 }
 
-                let mut children_node = CompiledNode::<ObjInits>::empty();
-                for mut init in obj_init.into_iter() {
-                    init_asts.push(init.yank_ast());
-                    children_node = children_node.append_result(init);
+                if let Some(Token::RBrace) = self.tokenizer.peek()? {
+                    self.tokenizer.next()?;
                 }
 
                 let new_ast = AstNode::new(
@@ -764,10 +767,26 @@ impl<'l> CelCompiler<'l> {
                     self.tokenizer.location(),
                 );
 
-                Ok(CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::MkDict(
-                    obj_init_len as u32,
-                )])
-                .consume_children(children_node)
+                Ok(CompiledNode::from_children_w_bytecode(
+                    obj_init,
+                    vec![ByteCode::MkDict(obj_init_len as u32)],
+                    |vals| {
+                        let mut obj_map = HashMap::new();
+                        for i in (0..vals.len()).step_by(2) {
+                            let key = if let CelValue::String(ref k) = vals[i + 1] {
+                                k
+                            } else {
+                                return CelValue::from_err(CelError::value(
+                                    "Only strings can be object keys",
+                                ));
+                            };
+
+                            obj_map.insert(key.clone(), vals[i].clone());
+                        }
+
+                        obj_map.into()
+                    },
+                )
                 .add_ast(new_ast))
             }
             Some(Token::UIntLit(val)) => {
@@ -869,16 +888,15 @@ impl<'l> CelCompiler<'l> {
         Ok(exprs)
     }
 
-    fn parse_obj_inits(&mut self) -> CelResult<Vec<CompiledNode<ObjInit>>> {
+    fn parse_obj_inits(&mut self) -> CelResult<Vec<CompiledNode<Expr>>> {
         let mut inits = Vec::new();
 
         'outer: loop {
             if self.tokenizer.peek()? == Some(Token::RBrace) {
                 break 'outer;
             }
-            let start_loc = self.tokenizer.location();
 
-            let mut compiled_key = self.parse_expression()?;
+            let compiled_key = self.parse_expression()?;
 
             let next_token = self.tokenizer.next()?;
             if next_token != Some(Token::Colon) {
@@ -887,24 +905,10 @@ impl<'l> CelCompiler<'l> {
                     .into());
             }
             // MkDict expects value then key
-            let mut compiled_value = self.parse_expression()?;
-            let end_loc = self.tokenizer.location();
+            let compiled_value = self.parse_expression()?;
 
-            let ast = AstNode::new(
-                ObjInit {
-                    key: compiled_key.yank_ast(),
-                    value: compiled_value.yank_ast(),
-                },
-                start_loc,
-                end_loc,
-            );
-
-            // TODO: refactor this to build map if everything is const
-            inits.push(
-                CompiledNode::<ObjInit>::from_node(compiled_value)
-                    .append_result(compiled_key)
-                    .add_ast(ast),
-            );
+            inits.push(compiled_value);
+            inits.push(compiled_key);
 
             match self.tokenizer.peek()? {
                 Some(Token::Comma) => {

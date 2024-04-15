@@ -51,6 +51,44 @@ impl<T: Clone> CompiledNode<T> {
         }
     }
 
+    pub fn from_children_w_bytecode<T1: Clone, F>(
+        children: Vec<CompiledNode<T1>>,
+        bytecode: Vec<ByteCode>,
+        resolve: F,
+    ) -> CompiledNode<T>
+    where
+        F: FnOnce(Vec<CelValue>) -> CelValue,
+    {
+        let mut all_const = true;
+        let mut details = ProgramDetails::new();
+
+        for c in children.iter() {
+            all_const &= c.is_const();
+            details.union_from(c.details.clone());
+        }
+
+        let inner = if all_const {
+            NodeValue::ConstExpr(resolve(
+                children.into_iter().map(|c| c.const_val()).collect(),
+            ))
+        } else {
+            NodeValue::Bytecode(
+                children
+                    .into_iter()
+                    .map(|c| c.inner.into_bytecode())
+                    .flatten()
+                    .chain(bytecode.into_iter())
+                    .collect(),
+            )
+        };
+
+        CompiledNode {
+            inner,
+            details,
+            ast: None,
+        }
+    }
+
     pub fn convert_with_ast<F, O: Clone>(self, ast_builder: F) -> CompiledNode<O>
     where
         F: FnOnce(Option<AstNode<T>>) -> AstNode<O>,
@@ -102,44 +140,14 @@ impl<T: Clone> CompiledNode<T> {
         }
     }
 
-    pub fn consume_child<T1: Clone, F>(
-        mut self,
-        child: CompiledNode<T1>,
-        resolve: F,
-    ) -> CompiledNode<T>
-    where
-        F: FnOnce(CelValue, CelValue) -> CelValue,
-    {
+    pub fn consume_child<T1: Clone>(mut self, child: CompiledNode<T1>) -> CompiledNode<T> {
         let mut ast = None;
         std::mem::swap(&mut ast, &mut self.ast);
 
-        match (self, child) {
-            (
-                CompiledNode {
-                    inner: NodeValue::ConstExpr(s),
-                    details: mut d1,
-                    ast: _,
-                },
-                CompiledNode {
-                    inner: NodeValue::ConstExpr(c),
-                    details: d2,
-                    ast: _,
-                },
-            ) => {
-                d1.union_from(d2);
-                CompiledNode {
-                    inner: NodeValue::ConstExpr(resolve(s, c)),
-                    details: d1,
-                    ast,
-                }
-            }
-            (s, c) => {
-                let mut r = s.append_result(c);
+        let mut r = self.append_result(child);
 
-                r.ast = ast;
-                r
-            }
-        }
+        r.ast = ast;
+        r
     }
 
     pub fn consume_children2<T1: Clone, T2: Clone, F>(
@@ -214,27 +222,6 @@ impl<T: Clone> CompiledNode<T> {
                     ast: None,
                 }
             }
-        }
-    }
-
-    pub fn consume_children<O: Clone, T1: Clone>(
-        self,
-        children: CompiledNode<T1>,
-    ) -> CompiledNode<O> {
-        let new_bytecode: Vec<ByteCode> = children
-            .inner
-            .into_bytecode()
-            .into_iter()
-            .chain(self.inner.into_bytecode().into_iter())
-            .collect();
-
-        let mut new_details = self.details;
-        new_details.union_from(children.details);
-
-        CompiledNode {
-            inner: NodeValue::Bytecode(new_bytecode),
-            details: new_details,
-            ast: None,
         }
     }
 
@@ -326,6 +313,17 @@ impl<T: Clone> CompiledNode<T> {
 
     pub fn into_bytecode(self) -> Vec<ByteCode> {
         self.inner.into_bytecode()
+    }
+
+    pub fn is_const(&self) -> bool {
+        self.inner.is_const()
+    }
+
+    pub fn const_val(self) -> CelValue {
+        match self.inner {
+            NodeValue::ConstExpr(c) => c,
+            _ => panic!("Internal Error: not const"),
+        }
     }
 }
 
