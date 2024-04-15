@@ -531,156 +531,143 @@ impl<'l> CelCompiler<'l> {
     }
 
     fn parse_member(&mut self) -> CelResult<CompiledNode<Member>> {
-        let start_loc = self.tokenizer.location();
-        let primary = self.parse_primary()?;
-        let mut member_prime = self.parse_member_prime()?;
-        let member_prime_ast = member_prime.yank_ast();
+        let inital_start = self.tokenizer.location();
+        let primary_node = self.parse_primary()?;
 
-        Ok(primary.consume_child(member_prime).convert_with_ast(|ast| {
-            AstNode::new(
-                Member {
-                    primary: ast.expect("Internal Error: no ast"),
-                    member: member_prime_ast.clone(),
-                },
-                start_loc,
-                self.tokenizer.location(),
-            )
-        }))
-    }
+        let mut member_prime_node = CompiledNode::<Member>::empty();
+        let mut member_prime_ast: Vec<AstNode<MemberPrime>> = Vec::new();
 
-    fn parse_member_prime(&mut self) -> CelResult<CompiledNode<MemberPrime>> {
-        let start_loc = self.tokenizer.location();
+        loop {
+            let start_loc = self.tokenizer.location();
+            match self.tokenizer.peek()? {
+                Some(Token::Dot) => {
+                    self.tokenizer.next()?;
+                    match self.tokenizer.next()? {
+                        Some(Token::Ident(ident)) => {
+                            let res = CompiledNode::<NoAst>::with_bytecode(vec![
+                                ByteCode::Push(CelValue::from_ident(&ident)),
+                                ByteCode::Access,
+                            ]);
 
-        match self.tokenizer.peek()? {
-            Some(Token::Dot) => {
-                self.tokenizer.next()?;
-                match self.tokenizer.next()? {
-                    Some(Token::Ident(ident)) => {
-                        let res = CompiledNode::<NoAst>::with_bytecode(vec![
-                            ByteCode::Push(CelValue::from_ident(&ident)),
-                            ByteCode::Access,
-                        ]);
-
-                        let ident_end = self.tokenizer.location();
-                        let mut child_res = self.parse_member_prime()?;
-                        let child_res_ast = child_res.yank_ast();
-
-                        Ok(res.append_result(child_res).convert_with_ast(
-                            |_ast: Option<AstNode<NoAst>>| {
-                                AstNode::new(
-                                    MemberPrime::MemberAccess {
-                                        ident: AstNode::new(
-                                            Ident(ident.clone()),
-                                            start_loc,
-                                            ident_end,
-                                        ),
-                                        tail: Box::new(child_res_ast.clone()),
-                                    },
-                                    start_loc,
-                                    self.tokenizer.location(),
-                                )
-                            },
-                        ))
-                    }
-                    Some(other) => Err(SyntaxError::from_location(self.tokenizer.location())
-                        .with_message(format!("Expected ident got {:?}", other))
-                        .into()),
-                    None => Err(SyntaxError::from_location(self.tokenizer.location())
-                        .with_message("Expected ident got NOTHING".to_string())
-                        .into()),
-                }
-            }
-            Some(Token::LParen) => {
-                self.tokenizer.next()?;
-
-                let start_loc = self.tokenizer.location();
-                let args = self.parse_expression_list(Token::RParen)?;
-
-                let token = self.tokenizer.next()?;
-                if token != Some(Token::RParen) {
-                    Err(SyntaxError::from_location(self.tokenizer.location())
-                        .with_message(format!(
-                            "Unexpected token {}, expected RPARAN",
-                            &token.map_or("NOTHING".to_string(), |x| format!("{:?}", x))
-                        ))
-                        .into())
-                } else {
-                    let mut args_node = CompiledNode::<ExprList>::empty();
-                    let mut args_ast = Vec::new();
-                    let args_len = args.len();
-
-                    // Arguments are evaluated backwards so they get popped off the stack in order
-                    for mut a in args.into_iter().rev() {
-                        args_ast.push(a.yank_ast());
-                        args_node =
-                            args_node.append_result(CompiledNode::<NoAst>::with_bytecode(vec![
-                                ByteCode::Push(a.into_bytecode().into()),
-                            ]))
-                    }
-
-                    let mut child_node = self.parse_member_prime()?;
-                    let child_ast = child_node.yank_ast();
-
-                    Ok(
-                        CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::Call(args_len as u32)])
-                            .consume_call_children::<NoAst>(args_node)
-                            .append_result(child_node)
-                            .add_ast(AstNode::new(
-                                MemberPrime::Call {
-                                    call: AstNode::new(
-                                        ExprList { exprs: args_ast },
+                            member_prime_node = member_prime_node.consume_child(res);
+                            member_prime_ast.push(AstNode::new(
+                                MemberPrime::MemberAccess {
+                                    ident: AstNode::new(
+                                        Ident(ident.clone()),
                                         start_loc,
                                         self.tokenizer.location(),
                                     ),
-                                    tail: Box::new(child_ast),
                                 },
                                 start_loc,
                                 self.tokenizer.location(),
-                            )),
-                    )
-                }
-            }
-            Some(Token::LBracket) => {
-                self.tokenizer.next()?;
-
-                let mut index_node = self.parse_expression()?;
-                let index_ast = index_node.yank_ast();
-
-                let next_token = self.tokenizer.next()?;
-                match next_token {
-                    Some(Token::RBracket) => {
-                        let mut child_node = self.parse_member_prime()?;
-                        let child_ast = child_node.yank_ast();
-
-                        Ok(index_node
-                            .append_result::<NoAst, MemberPrime>(
-                                CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::Index]),
-                            )
-                            .append_result(child_node)
-                            .add_ast(AstNode::new(
-                                MemberPrime::ArrayAccess {
-                                    access: index_ast,
-                                    tail: Box::new(child_ast),
-                                },
-                                start_loc,
-                                self.tokenizer.location(),
-                            )))
+                            ));
+                        }
+                        Some(other) => {
+                            return Err(SyntaxError::from_location(self.tokenizer.location())
+                                .with_message(format!("Expected IDENT got {:?}", other))
+                                .into());
+                        }
+                        None => {
+                            return Err(SyntaxError::from_location(self.tokenizer.location())
+                                .with_message("Expected IDENT got NOTHING".to_string())
+                                .into());
+                        }
                     }
-                    _ => Err(SyntaxError::from_location(self.tokenizer.location())
-                        .with_message(format!(
-                            "Unexpected token {}, expected RBRACKET",
-                            &next_token.map_or("NOTHING".to_string(), |x| format!("{:?}", x))
-                        ))
-                        .into()),
                 }
-            }
+                Some(Token::LParen) => {
+                    self.tokenizer.next()?;
 
-            _ => Ok(CompiledNode::empty().add_ast(AstNode::new(
-                MemberPrime::Empty,
-                start_loc,
-                self.tokenizer.location(),
-            ))),
+                    let start_loc = self.tokenizer.location();
+                    let args = self.parse_expression_list(Token::RParen)?;
+
+                    let token = self.tokenizer.next()?;
+                    if token != Some(Token::RParen) {
+                        return Err(SyntaxError::from_location(self.tokenizer.location())
+                            .with_message(format!(
+                                "Unexpected token {}, expected RPARAN",
+                                &token.map_or("NOTHING".to_string(), |x| format!("{:?}", x))
+                            ))
+                            .into());
+                    } else {
+                        let mut args_node = CompiledNode::<ExprList>::empty();
+                        let mut args_ast = Vec::new();
+                        let args_len = args.len();
+
+                        // Arguments are evaluated backwards so they get popped off the stack in order
+                        for mut a in args.into_iter().rev() {
+                            args_ast.push(a.yank_ast());
+                            args_node =
+                                args_node.append_result(CompiledNode::<NoAst>::with_bytecode(vec![
+                                    ByteCode::Push(a.into_bytecode().into()),
+                                ]))
+                        }
+
+                        member_prime_node = member_prime_node
+                            .consume_child(args_node)
+                            .consume_child(CompiledNode::<NoAst>::with_bytecode(vec![
+                                ByteCode::Call(args_len as u32),
+                            ]));
+                        member_prime_ast.push(AstNode::new(
+                            MemberPrime::Call {
+                                call: AstNode::new(
+                                    ExprList { exprs: args_ast },
+                                    start_loc,
+                                    self.tokenizer.location(),
+                                ),
+                            },
+                            start_loc,
+                            self.tokenizer.location(),
+                        ));
+                    }
+                }
+                Some(Token::LBracket) => {
+                    self.tokenizer.next()?;
+
+                    let mut index_node = self.parse_expression()?;
+                    let index_ast = index_node.yank_ast();
+
+                    let next_token = self.tokenizer.next()?;
+                    match next_token {
+                        Some(Token::RBracket) => {
+                            member_prime_node = member_prime_node.consume_child(
+                                index_node.append_result::<NoAst, MemberPrime>(
+                                    CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::Index]),
+                                ),
+                            );
+
+                            member_prime_ast.push(AstNode::new(
+                                MemberPrime::ArrayAccess { access: index_ast },
+                                start_loc,
+                                self.tokenizer.location(),
+                            ));
+                        }
+                        _ => {
+                            return Err(SyntaxError::from_location(self.tokenizer.location())
+                                .with_message(format!(
+                                    "Unexpected token {}, expected RBRACKET",
+                                    &next_token
+                                        .map_or("NOTHING".to_string(), |x| format!("{:?}", x))
+                                ))
+                                .into());
+                        }
+                    }
+                }
+                _ => break,
+            }
         }
+
+        Ok(primary_node
+            .consume_child(member_prime_node)
+            .convert_with_ast(|ast| {
+                AstNode::new(
+                    Member {
+                        primary: ast.expect("Internal Error: no ast"),
+                        member: member_prime_ast,
+                    },
+                    inital_start,
+                    self.tokenizer.location(),
+                )
+            }))
     }
 
     fn parse_primary(&mut self) -> CelResult<CompiledNode<Primary>> {
@@ -735,7 +722,7 @@ impl<'l> CelCompiler<'l> {
                 Ok(CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::MkList(
                     expr_list_len as u32,
                 )])
-                .consume_children::<NoAst, _>(children_node, None)
+                .consume_children::<NoAst, _>(children_node)
                 .convert_with_ast(move |_ast| {
                     AstNode::new(
                         Primary::ListConstruction(AstNode::new(
@@ -780,7 +767,7 @@ impl<'l> CelCompiler<'l> {
                 Ok(CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::MkDict(
                     obj_init_len as u32,
                 )])
-                .consume_children(children_node, None)
+                .consume_children(children_node)
                 .add_ast(new_ast))
             }
             Some(Token::UIntLit(val)) => {

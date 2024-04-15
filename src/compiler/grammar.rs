@@ -111,23 +111,14 @@ pub enum NegList {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Member {
     pub primary: AstNode<Primary>,
-    pub member: AstNode<MemberPrime>,
+    pub member: Vec<AstNode<MemberPrime>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MemberPrime {
-    MemberAccess {
-        ident: AstNode<Ident>,
-        tail: Box<AstNode<MemberPrime>>,
-    },
-    Call {
-        call: AstNode<ExprList>,
-        tail: Box<AstNode<MemberPrime>>,
-    },
-    ArrayAccess {
-        access: AstNode<Expr>,
-        tail: Box<AstNode<MemberPrime>>,
-    },
+    MemberAccess { ident: AstNode<Ident> },
+    Call { call: AstNode<ExprList> },
+    ArrayAccess { access: AstNode<Expr> },
     Empty,
 }
 

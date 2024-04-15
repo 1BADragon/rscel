@@ -507,7 +507,6 @@ impl<'a> Interpreter<'a> {
             match stack.pop() {
                 Ok(val) => {
                     let cel: CelValue = val.try_into()?;
-                    println!("{:?}", cel);
                     cel.into_result()
                 }
                 Err(err) => Err(err),

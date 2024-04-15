@@ -5,11 +5,13 @@ use super::{
     grammar::{ConditionalOr, Expr, ExprList},
 };
 
+#[derive(Debug)]
 pub enum NodeValue {
     Bytecode(Vec<ByteCode>),
     ConstExpr(CelValue),
 }
 
+#[derive(Debug)]
 pub struct CompiledNode<T: Clone> {
     inner: NodeValue,
     details: ProgramDetails,
@@ -100,14 +102,44 @@ impl<T: Clone> CompiledNode<T> {
         }
     }
 
-    pub fn consume_child<T1: Clone>(mut self, child: CompiledNode<T1>) -> CompiledNode<T> {
+    pub fn consume_child<T1: Clone, F>(
+        mut self,
+        child: CompiledNode<T1>,
+        resolve: F,
+    ) -> CompiledNode<T>
+    where
+        F: FnOnce(CelValue, CelValue) -> CelValue,
+    {
         let mut ast = None;
         std::mem::swap(&mut ast, &mut self.ast);
 
-        let mut r = self.append_result(child);
+        match (self, child) {
+            (
+                CompiledNode {
+                    inner: NodeValue::ConstExpr(s),
+                    details: mut d1,
+                    ast: _,
+                },
+                CompiledNode {
+                    inner: NodeValue::ConstExpr(c),
+                    details: d2,
+                    ast: _,
+                },
+            ) => {
+                d1.union_from(d2);
+                CompiledNode {
+                    inner: NodeValue::ConstExpr(resolve(s, c)),
+                    details: d1,
+                    ast,
+                }
+            }
+            (s, c) => {
+                let mut r = s.append_result(c);
 
-        r.ast = ast;
-        r
+                r.ast = ast;
+                r
+            }
+        }
     }
 
     pub fn consume_children2<T1: Clone, T2: Clone, F>(
@@ -188,7 +220,6 @@ impl<T: Clone> CompiledNode<T> {
     pub fn consume_children<O: Clone, T1: Clone>(
         self,
         children: CompiledNode<T1>,
-        resolve_expr: Option<&dyn Fn(Vec<CelValue>) -> CelValue>,
     ) -> CompiledNode<O> {
         let new_bytecode: Vec<ByteCode> = children
             .inner
@@ -299,14 +330,14 @@ impl<T: Clone> CompiledNode<T> {
 }
 
 impl NodeValue {
-    pub fn is_const(&self) -> bool {
+    fn is_const(&self) -> bool {
         match self {
-            NodeValue::Bytecode(_) => false,
             NodeValue::ConstExpr(_) => true,
+            NodeValue::Bytecode(_) => false,
         }
     }
 
-    pub fn into_bytecode(self) -> Vec<ByteCode> {
+    fn into_bytecode(self) -> Vec<ByteCode> {
         match self {
             NodeValue::Bytecode(b) => b,
             NodeValue::ConstExpr(c) => [ByteCode::Push(c)].to_vec(),
