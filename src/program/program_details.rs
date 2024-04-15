@@ -22,6 +22,11 @@ impl ProgramDetails {
         }
     }
 
+    pub fn joined2(mut pd1: ProgramDetails, pd2: ProgramDetails) -> ProgramDetails {
+        pd1.union_from(pd2);
+        pd1
+    }
+
     pub fn add_ast(&mut self, ast: AstNode<Expr>) {
         self.ast = Some(ast);
     }

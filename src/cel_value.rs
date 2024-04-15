@@ -182,6 +182,14 @@ impl CelValue {
         }
     }
 
+    pub fn is_obj(&self) -> bool {
+        match self {
+            CelValue::Map(_) => true,
+            CelValue::Dyn(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn int_type() -> CelValue {
         CelValue::from_type("int")
     }
@@ -485,6 +493,51 @@ impl CelValue {
             f(self, rhs)
         }
     }
+
+    pub fn index(&self, ival: &CelValue) -> CelValue {
+        self.error_prop_or(ival, |obj, index| {
+            if let CelValue::List(list) = obj {
+                let index = if let CelValue::UInt(ref index) = index {
+                    *index as usize
+                } else if let CelValue::Int(index) = index {
+                    if *index < 0 {
+                        return CelValue::from_err(CelError::value(
+                            "Negative index is not allowed",
+                        ));
+                    }
+                    *index as usize
+                } else {
+                    return CelValue::from_err(CelError::value(
+                        "List index can only be int or uint",
+                    ));
+                };
+
+                if index >= list.len() {
+                    return CelValue::from_err(CelError::value("List access out of bounds"));
+                }
+
+                return list[index].clone();
+            } else if let CelValue::Map(map) = obj {
+                if let CelValue::String(index) = index {
+                    match map.get(index.as_str()) {
+                        Some(val) => return val.clone(),
+                        None => {
+                            return CelValue::from_err(CelError::attribute("obj", &index));
+                        }
+                    }
+                }
+            } else if let CelValue::Dyn(d) = obj {
+                if let CelValue::String(index) = index {
+                    return d.access(&index);
+                }
+            }
+            return CelValue::from_err(CelError::value(&format!(
+                "Index operator invalid between {:?} and {:?}",
+                index.as_type(),
+                obj.as_type()
+            )));
+        })
+    }
 }
 
 impl CelValueDyn for CelValue {
@@ -528,6 +581,7 @@ impl CelValueDyn for CelValue {
                 Some(val) => val.clone(),
                 None => CelValue::from_err(CelError::attribute("obj", key)),
             },
+            CelValue::Dyn(ref d) => d.access(key),
             #[cfg(protobuf)]
             CelValue::Message(msg) => {
                 let desc = msg.descriptor_dyn();

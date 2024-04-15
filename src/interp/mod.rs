@@ -332,43 +332,7 @@ impl<'a> Interpreter<'a> {
                     let index = stack.pop_val()?;
                     let obj = stack.pop_val()?;
 
-                    if let CelValue::List(list) = obj {
-                        let index = if let CelValue::UInt(index) = index {
-                            index as usize
-                        } else if let CelValue::Int(index) = index {
-                            if index < 0 {
-                                return Err(CelError::value("Negative index is not allowed"));
-                            }
-                            index as usize
-                        } else {
-                            return Err(CelError::value("List index can only be int or uint"));
-                        };
-
-                        if index >= list.len() {
-                            return Err(CelError::value("List access out of bounds"));
-                        }
-
-                        stack.push_val(list[index].clone());
-                    } else if let CelValue::Map(map) = obj {
-                        if let CelValue::String(index) = index {
-                            match map.get(&index) {
-                                Some(val) => stack.push_val(val.clone()),
-                                None => {
-                                    return Err(CelError::attribute("obj", &index));
-                                }
-                            }
-                        }
-                    } else if let CelValue::Dyn(d) = obj {
-                        if let CelValue::String(index) = index {
-                            stack.push_val(d.access(&index));
-                        }
-                    } else {
-                        return Err(CelError::value(&format!(
-                            "Index operator invalid between {:?} and {:?}",
-                            index.as_type(),
-                            obj.as_type()
-                        )));
-                    }
+                    stack.push_val(obj.index(&index));
                 }
                 ByteCode::Access => {
                     let index = stack.pop_noresolve()?;

@@ -547,12 +547,28 @@ impl<'l> CelCompiler<'l> {
                     self.tokenizer.next()?;
                     match self.tokenizer.next()? {
                         Some(Token::Ident(ident)) => {
-                            let res = CompiledNode::<NoAst>::with_bytecode(vec![
-                                ByteCode::Push(CelValue::from_ident(&ident)),
-                                ByteCode::Access,
-                            ]);
+                            let res =
+                                CompiledNode::<NoAst>::with_const(CelValue::from_ident(&ident));
 
-                            member_prime_node = member_prime_node.consume_child(res);
+                            member_prime_node = CompiledNode::from_children2_w_bytecode_cannone(
+                                member_prime_node,
+                                res,
+                                vec![ByteCode::Access],
+                                |o, c| {
+                                    if let CelValue::Ident(s) = c {
+                                        if o.is_obj() {
+                                            Some(o.access(&s))
+                                        } else {
+                                            None
+                                        }
+                                    } else {
+                                        Some(CelValue::from_err(CelError::value(
+                                            "Accessor must be ident",
+                                        )))
+                                    }
+                                },
+                            );
+
                             member_prime_ast.push(AstNode::new(
                                 MemberPrime::MemberAccess {
                                     ident: AstNode::new(
@@ -632,10 +648,11 @@ impl<'l> CelCompiler<'l> {
                     let next_token = self.tokenizer.next()?;
                     match next_token {
                         Some(Token::RBracket) => {
-                            member_prime_node = member_prime_node.consume_child(
-                                index_node.append_result::<NoAst, MemberPrime>(
-                                    CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::Index]),
-                                ),
+                            member_prime_node = CompiledNode::from_children2_w_bytecode(
+                                member_prime_node,
+                                index_node,
+                                vec![ByteCode::Index],
+                                |p, i| p.index(&i),
                             );
 
                             member_prime_ast.push(AstNode::new(

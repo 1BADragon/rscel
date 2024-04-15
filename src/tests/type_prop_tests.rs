@@ -57,6 +57,7 @@ fn test_equation(prog: &str, res: CelValue) {
     ctx.add_program_str("main", prog).unwrap();
 
     let eval_res = ctx.exec("main", &exec_ctx);
+    println!("{:?}", eval_res);
     if cfg!(feature = "type_prop") {
         assert_eq!(eval_res.unwrap(), res);
     } else {

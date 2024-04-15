@@ -10,7 +10,7 @@ build:
 
 .env:
 	python3 -m venv .env
-	. .env/bin/activate && pip install maturin pytest
+	. .env/bin/activate && pip install maturin pytest protobuf
 
 wasm-binding:
 	RUSTFLAGS="-C opt-level=s" wasm-pack build --target web --features wasm $(CARGO_ARGS)

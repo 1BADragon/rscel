@@ -1,8 +1,10 @@
-use crate::{interp::JmpWhen, program::ProgramDetails, ByteCode, CelValue, CelValueDyn, Program};
+use crate::{
+    interp::JmpWhen, program::ProgramDetails, ByteCode, CelError, CelValue, CelValueDyn, Program,
+};
 
 use super::{
     ast_node::AstNode,
-    grammar::{ConditionalOr, Expr, ExprList},
+    grammar::{ConditionalOr, Expr},
 };
 
 #[derive(Debug)]
@@ -86,6 +88,80 @@ impl<T: Clone> CompiledNode<T> {
             inner,
             details,
             ast: None,
+        }
+    }
+
+    pub fn from_children2_w_bytecode<T1: Clone, T2: Clone, F>(
+        child1: CompiledNode<T1>,
+        child2: CompiledNode<T2>,
+        bytecode: Vec<ByteCode>,
+        resolve: F,
+    ) -> CompiledNode<T>
+    where
+        F: FnOnce(CelValue, CelValue) -> CelValue,
+    {
+        let new_details = ProgramDetails::joined2(child1.details, child2.details);
+
+        match (child1.inner, child2.inner) {
+            (NodeValue::ConstExpr(c1), NodeValue::ConstExpr(c2)) => CompiledNode {
+                inner: NodeValue::ConstExpr(resolve(c1, c2)),
+                details: new_details,
+                ast: None,
+            },
+            (c1, c2) => CompiledNode {
+                inner: NodeValue::Bytecode(
+                    c1.into_bytecode()
+                        .into_iter()
+                        .chain(c2.into_bytecode().into_iter())
+                        .chain(bytecode.into_iter())
+                        .collect(),
+                ),
+                details: new_details,
+                ast: None,
+            },
+        }
+    }
+
+    pub fn from_children2_w_bytecode_cannone<T1: Clone, T2: Clone, F>(
+        child1: CompiledNode<T1>,
+        child2: CompiledNode<T2>,
+        bytecode: Vec<ByteCode>,
+        resolve: F,
+    ) -> CompiledNode<T>
+    where
+        F: FnOnce(&CelValue, &CelValue) -> Option<CelValue>,
+    {
+        let new_details = ProgramDetails::joined2(child1.details, child2.details);
+
+        match (child1.inner, child2.inner) {
+            (NodeValue::ConstExpr(c1), NodeValue::ConstExpr(c2)) => match resolve(&c1, &c2) {
+                Some(res) => CompiledNode {
+                    inner: NodeValue::ConstExpr(res),
+                    details: new_details,
+                    ast: None,
+                },
+                None => CompiledNode {
+                    inner: NodeValue::Bytecode(
+                        [ByteCode::Push(c1), ByteCode::Push(c2)]
+                            .into_iter()
+                            .chain(bytecode.into_iter())
+                            .collect(),
+                    ),
+                    details: new_details,
+                    ast: None,
+                },
+            },
+            (c1, c2) => CompiledNode {
+                inner: NodeValue::Bytecode(
+                    c1.into_bytecode()
+                        .into_iter()
+                        .chain(c2.into_bytecode().into_iter())
+                        .chain(bytecode.into_iter())
+                        .collect(),
+                ),
+                details: new_details,
+                ast: None,
+            },
         }
     }
 
@@ -225,27 +301,6 @@ impl<T: Clone> CompiledNode<T> {
         }
     }
 
-    pub fn consume_call_children<O: Clone>(
-        self,
-        children: CompiledNode<ExprList>,
-    ) -> CompiledNode<O> {
-        let new_bytecode: Vec<ByteCode> = children
-            .inner
-            .into_bytecode()
-            .into_iter()
-            .chain(self.inner.into_bytecode().into_iter())
-            .collect();
-
-        let mut new_details = self.details;
-        new_details.union_from(children.details);
-
-        CompiledNode {
-            inner: NodeValue::Bytecode(new_bytecode),
-            details: new_details,
-            ast: None,
-        }
-    }
-
     pub fn into_turnary(
         mut self,
         true_clause: CompiledNode<ConditionalOr>,
@@ -255,17 +310,44 @@ impl<T: Clone> CompiledNode<T> {
         self.details.union_from(false_clause.details);
 
         if let NodeValue::ConstExpr(i) = self.inner {
-            if i.is_truthy() {
-                CompiledNode {
-                    inner: true_clause.inner,
-                    details: self.details,
-                    ast: None,
+            if cfg!(feature = "type_prop") {
+                if i.is_truthy() {
+                    CompiledNode {
+                        inner: true_clause.inner,
+                        details: self.details,
+                        ast: None,
+                    }
+                } else {
+                    CompiledNode {
+                        inner: false_clause.inner,
+                        details: self.details,
+                        ast: None,
+                    }
                 }
             } else {
-                CompiledNode {
-                    inner: false_clause.inner,
-                    details: self.details,
-                    ast: None,
+                if let CelValue::Bool(b) = i {
+                    if b {
+                        CompiledNode {
+                            inner: true_clause.inner,
+                            details: self.details,
+                            ast: None,
+                        }
+                    } else {
+                        CompiledNode {
+                            inner: false_clause.inner,
+                            details: self.details,
+                            ast: None,
+                        }
+                    }
+                } else {
+                    CompiledNode {
+                        inner: NodeValue::ConstExpr(CelValue::from_err(CelError::Value(format!(
+                            "{} cannot be converted to bool",
+                            i.as_type()
+                        )))),
+                        details: self.details,
+                        ast: None,
+                    }
                 }
             }
         } else {
