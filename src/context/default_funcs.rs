@@ -15,6 +15,13 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("startsWith", &starts_with_impl),
     ("endsWith", &ends_with_impl),
     ("matches", &matches_impl),
+    ("startsWithI", &starts_with_i_impl),
+    ("endsWithI", &ends_with_i_impl),
+    ("toLower", &to_lower_impl),
+    ("toUpper", &to_upper_impl),
+    ("trim", &trim_impl),
+    ("trim_start", &trim_start_impl),
+    ("trim_end", &trim_end_impl),
     ("abs", &abs_impl),
     ("sqrt", &sqrt_impl),
     ("pow", &pow_impl),
@@ -35,6 +42,26 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("getMonth", &get_month_impl),
     ("getSeconds", &get_seconds_impl),
 ];
+
+macro_rules! string_func {
+    ($cel_func_name: ident, $func_name:ident, $str_func:ident) => {
+        fn $func_name(this: CelValue, args: &[CelValue]) -> CelValue {
+            if args.len() > 0 {
+                return CelValue::from_err(CelError::argument(
+                    "$cel_func_name does not take any argments",
+                ));
+            }
+
+            if let CelValue::String(s) = this {
+                CelValue::String(s.$str_func().chars().collect())
+            } else {
+                return CelValue::from_err(CelError::value(
+                    "$cel_func_name only available on string",
+                ));
+            }
+        }
+    };
+}
 
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
     for (name, func) in DEFAULT_FUNCS.iter() {
@@ -78,38 +105,6 @@ fn size_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     })
 }
 
-fn starts_with_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    if args.len() != 1 {
-        return CelValue::from_err(CelError::argument(
-            "endsWith() expects exactly one argument",
-        ));
-    }
-
-    if let CelValue::String(lhs) = this {
-        if let CelValue::String(rhs) = &args[0] {
-            return lhs.starts_with(rhs).into();
-        }
-    }
-
-    CelValue::from_err(CelError::value("endsWith must be form string.(string)"))
-}
-
-fn ends_with_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    if args.len() != 1 {
-        return CelValue::from_err(CelError::argument(
-            "endsWith() expects exactly one argument",
-        ));
-    }
-
-    if let CelValue::String(lhs) = this {
-        if let CelValue::String(rhs) = &args[0] {
-            return lhs.ends_with(rhs).into();
-        }
-    }
-
-    CelValue::from_err(CelError::value("endsWith must be form string.(string)"))
-}
-
 fn matches_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     let (vc_lhs, vc_rhs) = if let CelValue::Null = this {
         if args.len() != 2 {
@@ -145,6 +140,76 @@ fn matches_impl(this: CelValue, args: &[CelValue]) -> CelValue {
         "matches has the forms string.(string) or (string, string)",
     ))
 }
+
+fn starts_with_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+    if args.len() != 1 {
+        return CelValue::from_err(CelError::argument(
+            "endsWith() expects exactly one argument",
+        ));
+    }
+
+    if let CelValue::String(lhs) = this {
+        if let CelValue::String(rhs) = &args[0] {
+            return lhs.starts_with(rhs).into();
+        }
+    }
+
+    CelValue::from_err(CelError::value("endsWith must be form string.(string)"))
+}
+
+fn ends_with_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+    if args.len() != 1 {
+        return CelValue::from_err(CelError::argument(
+            "endsWith() expects exactly one argument",
+        ));
+    }
+
+    if let CelValue::String(lhs) = this {
+        if let CelValue::String(rhs) = &args[0] {
+            return lhs.ends_with(rhs).into();
+        }
+    }
+
+    CelValue::from_err(CelError::value("endsWith must be form string.(string)"))
+}
+
+fn starts_with_i_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+    if args.len() != 1 {
+        return CelValue::from_err(CelError::argument(
+            "endsWith() expects exactly one argument",
+        ));
+    }
+
+    if let CelValue::String(lhs) = this {
+        if let CelValue::String(rhs) = &args[0] {
+            return lhs.to_lowercase().starts_with(&rhs.to_lowercase()).into();
+        }
+    }
+
+    CelValue::from_err(CelError::value("endsWith must be form string.(string)"))
+}
+
+fn ends_with_i_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+    if args.len() != 1 {
+        return CelValue::from_err(CelError::argument(
+            "endsWith() expects exactly one argument",
+        ));
+    }
+
+    if let CelValue::String(lhs) = this {
+        if let CelValue::String(rhs) = &args[0] {
+            return lhs.to_lowercase().ends_with(&rhs.to_lowercase()).into();
+        }
+    }
+
+    CelValue::from_err(CelError::value("endsWith must be form string.(string)"))
+}
+
+string_func!(toLower, to_lower_impl, to_lowercase);
+string_func!(toUpper, to_upper_impl, to_uppercase);
+string_func!(trim, trim_impl, trim);
+string_func!(trimStart, trim_start_impl, trim_start);
+string_func!(trimEnd, trim_end_impl, trim_end);
 
 fn abs_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     if args.len() != 1 {
