@@ -11,6 +11,7 @@ use regex::Regex;
 
 const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("contains", &contains_impl),
+    ("containsI", &contains_i_impl),
     ("size", &size_impl),
     ("startsWith", &starts_with_impl),
     ("endsWith", &ends_with_impl),
@@ -84,6 +85,24 @@ fn contains_impl(this: CelValue, args: &[CelValue]) -> CelValue {
         }
     } else {
         CelValue::from_err(CelError::value("contains() can only operate on string"))
+    }
+}
+
+fn contains_i_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+    if args.len() != 1 {
+        return CelValue::from_err(CelError::argument(
+            "contains() expects exactly one argument",
+        ));
+    }
+
+    if let CelValue::String(this_str) = this {
+        if let CelValue::String(rhs) = &args[0] {
+            CelValue::from_bool(this_str.to_lowercase().contains(&rhs.to_lowercase()))
+        } else {
+            CelValue::from_err(CelError::value("containsI() arg must be string"))
+        }
+    } else {
+        CelValue::from_err(CelError::value("containsI() can only operate on string"))
     }
 }
 

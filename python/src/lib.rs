@@ -1,4 +1,4 @@
-use crate::{BindContext, CelContext, CelError, CelValue, CelValueDyn};
+use rscel::{BindContext, CelContext, CelError, CelValue, CelValueDyn};
 
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},

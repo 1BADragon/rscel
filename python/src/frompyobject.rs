@@ -10,7 +10,7 @@ use pyo3::{
     FromPyObject, PyAny, PyErr, PyObject, PyResult, PyTryFrom, Python,
 };
 
-use crate::CelValue;
+use rscel::CelValue;
 
 struct WrappedError {
     err: PyErr,

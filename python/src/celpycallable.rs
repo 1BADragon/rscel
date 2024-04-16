@@ -1,6 +1,6 @@
 use pyo3::{types::PyTuple, Py, PyAny, PyObject, Python, ToPyObject};
 
-use crate::{CelError, CelValue};
+use rscel::{CelError, CelValue};
 
 pub struct CelPyCallable {
     func: Py<PyAny>,

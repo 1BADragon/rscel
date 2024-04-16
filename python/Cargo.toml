@@ -1,0 +1,10 @@
+[package]
+name = "rscel_python"
+version = "1.0.0"
+edition = "2021"
+description = "Python bindings for the rscel package"
+license = "MIT"
+
+[dependencies]
+rscel = { path = "../rscel" }
+pyo3 = {workspace = true}
