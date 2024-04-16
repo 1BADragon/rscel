@@ -133,6 +133,12 @@ fn test_contains() {
 #[test_case("-.1", (-0.1).into(); "neg dot leading floating point")]
 #[test_case("2+3 in [5]", true.into(); "check in binding")]
 #[test_case("foo.b || true", true.into(); "Error bypassing")]
+#[test_case(r#""\u00fc""#, "ü".into(); "Test unicode short lower")]
+#[test_case(r#""\u00FC""#, "ü".into(); "Test unicode short upper")]
+#[test_case(r#""\U000000fc""#, "ü".into(); "Test unicode long lower")]
+#[test_case(r#""\U000000FC""#, "ü".into(); "Test unicode long upper")]
+#[test_case(r#""\x48""#, "H".into(); "Test hex escape lower")]
+#[test_case(r#""\X48""#, "H".into(); "Test hex escape upper")]
 fn test_equation(prog: &str, res: CelValue) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

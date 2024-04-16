@@ -192,9 +192,33 @@ impl<'l> StringTokenizer<'l> {
                     'r' => working.push('\r' as u8),
                     't' => working.push('\t' as u8),
                     'v' => working.push(0x0bu8),
+                    'x' => working.push(self.extract_hex_val(2)? as u8),
+                    'X' => working.push(self.extract_hex_val(2)? as u8),
                     '\\' => working.push('\\' as u8),
                     '\'' => working.push('\'' as u8),
                     '"' => working.push('"' as u8),
+                    '0'..='9' => {
+                        let mut oct: String = [escaped].into_iter().collect();
+                        for _ in 0..2 {
+                            match self.scanner.next() {
+                                Some(c) => oct.push(c),
+                                None => {
+                                    return Err(SyntaxError::from_location(self.scanner.location())
+                                        .with_message(format!("Octal number requires 3 digits")))
+                                }
+                            }
+                        }
+
+                        let val = match u8::from_str_radix(&oct, 8) {
+                            Ok(v) => v,
+                            Err(_) => {
+                                return Err(SyntaxError::from_location(self.scanner.location())
+                                    .with_message(format!("{} is not a valid octal number", oct)))
+                            }
+                        };
+
+                        working.push(val)
+                    }
                     other => {
                         other.encode_utf8(&mut buf);
                         working.extend_from_slice(&buf[..other.len_utf8()]);
@@ -202,7 +226,6 @@ impl<'l> StringTokenizer<'l> {
                 }
             } else {
                 curr.encode_utf8(&mut buf);
-                println!("{:?} {}", buf, curr.len_utf8());
                 working.extend_from_slice(&buf[..curr.len_utf8()]);
             }
         }
@@ -241,10 +264,42 @@ impl<'l> StringTokenizer<'l> {
                     'n' => working.push('\n'),
                     'r' => working.push('\r'),
                     't' => working.push('\t'),
+                    'u' => working.push(self.extract_hex_val(4)?),
+                    'U' => working.push(self.extract_hex_val(8)?),
                     'v' => working.push(0x0b as char),
+                    'x' => working.push(self.extract_hex_val(2)?),
+                    'X' => working.push(self.extract_hex_val(2)?),
                     '\\' => working.push('\\'),
                     '\'' => working.push('\''),
                     '"' => working.push('"'),
+                    '0'..='9' => {
+                        let mut oct: String = [escaped].into_iter().collect();
+                        for _ in 0..2 {
+                            match self.scanner.next() {
+                                Some(c) => oct.push(c),
+                                None => {
+                                    return Err(SyntaxError::from_location(self.scanner.location())
+                                        .with_message(format!("Octal number requires 3 digits")))
+                                }
+                            }
+                        }
+
+                        let val = match u32::from_str_radix(&oct, 8) {
+                            Ok(v) => v,
+                            Err(_) => {
+                                return Err(SyntaxError::from_location(self.scanner.location())
+                                    .with_message(format!("{} is not a valid octal number", oct)))
+                            }
+                        };
+
+                        working.push(match char::from_u32(val) {
+                            Some(c) => c,
+                            None => {
+                                return Err(SyntaxError::from_location(self.scanner.location())
+                                    .with_message(format!("Invalid code point {}", val)))
+                            }
+                        })
+                    }
                     other => working.push(other),
                 }
             } else {
@@ -379,6 +434,41 @@ impl<'l> StringTokenizer<'l> {
                 Err(_) => Err(SyntaxError::from_location(self.scanner.location())
                     .with_message(format!("Failed to parse unsigned int {}", orig))),
             }
+        }
+    }
+
+    fn extract_hex_val(&mut self, len: usize) -> Result<char, SyntaxError> {
+        let mut code_str = String::new();
+        for _ in 0..len {
+            code_str.push(match self.scanner.next() {
+                Some(c) => {
+                    if c.is_digit(16) {
+                        c
+                    } else {
+                        return Err(SyntaxError::from_location(self.scanner.location())
+                            .with_message(format!(
+                                "{} is not a valid unicode code point value",
+                                c
+                            )));
+                    }
+                }
+                None => {
+                    return Err(SyntaxError::from_location(self.scanner.location())
+                        .with_message(format!("Expected {} hex digits after unicode escape", len)))
+                }
+            });
+        }
+
+        let unicode_value: u32 = u32::from_str_radix(&code_str, 16).unwrap();
+
+        match char::from_u32(unicode_value) {
+            Some(c) => Ok(c),
+            None => Err(
+                SyntaxError::from_location(self.scanner.location()).with_message(format!(
+                    "{:x} is not a valid unicode code point",
+                    unicode_value
+                )),
+            ),
         }
     }
 }

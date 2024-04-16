@@ -14,6 +14,7 @@ pub enum CelError {
     Runtime(String),
     Binding { symbol: String },
     Attribute { parent: String, field: String },
+    DivideByZero,
 
     Internal(String),
 }
@@ -70,11 +71,12 @@ impl CelError {
             Value(..) => "VALUE",
             Argument(..) => "ARGUMENT",
             InvalidOp(..) => "INVALID OP",
-
-            Internal(..) => "INTERNAL",
             Runtime(_) => "RUNTIME",
             Binding { .. } => "BINDING",
             Attribute { .. } => "ATTRIBUTE",
+            DivideByZero => "DIVIDE BY ZERO",
+
+            Internal(..) => "INTERNAL",
         }
     }
 }
@@ -103,6 +105,7 @@ impl fmt::Display for CelError {
             Attribute { parent, field } => {
                 write!(f, "Field {} does not exist on {}", field, parent)
             }
+            DivideByZero => write!(f, "Divide by zero error"),
         }
     }
 }

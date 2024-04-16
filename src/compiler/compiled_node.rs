@@ -310,23 +310,15 @@ impl<T: Clone> CompiledNode<T> {
         self.details.union_from(false_clause.details);
 
         if let NodeValue::ConstExpr(i) = self.inner {
-            if cfg!(feature = "type_prop") {
-                if i.is_truthy() {
-                    CompiledNode {
-                        inner: true_clause.inner,
-                        details: self.details,
-                        ast: None,
-                    }
-                } else {
-                    CompiledNode {
-                        inner: false_clause.inner,
-                        details: self.details,
-                        ast: None,
-                    }
+            if i.is_err() {
+                CompiledNode {
+                    inner: NodeValue::ConstExpr(i),
+                    details: self.details,
+                    ast: None,
                 }
             } else {
-                if let CelValue::Bool(b) = i {
-                    if b {
+                if cfg!(feature = "type_prop") {
+                    if i.is_truthy() {
                         CompiledNode {
                             inner: true_clause.inner,
                             details: self.details,
@@ -340,13 +332,28 @@ impl<T: Clone> CompiledNode<T> {
                         }
                     }
                 } else {
-                    CompiledNode {
-                        inner: NodeValue::ConstExpr(CelValue::from_err(CelError::Value(format!(
-                            "{} cannot be converted to bool",
-                            i.as_type()
-                        )))),
-                        details: self.details,
-                        ast: None,
+                    if let CelValue::Bool(b) = i {
+                        if b {
+                            CompiledNode {
+                                inner: true_clause.inner,
+                                details: self.details,
+                                ast: None,
+                            }
+                        } else {
+                            CompiledNode {
+                                inner: false_clause.inner,
+                                details: self.details,
+                                ast: None,
+                            }
+                        }
+                    } else {
+                        CompiledNode {
+                            inner: NodeValue::ConstExpr(CelValue::from_err(CelError::Value(
+                                format!("{} cannot be converted to bool", i.as_type()),
+                            ))),
+                            details: self.details,
+                            ast: None,
+                        }
                     }
                 }
             }

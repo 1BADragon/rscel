@@ -444,9 +444,8 @@ impl<'a> Interpreter<'a> {
                                     let arg_values = self.resolve_args(args)?;
                                     stack.push_val(construct_type(type_name, &arg_values));
                                 } else {
-                                    return Err(CelError::runtime(&format!(
-                                        "{} is not callable",
-                                        func_name
+                                    stack.push_val(CelValue::from_err(CelError::runtime(
+                                        &format!("{} is not callable", func_name),
                                     )));
                                 }
                             }

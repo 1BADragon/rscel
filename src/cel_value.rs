@@ -190,6 +190,15 @@ impl CelValue {
         }
     }
 
+    pub fn is_zero(&self) -> bool {
+        match self {
+            CelValue::Int(i) => *i == 0,
+            CelValue::UInt(u) => *u == 0,
+            CelValue::Float(f) => *f == 0.0,
+            _ => false,
+        }
+    }
+
     pub fn int_type() -> CelValue {
         CelValue::from_type("int")
     }
@@ -224,6 +233,10 @@ impl CelValue {
 
     pub fn null_type() -> CelValue {
         CelValue::from_type("null")
+    }
+
+    pub fn dyn_type() -> CelValue {
+        CelValue::from_type("dyn")
     }
 
     pub fn ident_type() -> CelValue {
@@ -347,23 +360,31 @@ impl CelValue {
     }
 
     pub fn lt(&self, rhs: &CelValue) -> CelValue {
-        CelValue::from_bool(self.ord(rhs)? == Some(Ordering::Less))
+        self.error_prop_or(rhs, |lhs, rhs| {
+            CelValue::from_bool(lhs.ord(rhs)? == Some(Ordering::Less))
+        })
     }
 
     pub fn gt(&self, rhs: &CelValue) -> CelValue {
-        CelValue::from_bool(self.ord(rhs)? == Some(Ordering::Greater))
+        self.error_prop_or(rhs, |lhs, rhs| {
+            CelValue::from_bool(lhs.ord(rhs)? == Some(Ordering::Greater))
+        })
     }
 
     pub fn le(&self, rhs: &CelValue) -> CelValue {
-        let res = self.ord(rhs)?;
+        self.error_prop_or(rhs, |lhs, rhs| {
+            let res = lhs.ord(rhs)?;
 
-        CelValue::from_bool(res == Some(Ordering::Less) || res == Some(Ordering::Equal))
+            CelValue::from_bool(res == Some(Ordering::Less) || res == Some(Ordering::Equal))
+        })
     }
 
     pub fn ge(&self, rhs: &CelValue) -> CelValue {
-        let res = self.ord(rhs)?;
+        self.error_prop_or(rhs, |lhs, rhs| {
+            let res = lhs.ord(rhs)?;
 
-        CelValue::from_bool(res == Some(Ordering::Greater) || res == Some(Ordering::Equal))
+            CelValue::from_bool(res == Some(Ordering::Greater) || res == Some(Ordering::Equal))
+        })
     }
 
     pub fn or(&self, rhs: &CelValue) -> CelValue {
@@ -639,15 +660,34 @@ impl CelValueDyn for CelValue {
                         CelValue::true_()
                     }
                 }
+                (CelValue::Map(l), CelValue::Map(r)) => {
+                    let mut r = r.clone();
+
+                    for (k, v1) in l.into_iter() {
+                        if let Some(v2) = r.remove(k) {
+                            if !CelValueDyn::eq(v1, &v2).is_true() {
+                                return CelValue::false_();
+                            }
+                        } else {
+                            return CelValue::false_();
+                        }
+                    }
+
+                    if !r.is_empty() {
+                        return CelValue::false_();
+                    }
+
+                    CelValue::true_()
+                }
                 (&CelValue::Null, &CelValue::Null) => CelValue::true_(),
                 (CelValue::Null, _) => CelValue::false_(),
                 (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) => CelValue::from_bool(l == r),
                 (CelValue::Duration(l), CelValue::Duration(r)) => CelValue::from_bool(l == r),
                 (CelValue::Type(l), CelValue::Type(r)) => CelValue::from_bool(l == r),
                 #[cfg(protobuf)]
-                (CelValue::Message(l), CelValue::Message(r)) => Ok(CelValue::from_bool(
-                    l.descriptor_dyn().eq(l.as_ref(), r.as_ref()),
-                )),
+                (CelValue::Message(l), CelValue::Message(r)) => {
+                    CelValue::from_bool(l.descriptor_dyn().eq(l.as_ref(), r.as_ref()))
+                }
                 #[cfg(protobuf)]
                 (
                     CelValue::Enum {
@@ -690,10 +730,11 @@ impl CelValueDyn for CelValue {
                     }
                 }
                 (CelValue::Dyn(d), rhs) => d.eq(rhs),
-                (_a, _b) => CelValue::from_err(CelError::invalid_op(&format!(
-                    "Invalid op '==' between {:?} and {:?}",
-                    type1, type2
-                ))),
+                // (_a, _b) => CelValue::from_err(CelError::invalid_op(&format!(
+                //     "Invalid op '==' between {:?} and {:?}",
+                //     type1, type2
+                // ))),
+                (_a, _b) => CelValue::false_(),
             }
         })
     }
@@ -1320,11 +1361,19 @@ impl Div for CelValue {
             match lhs.into_owned() {
                 CelValue::Int(val1) => {
                     if let CelValue::Int(val2) = rhs.into_owned() {
+                        if val2 == 0 {
+                            return CelValue::from_err(CelError::DivideByZero);
+                        }
+
                         return CelValue::from(val1 / val2);
                     }
                 }
                 CelValue::UInt(val1) => {
                     if let CelValue::UInt(val2) = rhs.into_owned() {
+                        if val2 == 0 {
+                            return CelValue::from_err(CelError::DivideByZero);
+                        }
+
                         return CelValue::from(val1 / val2);
                     }
                 }

@@ -13,7 +13,7 @@ pub fn construct_type(type_name: &str, args: &[CelValue]) -> CelValue {
         "type" => type_impl(CelValue::from_null(), args),
         "timestamp" => timestamp_impl(CelValue::from_null(), args),
         "duration" => duration_impl(CelValue::from_null(), args),
-
+        "dyn" => dyn_impl(CelValue::from_null(), args),
         _ => CelValue::from_err(CelError::runtime(&format!(
             "{} is not constructable",
             type_name
@@ -32,6 +32,7 @@ pub fn load_default_types(bind_ctx: &mut BindContext) {
     bind_ctx.add_type("timestamp", CelValue::timestamp_type());
     bind_ctx.add_type("duration", CelValue::duration_type());
     bind_ctx.add_type("null_type", CelValue::null_type());
+    bind_ctx.add_type("dyn", CelValue::dyn_type())
 }
 
 fn bool_impl(_: CelValue, args: &[CelValue]) -> CelValue {
@@ -201,4 +202,12 @@ fn duration_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     } else {
         CelValue::from_err(CelError::value("duration() expects a string argument"))
     }
+}
+
+fn dyn_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+    if args.len() != 1 {
+        return CelValue::from_err(CelError::argument("dyn() expects one argument"));
+    }
+
+    args[0].clone()
 }
