@@ -1,7 +1,8 @@
 [workspace]
 members = [
   "rscel",
-  "python"
+  "python",
+  "wasm"
 ]
 default-members = ["rscel"]
 resolver="2"

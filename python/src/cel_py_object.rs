@@ -30,7 +30,7 @@ impl CelValueDyn for CelPyObject {
     fn as_type(&self) -> CelValue {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
-            let name = inner.get_type().name().unwrap();
+            let name = inner.repr().unwrap();
 
             CelValue::Type(format!("pyobj-{}", name))
         })
@@ -55,10 +55,10 @@ impl CelValueDyn for CelPyObject {
         let rhs_type = self.as_type();
 
         if let CelValue::Dyn(rhs) = rhs {
-            if let Some(rhs_obj) = rhs.any_ref().downcast_ref::<PyObject>() {
+            if let Some(rhs_obj) = rhs.any_ref().downcast_ref::<CelPyObject>() {
                 return Python::with_gil(|py| {
                     let lhs_obj = self.inner.as_ref(py);
-                    let rhs_obj = rhs_obj.as_ref(py);
+                    let rhs_obj = rhs_obj.inner.as_ref(py);
 
                     match lhs_obj.eq(rhs_obj) {
                         Ok(res) => CelValue::from_bool(res),
