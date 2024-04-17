@@ -13,10 +13,10 @@ build:
 	. .env/bin/activate && pip install maturin pytest protobuf
 
 wasm-binding:
-	RUSTFLAGS="-C opt-level=s" wasm-pack build --target web --features wasm $(CARGO_ARGS)
+	$(MAKE_COMMAND) -C wasm wasm-binding
 	
 wasm-binding-release:
-	RUSTFLAGS="-C opt-level=s" wasm-pack build --target web --release --features wasm $(CARGO_ARGS)
+	$(MAKE_COMMAND) -C wasm wasm-binding-release
 
 python-binding: .env
 	. .env/bin/activate && cd python && maturin build $(CARGO_ARGS)
@@ -24,11 +24,11 @@ python-binding: .env
 python-binding-release: .env
 	. .env/bin/activate && cd python && maturin build --release $(CARGO_ARGS)
 
-wasm-example: wasm-binding
-	cd examples/wasm && npm start
+wasm-example:
+	$(MAKE_COMMAND) -C wasm wasm-example
 
-wasm-example-release: wasm-binding-release
-	cd examples/wasm && npm start
+wasm-example-release:
+	$(MAKE_COMMAND) -C wasm wasm-example-release
 
 .PHONY: all
 all: wasm-binding python-binding build
