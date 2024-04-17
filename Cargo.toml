@@ -3,6 +3,7 @@ members = [
   "rscel",
   "python"
 ]
+default-members = ["rscel"]
 resolver="2"
 
 [profile.release-with-debug]

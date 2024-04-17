@@ -145,6 +145,7 @@ impl PyBindContext {
 
 /* Module decl */
 #[pymodule]
+#[pyo3(name = "rscel")]
 fn rscel_module(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(eval, m)?)?;
     m.add_class::<PyCelContext>()?;

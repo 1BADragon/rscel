@@ -4,9 +4,14 @@ use std::fmt;
 
 use crate::py_cel_value::PyCelValue;
 
-#[derive()]
-struct CelPyObject {
+pub struct CelPyObject {
     inner: PyObject,
+}
+
+impl CelPyObject {
+    pub fn new(inner: PyObject) -> Self {
+        Self { inner }
+    }
 }
 
 impl fmt::Display for CelPyObject {

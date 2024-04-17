@@ -338,24 +338,19 @@ impl CelValue {
 
         let (lhs, rhs) = CelValue::type_prop(Cow::Borrowed(self), Cow::Borrowed(rhs_value));
 
-        if let (CelValue::Int(l), CelValue::Int(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            Ok(l.partial_cmp(r))
-        } else if let (CelValue::UInt(l), CelValue::UInt(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            Ok(l.partial_cmp(r))
-        } else if let (CelValue::Float(l), CelValue::Float(r)) = (lhs.as_ref(), rhs.as_ref()) {
-            Ok(l.partial_cmp(r))
-        } else if let (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) =
-            (lhs.as_ref(), rhs.as_ref())
-        {
-            Ok(l.partial_cmp(r))
-        } else if let (CelValue::Duration(l), CelValue::Duration(r)) = (lhs.as_ref(), rhs.as_ref())
-        {
-            Ok(l.partial_cmp(r))
-        } else {
-            Err(CelError::invalid_op(&format!(
+        match (lhs.as_ref(), rhs.as_ref()) {
+            (CelValue::Int(l), CelValue::Int(r)) => Ok(l.partial_cmp(r)),
+            (CelValue::UInt(l), CelValue::UInt(r)) => Ok(l.partial_cmp(r)),
+            (CelValue::Float(l), CelValue::Float(r)) => Ok(l.partial_cmp(r)),
+            (CelValue::Bool(l), CelValue::Bool(r)) => Ok(l.partial_cmp(r)),
+            (CelValue::String(l), CelValue::String(r)) => Ok(l.partial_cmp(r)),
+            (CelValue::Bytes(l), CelValue::Bytes(r)) => Ok(l.partial_cmp(r)),
+            (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) => Ok(l.partial_cmp(r)),
+            (CelValue::Duration(l), CelValue::Duration(r)) => Ok(l.partial_cmp(r)),
+            _ => Err(CelError::invalid_op(&format!(
                 "Invalid op 'ord' between {:?} and {:?}",
                 type1, type2
-            )))
+            ))),
         }
     }
 
@@ -622,9 +617,6 @@ impl CelValueDyn for CelValue {
 
     fn eq(&self, rhs_val: &CelValue) -> CelValue {
         self.error_prop_or(rhs_val, |lhs_val, rhs_val| {
-            let type1 = lhs_val.as_type();
-            let type2 = rhs_val.as_type();
-
             let rhs = if let CelValue::Dyn(d) = rhs_val {
                 match d.any_ref().downcast_ref::<CelValue>() {
                     Some(v) => v,

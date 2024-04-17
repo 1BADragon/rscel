@@ -5,6 +5,10 @@ edition = "2021"
 description = "Python bindings for the rscel package"
 license = "MIT"
 
+[lib]
+name = "rscel"
+crate-type = ["cdylib"]
+
 [dependencies]
 rscel = { path = "../rscel" }
 pyo3 = { workspace = true }

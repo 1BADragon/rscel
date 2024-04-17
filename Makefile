@@ -19,10 +19,10 @@ wasm-binding-release:
 	RUSTFLAGS="-C opt-level=s" wasm-pack build --target web --release --features wasm $(CARGO_ARGS)
 
 python-binding: .env
-	. .env/bin/activate && maturin build --features python $(CARGO_ARGS)
+	. .env/bin/activate && cd python && maturin build $(CARGO_ARGS)
 	
 python-binding-release: .env
-	. .env/bin/activate && maturin build --features python --release $(CARGO_ARGS)
+	. .env/bin/activate && cd python && maturin build --release $(CARGO_ARGS)
 
 wasm-example: wasm-binding
 	cd examples/wasm && npm start

@@ -7,12 +7,12 @@ use pyo3::{
         timezone_utc, PyBool, PyBytes, PyDateTime, PyDelta, PyDict, PyFloat, PyInt, PyList,
         PyString, PyTuple,
     },
-    FromPyObject, PyAny, PyErr, PyObject, PyResult, PyTryFrom, Python,
+    FromPyObject, PyAny, PyErr, PyResult, PyTryFrom, Python,
 };
 
 use rscel::CelValue;
 
-use crate::py_cel_value::PyCelValue;
+use crate::{cel_py_object::CelPyObject, py_cel_value::PyCelValue};
 
 struct WrappedError {
     err: PyErr,
@@ -207,8 +207,8 @@ fn extract_celval_recurse<'source>(
                     .into(),
             )),
             "NoneType" => Ok(PyCelValue::new(CelValue::from_null())),
-            _ => Ok(PyCelValue::new(CelValue::Dyn(Arc::<PyObject>::new(
-                ob.into(),
+            _ => Ok(PyCelValue::new(CelValue::Dyn(Arc::<CelPyObject>::new(
+                CelPyObject::new(ob.into()),
             )))),
         },
         Err(_) => Err(WrappedError::new(
