@@ -5,9 +5,9 @@ mod into_jsvalue;
 mod object_iter;
 mod utils;
 
-use crate::{BindContext, CelCompiler, CelContext, StringTokenizer};
 use eval_result::EvalResult;
 use object_iter::ObjectIterator;
+use rscel::{BindContext, CelCompiler, CelContext, StringTokenizer};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

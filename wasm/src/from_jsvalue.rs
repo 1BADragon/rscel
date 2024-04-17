@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use num::FromPrimitive;
 use wasm_bindgen::{JsCast, JsValue};
 
-use crate::{CelError, CelResult, CelValue};
+use rscel::{CelError, CelResult, CelValue};
 
 use super::{object_iter::ObjectIterator, values};
 

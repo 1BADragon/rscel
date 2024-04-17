@@ -1,6 +1,6 @@
 use wasm_bindgen::JsValue;
 
-use crate::{program::ProgramDetails, CelError, CelValue};
+use rscel::{CelError, CelValue, ProgramDetails};
 
 impl Into<JsValue> for CelValue {
     fn into(self) -> JsValue {

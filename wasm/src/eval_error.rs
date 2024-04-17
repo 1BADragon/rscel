@@ -1,6 +1,6 @@
 use wasm_bindgen::JsValue;
 
-use crate::CelError;
+use rscel::CelError;
 
 pub struct EvalError {
     kind: String,

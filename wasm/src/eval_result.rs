@@ -1,6 +1,6 @@
 use wasm_bindgen::JsValue;
 
-use crate::{program::ProgramDetails, CelValue, Program};
+use rscel::{CelValue, Program, ProgramDetails};
 
 use super::eval_error::EvalError;
 
