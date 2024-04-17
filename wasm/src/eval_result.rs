@@ -2,6 +2,8 @@ use wasm_bindgen::JsValue;
 
 use rscel::{CelValue, Program, ProgramDetails};
 
+use crate::{from_jsvalue::WasmCelValue, wasm_program_details::WasmProgramDetails};
+
 use super::eval_error::EvalError;
 
 pub struct EvalResult {
@@ -48,7 +50,9 @@ impl Into<JsValue> for EvalResult {
             js_sys::Reflect::set(
                 &obj,
                 &"result".into(),
-                &self.result.map_or(JsValue::undefined(), |x| x.into()),
+                &self
+                    .result
+                    .map_or(JsValue::undefined(), |x| WasmCelValue::new(x).into()),
             )
             .unwrap();
         } else {
@@ -65,7 +69,7 @@ impl Into<JsValue> for EvalResult {
             &"details".into(),
             &self
                 .program_details
-                .map_or(JsValue::undefined(), |x| x.into()),
+                .map_or(JsValue::undefined(), |x| WasmProgramDetails::new(x).into()),
         )
         .unwrap();
 

@@ -2,9 +2,11 @@ use wasm_bindgen::JsValue;
 
 use rscel::{CelError, CelValue, ProgramDetails};
 
-impl Into<JsValue> for CelValue {
+use crate::{eval_error::WasmCelError, from_jsvalue::WasmCelValue};
+
+impl Into<JsValue> for WasmCelValue {
     fn into(self) -> JsValue {
-        match self {
+        match self.into_inner() {
             CelValue::Int(i) => i.into(),
             CelValue::UInt(u) => u.into(),
             CelValue::Float(f) => f.into(),
@@ -23,7 +25,7 @@ impl Into<JsValue> for CelValue {
                 let arr = js_sys::Array::new();
 
                 for value in l.into_iter() {
-                    arr.push(&value.into());
+                    arr.push(&WasmCelValue::new(value).into());
                 }
 
                 arr.into()
@@ -32,7 +34,8 @@ impl Into<JsValue> for CelValue {
                 let obj = js_sys::Object::new();
 
                 for (key, value) in m.into_iter() {
-                    js_sys::Reflect::set(&obj, &key.into(), &value.into()).unwrap();
+                    js_sys::Reflect::set(&obj, &key.into(), &WasmCelValue::new(value).into())
+                        .unwrap();
                 }
 
                 obj.into()
@@ -67,35 +70,11 @@ impl Into<JsValue> for CelValue {
     }
 }
 
-impl Into<JsValue> for ProgramDetails {
-    fn into(self) -> JsValue {
-        let obj = js_sys::Object::new();
-
-        js_sys::Reflect::set(&obj, &"source".into(), &self.source().into()).unwrap();
-
-        let params_arr = js_sys::Array::new();
-
-        for param in self.params().into_iter() {
-            params_arr.push(&param.into());
-        }
-
-        js_sys::Reflect::set(&obj, &"params".into(), &params_arr.into()).unwrap();
-
-        // im not in the mood to write to JsValue for all of the grammer right now
-        if let Some(ast) = self.ast() {
-            let ast_jsvalue = serde_wasm_bindgen::to_value(ast).unwrap();
-            js_sys::Reflect::set(&obj, &"ast".into(), &ast_jsvalue).unwrap();
-        }
-
-        obj.into()
-    }
-}
-
-impl Into<JsValue> for CelError {
+impl Into<JsValue> for WasmCelError {
     fn into(self) -> JsValue {
         let val = js_sys::Object::new();
 
-        match self {
+        match self.into_inner() {
             CelError::Misc(err) => {
                 js_sys::Reflect::set(&val, &"type".into(), &"misc".into()).unwrap();
                 js_sys::Reflect::set(&val, &"msg".into(), &err.into()).unwrap();
@@ -141,6 +120,9 @@ impl Into<JsValue> for CelError {
                 js_sys::Reflect::set(&val, &"type".into(), &"attribute".into()).unwrap();
                 js_sys::Reflect::set(&val, &"parent".into(), &parent.into()).unwrap();
                 js_sys::Reflect::set(&val, &"field".into(), &field.into()).unwrap();
+            }
+            CelError::DivideByZero => {
+                js_sys::Reflect::set(&val, &"type".into(), &"divide by zero".into()).unwrap();
             }
         };
 

@@ -4,8 +4,11 @@ mod from_jsvalue;
 mod into_jsvalue;
 mod object_iter;
 mod utils;
+mod wasm_program_details;
 
+use eval_error::WasmCelError;
 use eval_result::EvalResult;
+use from_jsvalue::WasmCelValue;
 use object_iter::ObjectIterator;
 use rscel::{BindContext, CelCompiler, CelContext, StringTokenizer};
 use wasm_bindgen::prelude::*;
@@ -31,13 +34,13 @@ pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
     let mut exec_ctx = BindContext::new();
 
     if let Err(err) = ctx.add_program_str("entry", prog) {
-        return EvalResult::from_error(err.into()).into();
+        return EvalResult::from_error(WasmCelError::new(err).into()).into();
     }
 
     for (key, value) in ObjectIterator::new(binding.into()) {
-        match value.try_into() {
-            Ok(celval) => exec_ctx.bind_param(&key, celval),
-            Err(err) => return EvalResult::from_error(err.into()).into(),
+        match TryInto::<WasmCelValue>::try_into(value) {
+            Ok(celval) => exec_ctx.bind_param(&key, celval.into_inner()),
+            Err(err) => return EvalResult::from_error(WasmCelError::new(err).into()).into(),
         }
     }
 
@@ -45,7 +48,7 @@ pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
 
     match res {
         Ok(ok) => EvalResult::from_value(ok),
-        Err(err) => EvalResult::from_error(err.into()),
+        Err(err) => EvalResult::from_error(WasmCelError::new(err).into()),
     }
     .into()
 }
@@ -61,6 +64,6 @@ pub fn cel_details(source: &str) -> JsValue {
 
             EvalResult::from_program(prog).into()
         }
-        Err(err) => EvalResult::from_error(err.into()).into(),
+        Err(err) => EvalResult::from_error(WasmCelError::new(err).into()).into(),
     }
 }
