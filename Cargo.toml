@@ -11,4 +11,5 @@ debug = true
 
 [workspace.dependencies]
 pyo3 = { version = "0.20.0", features = ["extension-module", "chrono"] }
+chrono = { version = "0.4.38", features = ["serde"] }
 

@@ -12,6 +12,8 @@ use pyo3::{
 
 use rscel::CelValue;
 
+use crate::py_cel_value::PyCelValue;
+
 struct WrappedError {
     err: PyErr,
     path: Vec<String>,
@@ -91,29 +93,34 @@ impl WrappedDowncast for &PyAny {
 fn extract_celval_recurse<'source>(
     ob: &'source PyAny,
     current_path: &'source [&'source str],
-) -> Result<CelValue, WrappedError> {
+) -> Result<PyCelValue, WrappedError> {
     match ob.get_type().name() {
         Ok(type_name) => match type_name {
-            "int" => Ok(ob
-                .wrapped_downcast::<PyInt>(current_path)?
-                .wrapped_extract::<i64>(current_path)?
-                .into()),
-            "float" => Ok(ob
-                .wrapped_downcast::<PyFloat>(current_path)?
-                .wrapped_extract::<f64>(current_path)?
-                .into()),
-            "bool" => Ok(ob
-                .wrapped_downcast::<PyBool>(current_path)?
-                .wrapped_extract::<bool>(current_path)?
-                .into()),
-            "str" => Ok(ob
-                .wrapped_downcast::<PyString>(current_path)?
-                .wrapped_extract::<String>(current_path)?
-                .into()),
-            "bytes" => Ok(ob
-                .wrapped_downcast::<PyBytes>(current_path)?
-                .wrapped_extract::<Vec<u8>>(current_path)?
-                .into()),
+            "int" => Ok(PyCelValue::new(
+                ob.wrapped_downcast::<PyInt>(current_path)?
+                    .wrapped_extract::<i64>(current_path)?
+                    .into(),
+            )),
+            "float" => Ok(PyCelValue::new(
+                ob.wrapped_downcast::<PyFloat>(current_path)?
+                    .wrapped_extract::<f64>(current_path)?
+                    .into(),
+            )),
+            "bool" => Ok(PyCelValue::new(
+                ob.wrapped_downcast::<PyBool>(current_path)?
+                    .wrapped_extract::<bool>(current_path)?
+                    .into(),
+            )),
+            "str" => Ok(PyCelValue::new(
+                ob.wrapped_downcast::<PyString>(current_path)?
+                    .wrapped_extract::<String>(current_path)?
+                    .into(),
+            )),
+            "bytes" => Ok(PyCelValue::new(
+                ob.wrapped_downcast::<PyBytes>(current_path)?
+                    .wrapped_extract::<Vec<u8>>(current_path)?
+                    .into(),
+            )),
             "list" => {
                 let mut next_path: Vec<String> =
                     current_path.iter().map(|s| (*s).to_owned()).collect();
@@ -125,13 +132,16 @@ fn extract_celval_recurse<'source>(
                     .enumerate()
                 {
                     next_path.push(format!("{}", i));
-                    vec.push(val.wrapped_extract(
-                        &next_path.iter().map(String::as_str).collect::<Vec<&str>>(),
-                    )?);
+                    vec.push(
+                        val.wrapped_extract::<PyCelValue>(
+                            &next_path.iter().map(String::as_str).collect::<Vec<&str>>(),
+                        )?
+                        .into_inner(),
+                    );
                     next_path.pop();
                 }
 
-                Ok(vec.into())
+                Ok(PyCelValue::new(vec.into()))
             }
             "dict" => {
                 let mut next_path: Vec<String> =
@@ -157,15 +167,20 @@ fn extract_celval_recurse<'source>(
 
                     map.insert(
                         key,
-                        mapobj.get_item(keyobj).unwrap().unwrap().wrapped_extract(
-                            &next_path.iter().map(String::as_str).collect::<Vec<&str>>(),
-                        )?,
+                        mapobj
+                            .get_item(keyobj)
+                            .unwrap()
+                            .unwrap()
+                            .wrapped_extract::<PyCelValue>(
+                                &next_path.iter().map(String::as_str).collect::<Vec<&str>>(),
+                            )?
+                            .into_inner(),
                     );
 
                     next_path.pop();
                 }
 
-                Ok(map.into())
+                Ok(PyCelValue::new(map.into()))
             }
             "datetime" => {
                 let py_utc_dt = match Python::with_gil(|py| {
@@ -184,14 +199,17 @@ fn extract_celval_recurse<'source>(
                     .wrapped_downcast::<PyDateTime>(current_path)?
                     .wrapped_extract::<DateTime<Utc>>(current_path)?;
 
-                Ok(dt.with_timezone(&Utc).into())
+                Ok(PyCelValue::new(dt.with_timezone(&Utc).into()))
             }
-            "timedelta" => Ok(ob
-                .wrapped_downcast::<PyDelta>(current_path)?
-                .wrapped_extract::<Duration>(current_path)?
-                .into()),
-            "NoneType" => Ok(CelValue::from_null()),
-            _ => Ok(CelValue::Dyn(Arc::<PyObject>::new(ob.into()))),
+            "timedelta" => Ok(PyCelValue::new(
+                ob.wrapped_downcast::<PyDelta>(current_path)?
+                    .wrapped_extract::<Duration>(current_path)?
+                    .into(),
+            )),
+            "NoneType" => Ok(PyCelValue::new(CelValue::from_null())),
+            _ => Ok(PyCelValue::new(CelValue::Dyn(Arc::<PyObject>::new(
+                ob.into(),
+            )))),
         },
         Err(_) => Err(WrappedError::new(
             PyValueError::new_err(format!("Failed to get type from {:?}", ob,)),
@@ -200,7 +218,7 @@ fn extract_celval_recurse<'source>(
     }
 }
 
-impl<'source> FromPyObject<'source> for CelValue {
+impl<'source> FromPyObject<'source> for PyCelValue {
     fn extract(ob: &'source PyAny) -> PyResult<Self> {
         match extract_celval_recurse(ob, &[]) {
             Ok(val) => Ok(val),

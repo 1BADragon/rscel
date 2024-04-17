@@ -1,5 +1,5 @@
+use crate::py_cel_value::{PyCelValue, PyCelValueRef};
 use pyo3::{types::PyTuple, Py, PyAny, PyObject, Python, ToPyObject};
-
 use rscel::{CelError, CelValue};
 
 pub struct CelPyCallable {
@@ -24,13 +24,17 @@ impl FnOnce<(CelValue, &[CelValue])> for CelPyCallable {
                     &[args.0]
                         .iter()
                         .filter(|x| !x.is_null())
-                        .map(|x| x.to_object(py))
-                        .chain(args.1.into_iter().map(|x| x.to_object(py)))
+                        .map(|x| PyCelValueRef::new(x).to_object(py))
+                        .chain(
+                            args.1
+                                .into_iter()
+                                .map(|x| PyCelValueRef::new(x).to_object(py)),
+                        )
                         .collect::<Vec<PyObject>>(),
                 ),
                 None,
             ) {
-                Ok(val) => val.extract(py).unwrap(),
+                Ok(val) => val.extract::<PyCelValue>(py).unwrap().into_inner(),
                 Err(val) => CelValue::from_err(CelError::runtime(&val.to_string())),
             }
         })
@@ -47,13 +51,17 @@ impl FnMut<(CelValue, &[CelValue])> for CelPyCallable {
                     &[args.0]
                         .iter()
                         .filter(|x| !x.is_null())
-                        .map(|x| x.to_object(py))
-                        .chain(args.1.into_iter().map(|x| x.to_object(py)))
+                        .map(|x| PyCelValueRef::new(x).to_object(py))
+                        .chain(
+                            args.1
+                                .into_iter()
+                                .map(|x| PyCelValueRef::new(x).to_object(py)),
+                        )
                         .collect::<Vec<PyObject>>(),
                 ),
                 None,
             ) {
-                Ok(val) => val.extract(py).unwrap(),
+                Ok(val) => val.extract::<PyCelValue>(py).unwrap().into_inner(),
                 Err(val) => CelValue::from_err(CelError::runtime(&val.to_string())),
             }
         })
@@ -70,13 +78,17 @@ impl Fn<(CelValue, &[CelValue])> for CelPyCallable {
                     &[args.0]
                         .iter()
                         .filter(|x| !x.is_null())
-                        .map(|x| x.to_object(py))
-                        .chain(args.1.into_iter().map(|x| x.to_object(py)))
+                        .map(|x| PyCelValueRef::new(x).to_object(py))
+                        .chain(
+                            args.1
+                                .into_iter()
+                                .map(|x| PyCelValueRef::new(x).to_object(py)),
+                        )
                         .collect::<Vec<PyObject>>(),
                 ),
                 None,
             ) {
-                Ok(val) => val.extract(py).unwrap(),
+                Ok(val) => val.extract::<PyCelValue>(py).unwrap().into_inner(),
                 Err(val) => CelValue::from_err(CelError::runtime(&val.to_string())),
             }
         })

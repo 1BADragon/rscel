@@ -51,8 +51,6 @@
 //!   
 //! ```
 #![feature(try_trait_v2)]
-#![cfg_attr(feature = "python", feature(fn_traits))]
-#![cfg_attr(feature = "python", feature(unboxed_closures))]
 mod cel_error;
 mod cel_value;
 mod cel_value_dyn;
@@ -73,19 +71,9 @@ pub use context::{BindContext, CelContext, RsCelFunction, RsCelMacro};
 pub use interp::ByteCode;
 pub use program::Program;
 
-// If any of the binding featurs are enabled, export them
-#[cfg(any(feature = "python", feature = "wasm"))]
-pub mod bindings;
-
 // Some re-exports to allow a consistent use of serde
 pub use serde;
 pub use serde_json;
-
-#[cfg(feature = "python")]
-pub use bindings::python::*;
-
-#[cfg(feature = "wasm")]
-pub use bindings::wasm::*;
 
 #[cfg(test)]
 mod tests;

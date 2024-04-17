@@ -7,4 +7,5 @@ license = "MIT"
 
 [dependencies]
 rscel = { path = "../rscel" }
-pyo3 = {workspace = true}
+pyo3 = { workspace = true }
+chrono = { workspace = true }
