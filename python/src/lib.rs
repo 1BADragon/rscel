@@ -21,15 +21,15 @@ use celpycallable::CelPyCallable;
 
 /* Eval entry point */
 #[pyfunction]
-fn eval(py: Python<'_>, prog_str: String, bindings: &PyDict) -> PyResult<PyObject> {
+fn eval(py: Python<'_>, prog_str: String, bindings: &Bound<PyDict>) -> PyResult<PyObject> {
     let callables = {
         let mut callables = Vec::new();
         for keyobj in bindings.keys().iter() {
             let key = keyobj.downcast::<PyString>()?;
-            let val = bindings.get_item(keyobj).unwrap().unwrap();
+            let val = bindings.get_item(key).unwrap().unwrap().clone();
 
             if val.is_callable() {
-                callables.push((key.to_str()?, CelPyCallable::new(val.into())));
+                callables.push((key.to_str()?.to_string(), CelPyCallable::new(val.into())));
             }
         }
         callables
@@ -44,7 +44,7 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &PyDict) -> PyResult<PyObjec
     for keyobj in bindings.keys().iter() {
         let key = keyobj.downcast::<PyString>()?;
 
-        let val = bindings.get_item(keyobj).unwrap().unwrap();
+        let val = bindings.get_item(key).unwrap().unwrap();
 
         if !val.is_callable() {
             exec_ctx.bind_param(key.to_str()?, val.extract::<PyCelValue>()?.into_inner())
@@ -52,7 +52,7 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &PyDict) -> PyResult<PyObjec
     }
 
     for callable in callables.iter() {
-        exec_ctx.bind_func(callable.0, &callable.1);
+        exec_ctx.bind_func(&callable.0, &callable.1);
     }
 
     let res = ctx.exec("entry", &exec_ctx);
@@ -127,12 +127,12 @@ impl PyBindContext {
         self.bindings.insert(name.to_owned(), val.into_inner());
     }
 
-    pub fn bind_func(&mut self, name: &str, val: &PyAny) {
+    pub fn bind_func(&mut self, name: &str, val: &Bound<PyAny>) {
         self.funcs
-            .insert(name.to_owned(), CelPyCallable::new(val.into()));
+            .insert(name.to_owned(), CelPyCallable::new(val.clone().unbind()));
     }
 
-    pub fn bind(&mut self, name: &str, val: &PyAny) -> PyResult<()> {
+    pub fn bind(&mut self, name: &str, val: &Bound<PyAny>) -> PyResult<()> {
         if val.is_callable() {
             self.bind_func(name, val);
         } else {
@@ -146,7 +146,7 @@ impl PyBindContext {
 /* Module decl */
 #[pymodule]
 #[pyo3(name = "rscel")]
-fn rscel_module(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn rscel_module(_py: Python<'_>, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(eval, m)?)?;
     m.add_class::<PyCelContext>()?;
     m.add_class::<PyBindContext>()?;

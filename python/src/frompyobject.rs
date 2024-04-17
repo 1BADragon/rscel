@@ -4,10 +4,10 @@ use chrono::{DateTime, Duration, Utc};
 use pyo3::{
     exceptions::PyValueError,
     types::{
-        timezone_utc, PyBool, PyBytes, PyDateTime, PyDelta, PyDict, PyFloat, PyInt, PyList,
+        timezone_utc_bound, PyBool, PyBytes, PyDateTime, PyDelta, PyDict, PyFloat, PyInt, PyList,
         PyString, PyTuple,
     },
-    FromPyObject, PyAny, PyErr, PyResult, PyTryFrom, Python,
+    FromPyObject, PyAny, PyErr, PyResult, PyTypeCheck, Python,
 };
 
 use rscel::CelValue;
@@ -70,15 +70,18 @@ impl<'a> WrappedExtract<'a> for &PyAny {
 }
 
 trait WrappedDowncast {
-    fn wrapped_downcast<'a, D>(&'a self, path: &[&str]) -> Result<&'a D, WrappedError>
+    fn wrapped_downcast<D>(&self, path: &[&str]) -> Result<&D, WrappedError>
     where
-        D: PyTryFrom<'a>;
+        D: PyTypeCheck<AsRefTarget = D>;
 }
 
 impl WrappedDowncast for &PyAny {
-    fn wrapped_downcast<'a, D>(&'a self, path: &[&str]) -> Result<&'a D, WrappedError>
+    fn wrapped_downcast<D: PyTypeCheck<AsRefTarget = D>>(
+        &self,
+        path: &[&str],
+    ) -> Result<&D, WrappedError>
     where
-        D: PyTryFrom<'a>,
+        D: PyTypeCheck,
     {
         match self.downcast::<D>() {
             Ok(val) => Ok(val),
@@ -95,7 +98,7 @@ fn extract_celval_recurse<'source>(
     current_path: &'source [&'source str],
 ) -> Result<PyCelValue, WrappedError> {
     match ob.get_type().name() {
-        Ok(type_name) => match type_name {
+        Ok(type_name) => match type_name.as_ref() {
             "int" => Ok(PyCelValue::new(
                 ob.wrapped_downcast::<PyInt>(current_path)?
                     .wrapped_extract::<i64>(current_path)?
@@ -184,10 +187,10 @@ fn extract_celval_recurse<'source>(
             }
             "datetime" => {
                 let py_utc_dt = match Python::with_gil(|py| {
-                    let utc = timezone_utc(py);
+                    let utc = timezone_utc_bound(py);
                     let py_astimezone = ob.getattr("astimezone")?;
 
-                    let args = PyTuple::new(py, [utc]);
+                    let args = PyTuple::new_bound(py, [utc]);
 
                     py_astimezone.call1(args)
                 }) {

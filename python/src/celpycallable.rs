@@ -17,9 +17,9 @@ impl FnOnce<(CelValue, &[CelValue])> for CelPyCallable {
 
     extern "rust-call" fn call_once(self, args: (CelValue, &[CelValue])) -> Self::Output {
         Python::with_gil(|py| {
-            match self.func.call(
+            match self.func.call_bound(
                 py,
-                PyTuple::new(
+                PyTuple::new_bound(
                     py,
                     &[args.0]
                         .iter()
@@ -44,9 +44,9 @@ impl FnOnce<(CelValue, &[CelValue])> for CelPyCallable {
 impl FnMut<(CelValue, &[CelValue])> for CelPyCallable {
     extern "rust-call" fn call_mut(&mut self, args: (CelValue, &[CelValue])) -> Self::Output {
         Python::with_gil(|py| {
-            match self.func.call(
+            match self.func.call_bound(
                 py,
-                PyTuple::new(
+                PyTuple::new_bound(
                     py,
                     &[args.0]
                         .iter()
@@ -71,9 +71,9 @@ impl FnMut<(CelValue, &[CelValue])> for CelPyCallable {
 impl Fn<(CelValue, &[CelValue])> for CelPyCallable {
     extern "rust-call" fn call(&self, args: (CelValue, &[CelValue])) -> Self::Output {
         Python::with_gil(|py| {
-            match self.func.call(
+            match self.func.call_bound(
                 py,
-                PyTuple::new(
+                PyTuple::new_bound(
                     py,
                     &[args.0]
                         .iter()

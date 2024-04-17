@@ -1,4 +1,4 @@
-use pyo3::{PyObject, Python};
+use pyo3::{types::PyAnyMethods, PyObject, Python};
 use rscel::{CelError, CelValue, CelValueDyn};
 use std::fmt;
 
@@ -29,7 +29,7 @@ impl fmt::Debug for CelPyObject {
 impl CelValueDyn for CelPyObject {
     fn as_type(&self) -> CelValue {
         Python::with_gil(|py| {
-            let inner = self.inner.as_ref(py);
+            let inner = self.inner.bind(py);
             let name = inner.repr().unwrap();
 
             CelValue::Type(format!("pyobj-{}", name))
@@ -38,7 +38,7 @@ impl CelValueDyn for CelPyObject {
 
     fn access(&self, key: &str) -> CelValue {
         Python::with_gil(|py| {
-            let obj = self.inner.as_ref(py);
+            let obj = self.inner.bind(py);
 
             match obj.getattr(key) {
                 Ok(res) => match res.extract::<PyCelValue>() {
@@ -57,8 +57,8 @@ impl CelValueDyn for CelPyObject {
         if let CelValue::Dyn(rhs) = rhs {
             if let Some(rhs_obj) = rhs.any_ref().downcast_ref::<CelPyObject>() {
                 return Python::with_gil(|py| {
-                    let lhs_obj = self.inner.as_ref(py);
-                    let rhs_obj = rhs_obj.inner.as_ref(py);
+                    let lhs_obj = self.inner.bind(py);
+                    let rhs_obj = rhs_obj.inner.bind(py);
 
                     match lhs_obj.eq(rhs_obj) {
                         Ok(res) => CelValue::from_bool(res),
@@ -76,9 +76,9 @@ impl CelValueDyn for CelPyObject {
 
     fn is_truthy(&self) -> bool {
         Python::with_gil(|py| {
-            let inner = self.inner.as_ref(py);
+            let inner = self.inner.bind(py);
 
-            match inner.is_true() {
+            match inner.is_truthy() {
                 Ok(res) => res,
                 Err(_) => false, // this is just going to have to work. Basically is the equiv of calling bool(obj) and it throwing
             }

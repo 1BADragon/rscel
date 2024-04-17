@@ -5,9 +5,6 @@ edition = "2021"
 description = "Cel interpreter in rust"
 license = "MIT"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 
 [features]
 default = ["type_prop", "protobuf"]

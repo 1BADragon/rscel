@@ -11,5 +11,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 rscel = { path = "../rscel" }
-pyo3 = { workspace = true }
+pyo3 = { version = "0.21.2", features = ["extension-module", "chrono"] }
 chrono = { workspace = true }

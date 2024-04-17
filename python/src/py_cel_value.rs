@@ -74,7 +74,7 @@ impl<'a> ToPyObject for PyCelValueRef<'a> {
             Float(f) => f.to_object(py),
             Bool(b) => b.to_object(py),
             String(s) => s.to_object(py),
-            Bytes(s) => PyBytes::new(py, &s).into(),
+            Bytes(s) => PyBytes::new_bound(py, &s).into(),
             List(l) => l
                 .into_iter()
                 .map(|x| PyCelValueRef(x).to_object(py))
