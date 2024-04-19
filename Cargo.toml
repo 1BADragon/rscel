@@ -13,4 +13,5 @@ debug = true
 
 [workspace.dependencies]
 chrono = { version = "0.4.38", features = ["serde"] }
+serde_json = { version = "1.0.115", features = ["raw_value"] }
 

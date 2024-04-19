@@ -13,3 +13,5 @@ crate-type = ["cdylib"]
 rscel = { path = "../rscel" }
 pyo3 = { version = "0.21.2", features = ["extension-module", "chrono"] }
 chrono = { workspace = true }
+serde_json = { workspace = true } 
+bincode = "1.3.3"

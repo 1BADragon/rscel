@@ -12,6 +12,10 @@ impl CelPyObject {
     pub fn new(inner: PyObject) -> Self {
         Self { inner }
     }
+
+    pub fn as_inner(&self) -> &PyObject {
+        &self.inner
+    }
 }
 
 impl fmt::Display for CelPyObject {

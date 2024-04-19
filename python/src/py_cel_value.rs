@@ -4,6 +4,8 @@ use std::fmt;
 use pyo3::{types::PyBytes, PyObject, Python, ToPyObject};
 use rscel::CelValue;
 
+use crate::cel_py_object::CelPyObject;
+
 pub struct PyCelValue(CelValue);
 
 pub struct PyCelValueRef<'a>(&'a CelValue);
@@ -88,13 +90,15 @@ impl<'a> ToPyObject for PyCelValueRef<'a> {
             TimeStamp(ts) => ts.to_object(py),
             Duration(d) => d.to_object(py),
             Null => py.None(),
-            Dyn(d) => match d.any_ref().downcast_ref::<PyObject>() {
-                Some(obj) => obj.clone(),
-                // This *should* never happen. If this downcase were to fail that would
-                // mean that the data in this dyn isn't a PyObject which should be impossible
-                // for these bidnings
-                None => py.None(),
-            },
+            Dyn(d) => {
+                match d.any_ref().downcast_ref::<CelPyObject>() {
+                    Some(obj) => obj.as_inner().clone(),
+                    // This *should* never happen. If this downcase were to fail that would
+                    // mean that the data in this dyn isn't a CelPyObject which should be impossible
+                    // for these bidnings
+                    None => py.None(),
+                }
+            }
             _ => py.None(),
         }
     }

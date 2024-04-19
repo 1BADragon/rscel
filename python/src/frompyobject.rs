@@ -185,7 +185,7 @@ fn extract_celval_recurse<'source>(
 
                 Ok(PyCelValue::new(map.into()))
             }
-            "datetime" => {
+            "datetime.datetime" => {
                 let py_utc_dt = match Python::with_gil(|py| {
                     let utc = timezone_utc_bound(py);
                     let py_astimezone = ob.getattr("astimezone")?;
@@ -204,7 +204,7 @@ fn extract_celval_recurse<'source>(
 
                 Ok(PyCelValue::new(dt.with_timezone(&Utc).into()))
             }
-            "timedelta" => Ok(PyCelValue::new(
+            "datetime.timedelta" => Ok(PyCelValue::new(
                 ob.wrapped_downcast::<PyDelta>(current_path)?
                     .wrapped_extract::<Duration>(current_path)?
                     .into(),

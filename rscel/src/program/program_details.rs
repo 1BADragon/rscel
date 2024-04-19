@@ -4,12 +4,15 @@ use crate::{
     BindContext,
 };
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::collections::HashSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde_as]
 pub struct ProgramDetails {
     source: Option<String>,
     params: HashSet<String>,
+    #[serde(skip_serializing, skip_deserializing)]
     ast: Option<AstNode<Expr>>,
 }
 

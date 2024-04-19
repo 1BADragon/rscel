@@ -1,3 +1,4 @@
+import pytest
 import datetime as dt
 from zoneinfo import ZoneInfo
 import rscel
@@ -55,3 +56,57 @@ def test_datetime_converstion():
     d = dt.datetime.now()
     res = rscel.eval("d", {"d": d})
     assert res == d.astimezone(dt.timezone.utc)
+
+def test_empty_program():
+    p = rscel.CelProgram()
+
+    with pytest.raises(ValueError):
+        rscel.CelContext().add_program('empty', p)
+
+def test_program_bad_source():
+    p = rscel.CelProgram()
+
+    with pytest.raises(ValueError):
+        p.add_source("3 +")
+
+def test_program():
+    c = rscel.CelContext()
+    b = rscel.BindContext()
+    p = rscel.CelProgram()
+
+    p.add_source('3 + 3')
+    c.add_program('entry', p)
+
+    assert c.exec('entry', b) == 6
+
+def test_program_json_serialize():
+    c = rscel.CelContext()
+    b = rscel.BindContext()
+    p1 = rscel.CelProgram()
+
+    p1.add_source('3 + 3')
+
+    s = p1.serialize_to_json()
+
+    p2 = rscel.CelProgram()
+    p2.add_serialized_json(s)
+
+    c.add_program('entry', p2)
+
+    assert c.exec('entry', b) == 6
+    
+def test_program_bincode_serialize():
+    c = rscel.CelContext()
+    b = rscel.BindContext()
+    p1 = rscel.CelProgram()
+
+    p1.add_source('3 + 3')
+
+    s = p1.serialize_to_bincode()
+
+    p2 = rscel.CelProgram()
+    p2.add_serialized_bincode(s)
+
+    c.add_program('entry', p2)
+
+    assert c.exec('entry', b) == 6

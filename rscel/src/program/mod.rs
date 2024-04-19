@@ -3,6 +3,7 @@ mod program_details;
 use crate::{
     compiler::{ast_node::AstNode, grammar::Expr},
     interp::ByteCode,
+    CelCompiler, CelResult, StringTokenizer,
 };
 pub use program_details::ProgramDetails;
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,10 @@ pub struct Program {
 impl Program {
     pub fn new(details: ProgramDetails, bytecode: Vec<ByteCode>) -> Program {
         Program { details, bytecode }
+    }
+
+    pub fn from_source(source: &str) -> CelResult<Program> {
+        CelCompiler::with_tokenizer(&mut StringTokenizer::with_input(source)).compile()
     }
 
     pub fn params<'a>(&'a self) -> Vec<&'a str> {
