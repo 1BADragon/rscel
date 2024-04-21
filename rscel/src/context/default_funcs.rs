@@ -21,8 +21,9 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("toLower", &to_lower_impl),
     ("toUpper", &to_upper_impl),
     ("trim", &trim_impl),
-    ("trim_start", &trim_start_impl),
-    ("trim_end", &trim_end_impl),
+    ("trimStart", &trim_start_impl),
+    ("trimEnd", &trim_end_impl),
+    ("splitWhiteSpace", &split_whitespace_impl),
     ("abs", &abs_impl),
     ("sqrt", &sqrt_impl),
     ("pow", &pow_impl),
@@ -229,6 +230,23 @@ string_func!(toUpper, to_upper_impl, to_uppercase);
 string_func!(trim, trim_impl, trim);
 string_func!(trimStart, trim_start_impl, trim_start);
 string_func!(trimEnd, trim_end_impl, trim_end);
+
+fn split_whitespace_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+    if args.len() != 0 {
+        return CelValue::from_err(CelError::argument(
+            "split_whitespace() expects no arguments",
+        ));
+    }
+
+    if let CelValue::String(s) = this {
+        s.split_whitespace()
+            .map(|t| t.into())
+            .collect::<Vec<CelValue>>()
+            .into()
+    } else {
+        CelValue::from_err(CelError::argument("split_whitespace() expects string"))
+    }
+}
 
 fn abs_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     if args.len() != 1 {

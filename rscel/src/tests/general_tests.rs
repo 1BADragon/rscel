@@ -142,8 +142,11 @@ fn test_contains() {
 #[test_case("'fooBaR'.endsWithI('bar')", true.into(); "Test endsWithI")]
 #[test_case("'FoObar'.startsWithI('foo')", true.into(); "Test startsWithI")]
 #[test_case("'   foo   '.trim()", "foo".into(); "Test trim")]
-#[test_case("'   foo   '.trim_start()", "foo   ".into(); "Test trim_start")]
-#[test_case("'   foo   '.trim_end()", "   foo".into(); "Test trim_end")]
+#[test_case("'   foo   '.trimStart()", "foo   ".into(); "Test trimStart")]
+#[test_case("'   foo   '.trimEnd()", "   foo".into(); "Test trimEnd")]
+#[test_case("'foo'.toUpper()", "FOO".into(); "test toUpper")]
+#[test_case("'FOO'.toLower()", "foo".into(); "test toLower")]
+#[test_case(r#"'foo   bar\t\tbaz'.splitWhiteSpace()"#, CelValue::from_val_slice(&["foo".into(), "bar".into(), "baz".into()]); "test splitWhiteSpace")]
 fn test_equation(prog: &str, res: CelValue) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
