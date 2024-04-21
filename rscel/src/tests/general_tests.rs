@@ -141,6 +141,9 @@ fn test_contains() {
 #[test_case(r#""\X48""#, "H".into(); "Test hex escape upper")]
 #[test_case("'fooBaR'.endsWithI('bar')", true.into(); "Test endsWithI")]
 #[test_case("'FoObar'.startsWithI('foo')", true.into(); "Test startsWithI")]
+#[test_case("'   foo   '.trim()", "foo".into(); "Test trim")]
+#[test_case("'   foo   '.trim_start()", "foo   ".into(); "Test trim_start")]
+#[test_case("'   foo   '.trim_end()", "   foo".into(); "Test trim_end")]
 fn test_equation(prog: &str, res: CelValue) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
