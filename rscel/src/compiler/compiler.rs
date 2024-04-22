@@ -784,9 +784,10 @@ impl<'l> CelCompiler<'l> {
                     self.tokenizer.location(),
                 );
 
+                debug_assert!(obj_init_len % 2 == 0);
                 Ok(CompiledNode::from_children_w_bytecode(
                     obj_init,
-                    vec![ByteCode::MkDict(obj_init_len as u32)],
+                    vec![ByteCode::MkDict(obj_init_len as u32 / 2)],
                     |vals| {
                         let mut obj_map = HashMap::new();
                         for i in (0..vals.len()).step_by(2) {

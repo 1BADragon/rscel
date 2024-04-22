@@ -156,6 +156,22 @@ fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
             }
         }
         filtered_list.into()
+    } else if let CelValue::Map(map) = this {
+        let mut filtered_list: Vec<CelValue> = Vec::new();
+        let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
+        let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
+
+        for v in map.into_keys() {
+            let cel_value: CelValue = v.into();
+            // make a copy of the context to make borrow checker happy
+            bindings.bind_param(&ident_name, cel_value.clone());
+            let interp = Interpreter::new(&cel, &bindings);
+
+            if interp.run_raw(bytecode[1], true)?.is_truthy() {
+                filtered_list.push(cel_value);
+            }
+        }
+        filtered_list.into()
     } else {
         CelValue::from_err(CelError::value("filter() only available on list"))
     }
@@ -186,6 +202,34 @@ fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelV
             }
         } else if bytecode.len() == 3 {
             for v in list.into_iter() {
+                bindings.bind_param(&ident_name, v.clone());
+                let interp = Interpreter::new(&cel, &bindings);
+
+                if interp.run_raw(bytecode[1], true)?.is_truthy() {
+                    mapped_list.push(interp.run_raw(bytecode[2], true)?);
+                }
+            }
+        } else {
+            return CelValue::from_err(CelError::internal("Bytecode len check failed"));
+        }
+
+        mapped_list.into()
+    } else if let CelValue::Map(map) = this {
+        let mut mapped_list: Vec<CelValue> = Vec::new();
+        let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
+        // make a copy of the context to make borrow checker happy
+        let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
+
+        // optimize so we are only checking bytecode's len once
+        if bytecode.len() == 2 {
+            for v in map.into_keys().map(|k| Into::<CelValue>::into(k)) {
+                bindings.bind_param(&ident_name, v.clone());
+                let interp = Interpreter::new(&cel, &bindings);
+
+                mapped_list.push(interp.run_raw(bytecode[1], true)?);
+            }
+        } else if bytecode.len() == 3 {
+            for v in map.into_keys().map(|k| Into::<CelValue>::into(k)) {
                 bindings.bind_param(&ident_name, v.clone());
                 let interp = Interpreter::new(&cel, &bindings);
 

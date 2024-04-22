@@ -147,6 +147,8 @@ fn test_contains() {
 #[test_case("'foo'.toUpper()", "FOO".into(); "test toUpper")]
 #[test_case("'FOO'.toLower()", "foo".into(); "test toLower")]
 #[test_case(r#"'foo   bar\t\tbaz'.splitWhiteSpace()"#, CelValue::from_val_slice(&["foo".into(), "bar".into(), "baz".into()]); "test splitWhiteSpace")]
+#[test_case("{'foo': x}.map(k, k)", CelValue::from_val_slice(&["foo".into()]); "test map on map")]
+#[test_case("{'foo': x, 'bar': y}.filter(k, k == 'foo')", CelValue::from_val_slice(&["foo".into()]); "test filter on map")]
 fn test_equation(prog: &str, res: CelValue) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
