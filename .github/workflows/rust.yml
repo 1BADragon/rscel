@@ -38,8 +38,6 @@ jobs:
 
     - name: Run tests
       run: make run-all-tests
-      env:
-        RSCEL_TEST_PROTO: 1
 
   deploy:
     runs-on: ubuntu-latest

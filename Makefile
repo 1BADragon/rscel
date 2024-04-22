@@ -34,7 +34,7 @@ wasm-example-release:
 all: wasm-binding python-binding build
 
 run-tests:
-	cargo test -q $(CARGO_ARGS)
+	RSCEL_TEST_PROTO=1 cargo test -q $(CARGO_ARGS)
 
 run-no-feature-tests:
 	cargo test -q --no-default-features $(CARGO_ARGS)
