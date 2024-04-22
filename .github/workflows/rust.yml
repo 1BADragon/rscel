@@ -54,6 +54,6 @@ jobs:
             override: true
 
       - name: publish
-        run: cargo publish -p rscel --dry-run --token ${{ secrets.CRATES_IO_API_KEY }}
+        run: cargo publish -p rscel --token ${{ secrets.CRATES_IO_API_KEY }}
 
 
