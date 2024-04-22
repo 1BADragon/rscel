@@ -50,7 +50,6 @@
 //! assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), 7.into());
 //!   
 //! ```
-#![feature(try_trait_v2)]
 mod cel_error;
 mod cel_value;
 mod cel_value_dyn;

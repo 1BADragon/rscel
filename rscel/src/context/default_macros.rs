@@ -45,7 +45,11 @@ fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelV
         ));
     }
 
-    let ident_name = eval_ident(bytecode[0])?;
+    let ident_name = match eval_ident(bytecode[0]) {
+        Ok(s) => s,
+        Err(e) => return e.into(),
+    };
+
     if let CelValue::List(list) = this {
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
         let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
@@ -55,7 +59,10 @@ fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelV
             bindings.bind_param(&ident_name, v.clone());
             let interp = Interpreter::new(&cel, &bindings);
 
-            let res = interp.run_raw(bytecode[1], true)?;
+            let res = match interp.run_raw(bytecode[1], true) {
+                Ok(r) => r,
+                Err(e) => e.into(),
+            };
 
             if !res.is_truthy() {
                 return false.into();
@@ -75,7 +82,10 @@ fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
         ));
     }
 
-    let ident_name = eval_ident(bytecode[0])?;
+    let ident_name = match eval_ident(bytecode[0]) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
     if let CelValue::List(list) = this {
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
         let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
@@ -84,7 +94,10 @@ fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
             bindings.bind_param(&ident_name, v.clone());
             let interp = Interpreter::new(&cel, &bindings);
 
-            let res = interp.run_raw(bytecode[1], true)?;
+            let res = match interp.run_raw(bytecode[1], true) {
+                Ok(it) => it,
+                Err(err) => return err.into(),
+            };
 
             if res.is_truthy() {
                 return true.into();
@@ -104,7 +117,10 @@ fn exists_one_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) 
         ));
     }
 
-    let ident_name = eval_ident(bytecode[0])?;
+    let ident_name = match eval_ident(bytecode[0]) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     if let CelValue::List(list) = this {
         let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
@@ -115,7 +131,10 @@ fn exists_one_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) 
             bindings.bind_param(&ident_name, v.clone());
             let interp = Interpreter::new(&cel, &bindings);
 
-            let res = interp.run_raw(bytecode[1], true)?;
+            let res = match interp.run_raw(bytecode[1], true) {
+                Ok(it) => it,
+                Err(err) => return err.into(),
+            };
 
             if res.is_truthy() {
                 count += 1;
@@ -139,7 +158,10 @@ fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
         ));
     }
 
-    let ident_name = eval_ident(bytecode[0])?;
+    let ident_name = match eval_ident(bytecode[0]) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     if let CelValue::List(list) = this {
         let mut filtered_list: Vec<CelValue> = Vec::new();
@@ -151,7 +173,12 @@ fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
             bindings.bind_param(&ident_name, v.clone());
             let interp = Interpreter::new(&cel, &bindings);
 
-            if interp.run_raw(bytecode[1], true)?.is_truthy() {
+            if match interp.run_raw(bytecode[1], true) {
+                Ok(it) => it,
+                Err(err) => return err.into(),
+            }
+            .is_truthy()
+            {
                 filtered_list.push(v.clone());
             }
         }
@@ -167,7 +194,12 @@ fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
             bindings.bind_param(&ident_name, cel_value.clone());
             let interp = Interpreter::new(&cel, &bindings);
 
-            if interp.run_raw(bytecode[1], true)?.is_truthy() {
+            if match interp.run_raw(bytecode[1], true) {
+                Ok(it) => it,
+                Err(err) => return err.into(),
+            }
+            .is_truthy()
+            {
                 filtered_list.push(cel_value);
             }
         }
@@ -184,7 +216,10 @@ fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelV
         ));
     }
 
-    let ident_name = eval_ident(bytecode[0])?;
+    let ident_name = match eval_ident(bytecode[0]) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     if let CelValue::List(list) = this {
         let mut mapped_list: Vec<CelValue> = Vec::new();
@@ -198,15 +233,26 @@ fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelV
                 bindings.bind_param(&ident_name, v.clone());
                 let interp = Interpreter::new(&cel, &bindings);
 
-                mapped_list.push(interp.run_raw(bytecode[1], true)?);
+                mapped_list.push(match interp.run_raw(bytecode[1], true) {
+                    Ok(it) => it,
+                    Err(err) => return err.into(),
+                });
             }
         } else if bytecode.len() == 3 {
             for v in list.into_iter() {
                 bindings.bind_param(&ident_name, v.clone());
                 let interp = Interpreter::new(&cel, &bindings);
 
-                if interp.run_raw(bytecode[1], true)?.is_truthy() {
-                    mapped_list.push(interp.run_raw(bytecode[2], true)?);
+                if match interp.run_raw(bytecode[1], true) {
+                    Ok(it) => it,
+                    Err(err) => return err.into(),
+                }
+                .is_truthy()
+                {
+                    mapped_list.push(match interp.run_raw(bytecode[2], true) {
+                        Ok(it) => it,
+                        Err(err) => return err.into(),
+                    });
                 }
             }
         } else {
@@ -226,15 +272,26 @@ fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelV
                 bindings.bind_param(&ident_name, v.clone());
                 let interp = Interpreter::new(&cel, &bindings);
 
-                mapped_list.push(interp.run_raw(bytecode[1], true)?);
+                mapped_list.push(match interp.run_raw(bytecode[1], true) {
+                    Ok(it) => it,
+                    Err(err) => return err.into(),
+                });
             }
         } else if bytecode.len() == 3 {
             for v in map.into_keys().map(|k| Into::<CelValue>::into(k)) {
                 bindings.bind_param(&ident_name, v.clone());
                 let interp = Interpreter::new(&cel, &bindings);
 
-                if interp.run_raw(bytecode[1], true)?.is_truthy() {
-                    mapped_list.push(interp.run_raw(bytecode[2], true)?);
+                if match interp.run_raw(bytecode[1], true) {
+                    Ok(it) => it,
+                    Err(err) => return err.into(),
+                }
+                .is_truthy()
+                {
+                    mapped_list.push(match interp.run_raw(bytecode[2], true) {
+                        Ok(it) => it,
+                        Err(err) => return err.into(),
+                    });
                 }
             }
         } else {
@@ -253,9 +310,18 @@ fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
         return CelValue::from_err(CelError::argument("reduce() macro expects 4 arguments"));
     }
 
-    let curr_name = eval_ident(bytecode[0])?;
-    let next_name = eval_ident(bytecode[1])?;
-    let mut cur_value = ctx.run_raw(bytecode[3], true)?;
+    let curr_name = match eval_ident(bytecode[0]) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
+    let next_name = match eval_ident(bytecode[1]) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
+    let mut cur_value = match ctx.run_raw(bytecode[3], true) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
     let cel = ctx.cel_copy().unwrap_or_else(|| CelContext::new());
     let mut bindings = ctx.bindings_copy().unwrap_or_else(|| BindContext::new());
 
@@ -266,7 +332,10 @@ fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
 
             let interp = Interpreter::new(&cel, &bindings);
 
-            cur_value = interp.run_raw(bytecode[2], true)?;
+            cur_value = match interp.run_raw(bytecode[2], true) {
+                Ok(it) => it,
+                Err(err) => return err.into(),
+            };
         }
 
         cur_value

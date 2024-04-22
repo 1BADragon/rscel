@@ -417,70 +417,100 @@ fn get_adjusted_datetime(this: CelValue, args: &[CelValue]) -> CelResult<DateTim
 }
 
 fn get_date_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    let date = get_adjusted_datetime(this, args)?;
+    let date = match get_adjusted_datetime(this, args) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     let day_of_month = date.day();
     CelValue::from_int(day_of_month as i64)
 }
 
 fn get_day_of_month_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    let date = get_adjusted_datetime(this, args)?;
+    let date = match get_adjusted_datetime(this, args) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     let day_of_month = date.day() - 1;
     CelValue::from_int(day_of_month as i64)
 }
 
 fn get_day_of_week_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    let date = get_adjusted_datetime(this, args)?;
+    let date = match get_adjusted_datetime(this, args) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     let day_of_week = date.weekday().number_from_sunday() - 1;
     CelValue::from_int(day_of_week as i64)
 }
 
 fn get_day_of_year_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    let date = get_adjusted_datetime(this, args)?;
+    let date = match get_adjusted_datetime(this, args) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     let day_of_year = date.ordinal() - 1;
     CelValue::from_int(day_of_year as i64)
 }
 
 fn get_full_year_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    let date = get_adjusted_datetime(this, args)?;
+    let date = match get_adjusted_datetime(this, args) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     let year = date.year();
     CelValue::from_int(year as i64)
 }
 
 fn get_hours_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    let date = get_adjusted_datetime(this, args)?;
+    let date = match get_adjusted_datetime(this, args) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     let hours = date.time().hour();
     CelValue::from_int(hours as i64)
 }
 
 fn get_milliseconds_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    let date = get_adjusted_datetime(this, args)?;
+    let date = match get_adjusted_datetime(this, args) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     let milliseconds = date.timestamp_subsec_millis();
     CelValue::from_int(milliseconds as i64)
 }
 
 fn get_minutes_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    let date = get_adjusted_datetime(this, args)?;
+    let date = match get_adjusted_datetime(this, args) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     let minutes = date.time().minute();
     CelValue::from_int(minutes as i64)
 }
 
 fn get_month_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    let date = get_adjusted_datetime(this, args)?;
+    let date = match get_adjusted_datetime(this, args) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     let month = date.month0();
     CelValue::from_int(month as i64)
 }
 
 fn get_seconds_impl(this: CelValue, args: &[CelValue]) -> CelValue {
-    let date = get_adjusted_datetime(this, args)?;
+    let date = match get_adjusted_datetime(this, args) {
+        Ok(it) => it,
+        Err(err) => return err.into(),
+    };
 
     let second = date.time().second();
     CelValue::from_int(second as i64)

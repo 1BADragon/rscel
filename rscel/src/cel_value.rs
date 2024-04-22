@@ -6,10 +6,9 @@ use std::{
     borrow::Cow,
     cmp::Ordering,
     collections::HashMap,
-    convert::Infallible,
     fmt,
     iter::zip,
-    ops::{Add, Div, FromResidual, Mul, Neg, Not, Rem, Sub},
+    ops::{Add, Div, Mul, Neg, Not, Rem, Sub},
     sync::Arc,
 };
 
@@ -355,30 +354,30 @@ impl CelValue {
     }
 
     pub fn lt(&self, rhs: &CelValue) -> CelValue {
-        self.error_prop_or(rhs, |lhs, rhs| {
-            CelValue::from_bool(lhs.ord(rhs)? == Some(Ordering::Less))
+        self.error_prop_or(rhs, |lhs, rhs| match lhs.ord(rhs) {
+            Ok(val) => (val == Some(Ordering::Less)).into(),
+            Err(e) => e.into(),
         })
     }
 
     pub fn gt(&self, rhs: &CelValue) -> CelValue {
-        self.error_prop_or(rhs, |lhs, rhs| {
-            CelValue::from_bool(lhs.ord(rhs)? == Some(Ordering::Greater))
+        self.error_prop_or(rhs, |lhs, rhs| match lhs.ord(rhs) {
+            Ok(val) => (val == Some(Ordering::Greater)).into(),
+            Err(e) => e.into(),
         })
     }
 
     pub fn le(&self, rhs: &CelValue) -> CelValue {
-        self.error_prop_or(rhs, |lhs, rhs| {
-            let res = lhs.ord(rhs)?;
-
-            CelValue::from_bool(res == Some(Ordering::Less) || res == Some(Ordering::Equal))
+        self.error_prop_or(rhs, |lhs, rhs| match lhs.ord(rhs) {
+            Ok(val) => (val == Some(Ordering::Less) || val == Some(Ordering::Equal)).into(),
+            Err(e) => e.into(),
         })
     }
 
     pub fn ge(&self, rhs: &CelValue) -> CelValue {
-        self.error_prop_or(rhs, |lhs, rhs| {
-            let res = lhs.ord(rhs)?;
-
-            CelValue::from_bool(res == Some(Ordering::Greater) || res == Some(Ordering::Equal))
+        self.error_prop_or(rhs, |lhs, rhs| match lhs.ord(rhs) {
+            Ok(val) => (val == Some(Ordering::Greater) || val == Some(Ordering::Equal)).into(),
+            Err(e) => e.into(),
         })
     }
 
@@ -1522,13 +1521,12 @@ impl From<CelError> for CelValue {
     }
 }
 
-impl FromResidual<CelResult<Infallible>> for CelValue {
-    fn from_residual(residual: CelResult<Infallible>) -> Self {
-        if let Err(e) = residual {
-            return CelValue::from_err(e);
+impl From<CelResult<CelValue>> for CelValue {
+    fn from(value: CelResult<CelValue>) -> Self {
+        match value {
+            Ok(val) => val.into(),
+            Err(e) => e.into(),
         }
-
-        unreachable!()
     }
 }
 
