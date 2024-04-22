@@ -53,10 +53,7 @@ jobs:
             toolchain: stable
             override: true
 
-      - name: login to crates.io
-        run: cargo login ${{ secrets.CRATES_IO_API_KEY }}
-
       - name: publish
-        run: cargo publish -p rscel --dry-run
+        run: cargo publish -p rscel --dry-run --token ${{ secrets.CRATES_IO_API_KEY }}
 
 
