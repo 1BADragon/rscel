@@ -1,0 +1,17 @@
+[package]
+name = "rscel_wasm"
+version = "1.0.0"
+edition = "2021"
+description = "Cel interpreter in rust"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rscel = { path = "../rscel" }
+num = "0.4.2"
+wasm-bindgen = "0.2.92"
+console_error_panic_hook = "0.1.7"
+serde-wasm-bindgen = "0.6.5"
+js-sys = "0.3.68"
