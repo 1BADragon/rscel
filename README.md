@@ -54,14 +54,4 @@ assert_eq!(ctx.exec("main", &exec_ctx), 7.into());
   
 ```
 
-## Current Benchmark Times
-| Bench Run                | Time           |
-|--------------------------|----------------|
-|Run One No Binding        | 0.000070054S   |
-|Run Many No Binding       | 0.003451698S   |
-|Run One With Binding      | 0.000015177S   |
-|Run Many With Bindings    | 0.004443471S   |
-|Build Many                | 0.006989954S   |
-|Build Many With Bindings  | 0.084859163S   |
-
 Build status: [![Rust](https://github.com/1BADragon/rscel/actions/workflows/rust.yml/badge.svg)](https://github.com/1BADragon/rscel/actions/workflows/rust.yml)

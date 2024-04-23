@@ -1,4 +1,5 @@
 CARGO_ARGS?=
+PYTEST_ARGS?=
 
 .PHONY: default
 default: build
@@ -9,31 +10,31 @@ build:
 
 .env:
 	python3 -m venv .env
-	. .env/bin/activate && pip install maturin && pip install pytest
+	. .env/bin/activate && pip install maturin pytest protobuf
 
 wasm-binding:
-	RUSTFLAGS="-C opt-level=s" wasm-pack build --target web --features wasm $(CARGO_ARGS)
+	$(MAKE_COMMAND) -C wasm wasm-binding
 	
 wasm-binding-release:
-	RUSTFLAGS="-C opt-level=s" wasm-pack build --target web --release --features wasm $(CARGO_ARGS)
+	$(MAKE_COMMAND) -C wasm wasm-binding-release
 
 python-binding: .env
-	. .env/bin/activate && maturin build --features python $(CARGO_ARGS)
+	. .env/bin/activate && cd python && maturin build $(CARGO_ARGS)
 	
 python-binding-release: .env
-	. .env/bin/activate && maturin build --features python --release $(CARGO_ARGS)
+	. .env/bin/activate && cd python && maturin build --release $(CARGO_ARGS)
 
-wasm-example: wasm-binding
-	cd examples/wasm && npm start
+wasm-example:
+	$(MAKE_COMMAND) -C wasm wasm-example
 
-wasm-example-release: wasm-binding-release
-	cd examples/wasm && npm start
+wasm-example-release:
+	$(MAKE_COMMAND) -C wasm wasm-example-release
 
 .PHONY: all
 all: wasm-binding python-binding build
 
 run-tests:
-	cargo test -q $(CARGO_ARGS)
+	RSCEL_TEST_PROTO=1 cargo test -q $(CARGO_ARGS)
 
 run-no-feature-tests:
 	cargo test -q --no-default-features $(CARGO_ARGS)
@@ -41,7 +42,14 @@ run-no-feature-tests:
 run-python-tests: .env python-binding
 	. .env/bin/activate && \
 	pip install --force-reinstall target/wheels/$(shell ls target/wheels) && \
-	python -m pytest test/
+	cd test && \
+	python -m pytest test_rscel.py $(PYTEST_ARGS)
+
+run-all-python-tests: .env python-binding
+	. .env/bin/activate && \
+	pip install --force-reinstall target/wheels/$(shell ls target/wheels) && \
+	cd test && \
+	python -m pytest test*.py $(PYTEST_ARGS)
 	
 .PHONY: run-all-tests
 run-all-tests: run-tests run-no-feature-tests run-python-tests
