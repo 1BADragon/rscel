@@ -339,11 +339,20 @@ impl<'l> StringTokenizer<'l> {
                         }
 
                         working.push(c);
-
-                        loop {
+                        let mut bracket_count = 1;
+                        while bracket_count > 0 {
                             if let Some(c) = self.scanner.next() {
                                 match c {
-                                    '}' => break,
+                                    '}' => {
+                                        bracket_count -= 1;
+                                        if bracket_count > 0 {
+                                            working.push('}');
+                                        }
+                                    }
+                                    '{' => {
+                                        bracket_count += 1;
+                                        working.push('{');
+                                    }
                                     other => working.push(other),
                                 }
                             } else {
