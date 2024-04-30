@@ -463,6 +463,25 @@ impl<'a> Interpreter<'a> {
                         },
                     };
                 }
+                ByteCode::FmtString(nsegments) => {
+                    let mut segments = Vec::new();
+                    for _ in 0..*nsegments {
+                        segments.push(stack.pop_val()?);
+                    }
+
+                    let mut working = String::new();
+                    for seg in segments.into_iter().rev() {
+                        if let CelValue::String(s) = seg {
+                            working.push_str(&s)
+                        } else {
+                            return Err(CelError::Runtime(
+                                "Expected string from format string specifier".to_string(),
+                            ));
+                        }
+                    }
+
+                    stack.push_val(CelValue::String(working));
+                }
             };
         }
 

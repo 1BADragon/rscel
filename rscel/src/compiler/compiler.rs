@@ -1,10 +1,16 @@
 use std::collections::HashMap;
 
 use super::{
-    ast_node::AstNode, compiled_node::CompiledNode, grammar::*, syntax_error::SyntaxError,
-    tokenizer::Tokenizer, tokens::Token,
+    ast_node::AstNode,
+    compiled_node::CompiledNode,
+    grammar::*,
+    syntax_error::SyntaxError,
+    tokenizer::Tokenizer,
+    tokens::{FStringSegment, Token},
 };
-use crate::{interp::JmpWhen, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program};
+use crate::{
+    interp::JmpWhen, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, StringTokenizer,
+};
 
 pub struct CelCompiler<'l> {
     tokenizer: &'l mut dyn Tokenizer,
@@ -853,6 +859,37 @@ impl<'l> CelCompiler<'l> {
                         self.tokenizer.location(),
                     )),
                 )
+            }
+            Some(Token::FStringLit(segments)) => {
+                self.tokenizer.next()?;
+                let mut bytecode = Vec::new();
+
+                for segment in segments.iter() {
+                    bytecode.push(ByteCode::Push(CelValue::Ident("string".to_string())));
+                    match segment {
+                        FStringSegment::Lit(c) => {
+                            bytecode.push(ByteCode::Push(CelValue::String(c.clone())))
+                        }
+                        FStringSegment::Expr(e) => {
+                            let mut tok = StringTokenizer::with_input(&e);
+                            let mut comp = CelCompiler::with_tokenizer(&mut tok);
+
+                            let e = comp.parse_expression()?;
+
+                            bytecode.push(ByteCode::Push(CelValue::ByteCode(e.into_bytecode())));
+                        }
+                    }
+                    bytecode.push(ByteCode::Call(1));
+                }
+
+                // Reverse it so its evaluated in order on the stack
+                bytecode.push(ByteCode::FmtString(segments.len() as u32));
+
+                Ok(CompiledNode::with_bytecode(bytecode).add_ast(AstNode::new(
+                    Primary::Literal(LiteralsAndKeywords::FStringList(segments)),
+                    start_loc,
+                    self.tokenizer.location(),
+                )))
             }
             Some(Token::BoolLit(val)) => {
                 self.tokenizer.next()?;

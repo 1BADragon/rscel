@@ -39,6 +39,7 @@ pub enum ByteCode {
     Index,
     Access,
     Call(u32),
+    FmtString(u32),
 }
 
 impl fmt::Debug for ByteCode {
@@ -74,6 +75,7 @@ impl fmt::Debug for ByteCode {
             Index => write!(f, "INDEX"),
             Access => write!(f, "ACCESS"),
             Call(size) => write!(f, "CALL {}", size),
+            FmtString(size) => write!(f, "FMT {}", size),
         }
     }
 }

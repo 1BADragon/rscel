@@ -1,4 +1,4 @@
-use super::ast_node::AstNode;
+use super::{ast_node::AstNode, tokens::FStringSegment};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -172,6 +172,7 @@ pub enum LiteralsAndKeywords {
     IntegerLit(i64),
     UnsignedLit(u64),
     FloatingLit(f64),
+    FStringList(Vec<FStringSegment>),
     StringLit(String),
     ByteStringLit(Vec<u8>),
     BooleanLit(bool),
