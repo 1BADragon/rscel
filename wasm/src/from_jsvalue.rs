@@ -1,5 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
+use chrono::offset::TimeZone;
 use num::FromPrimitive;
 use wasm_bindgen::{JsCast, JsValue};
 
@@ -65,7 +66,23 @@ impl TryFrom<JsValue> for WasmCelValue {
     type Error = CelError;
     fn try_from(value: JsValue) -> Result<Self, Self::Error> {
         if value.is_object() {
-            if value.is_array() {
+            if value.is_instance_of::<js_sys::Date>() {
+                let date: js_sys::Date = value.into();
+                Ok(WasmCelValue::new(
+                    (chrono::Utc
+                        .with_ymd_and_hms(
+                            date.get_utc_full_year() as i32,
+                            date.get_utc_month(),
+                            date.get_utc_day(),
+                            date.get_utc_hours(),
+                            date.get_utc_minutes(),
+                            date.get_utc_seconds(),
+                        )
+                        .unwrap()
+                        + chrono::TimeDelta::milliseconds(date.get_utc_milliseconds() as i64))
+                    .into(),
+                ))
+            } else if value.is_array() {
                 let mut list: Vec<CelValue> = Vec::new();
 
                 for list_value in values(&value).into_iter() {
