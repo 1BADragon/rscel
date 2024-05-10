@@ -14,8 +14,8 @@ type_prop = []
 protobuf = ["dep:protobuf"]
 
 [build-dependencies]
-protobuf-codegen = "3.4.0"
-protoc-bin-vendored = "3.0.0"
+protobuf-codegen = { version = "3.4.0" }
+protoc-bin-vendored = { version = "3.0.0" }
 
 [dependencies]
 test-case = "3.3.1"

@@ -14,7 +14,7 @@ use std::{
 
 use serde_json::value::Value;
 
-#[cfg(protobuf)]
+#[cfg(feature = "protobuf")]
 use protobuf::{
     reflect::{EnumDescriptor, MessageDescriptor, ReflectValueRef},
     MessageDyn,
@@ -48,10 +48,10 @@ pub enum CelValue {
     #[serde(skip_serializing, skip_deserializing)]
     Duration(Duration),
     ByteCode(Vec<ByteCode>),
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     #[serde(skip_serializing, skip_deserializing)]
     Message(Box<dyn MessageDyn>),
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     #[serde(skip_serializing, skip_deserializing)]
     Enum {
         descriptor: EnumDescriptor,
@@ -124,12 +124,12 @@ impl CelValue {
         CelValue::Ident(val.to_owned())
     }
 
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     pub fn from_proto_msg(val: Box<dyn MessageDyn>) -> CelValue {
         CelValue::Message(val)
     }
 
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     pub fn from_proto_enum(descriptor: EnumDescriptor, value: i32) -> CelValue {
         CelValue::Enum { descriptor, value }
     }
@@ -262,12 +262,12 @@ impl CelValue {
         CelValue::from_type("err")
     }
 
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     pub fn message_type(desc: &MessageDescriptor) -> CelValue {
         CelValue::Type(format!("message-{}", desc.full_name()))
     }
 
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     pub fn enum_type(desc: &EnumDescriptor) -> CelValue {
         CelValue::Type(format!("enum-{}", desc.full_name()))
     }
@@ -572,9 +572,9 @@ impl CelValueDyn for CelValue {
             CelValue::TimeStamp(_) => CelValue::timestamp_type(),
             CelValue::Duration(_) => CelValue::duration_type(),
             CelValue::ByteCode(_) => CelValue::bytecode_type(),
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             CelValue::Message(msg) => CelValue::message_type(&msg.descriptor_dyn()),
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             CelValue::Enum {
                 descriptor,
                 value: _value,
@@ -597,7 +597,7 @@ impl CelValueDyn for CelValue {
                 None => CelValue::from_err(CelError::attribute("obj", key)),
             },
             CelValue::Dyn(ref d) => d.access(key),
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             CelValue::Message(msg) => {
                 let desc = msg.descriptor_dyn();
 
@@ -675,11 +675,11 @@ impl CelValueDyn for CelValue {
                 (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) => CelValue::from_bool(l == r),
                 (CelValue::Duration(l), CelValue::Duration(r)) => CelValue::from_bool(l == r),
                 (CelValue::Type(l), CelValue::Type(r)) => CelValue::from_bool(l == r),
-                #[cfg(protobuf)]
+                #[cfg(feature = "protobuf")]
                 (CelValue::Message(l), CelValue::Message(r)) => {
                     CelValue::from_bool(l.descriptor_dyn().eq(l.as_ref(), r.as_ref()))
                 }
-                #[cfg(protobuf)]
+                #[cfg(feature = "protobuf")]
                 (
                     CelValue::Enum {
                         descriptor: l_desc,
@@ -690,7 +690,7 @@ impl CelValueDyn for CelValue {
                         value: r_value,
                     },
                 ) => CelValue::from_bool(l_value == r_value && l_desc == r_desc),
-                #[cfg(protobuf)]
+                #[cfg(feature = "protobuf")]
                 (
                     CelValue::Enum {
                         descriptor: _l_desc,
@@ -698,7 +698,7 @@ impl CelValueDyn for CelValue {
                     },
                     CelValue::Int(intval),
                 ) => CelValue::from_bool(*intval == (*l_value as i64)),
-                #[cfg(protobuf)]
+                #[cfg(feature = "protobuf")]
                 (
                     CelValue::Enum {
                         descriptor: _l_desc,
@@ -706,7 +706,7 @@ impl CelValueDyn for CelValue {
                     },
                     CelValue::UInt(intval),
                 ) => CelValue::from_bool(*intval == (*l_value as u64)),
-                #[cfg(protobuf)]
+                #[cfg(feature = "protobuf")]
                 (
                     CelValue::Enum {
                         descriptor: l_desc,
@@ -744,12 +744,12 @@ impl CelValueDyn for CelValue {
             CelValue::Type(_) => true,
             CelValue::TimeStamp(_) => true,
             CelValue::Duration(_) => true,
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             CelValue::Enum {
                 descriptor: _,
                 value,
             } => *value != 0,
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             CelValue::Message(_) => true,
             CelValue::Dyn(obj) => obj.is_truthy(),
             CelValue::Err(_) => false,
@@ -838,7 +838,7 @@ impl From<Value> for CelValue {
     }
 }
 
-#[cfg(protobuf)]
+#[cfg(feature = "protobuf")]
 impl<'a> From<ReflectValueRef<'a>> for CelValue {
     fn from(value: ReflectValueRef) -> Self {
         match value {
@@ -1150,11 +1150,11 @@ impl PartialEq for CelValue {
             lhs == rhs
         } else {
             match (self, other) {
-                #[cfg(protbuf)]
+                #[cfg(feature = "protobuf")]
                 (CelValue::Message(lhs), CelValue::Message(rhs)) => {
                     lhs.descriptor_dyn().eq(lhs.as_ref(), rhs.as_ref())
                 }
-                #[cfg(protbuf)]
+                #[cfg(feature = "protobuf")]
                 (
                     CelValue::Enum {
                         descriptor: lhs_descriptor,
@@ -1499,9 +1499,9 @@ impl fmt::Display for CelValue {
             TimeStamp(val) => write!(f, "{}", val),
             Duration(val) => write!(f, "{}", val),
             ByteCode(val) => write!(f, "{:?}", val),
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             Message(msg) => write!(f, "{}", msg.as_ref()),
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             Enum { descriptor, value } => {
                 if let Some(v) = descriptor.value_by_number(*value) {
                     write!(f, "{}::{} ({})", descriptor.full_name(), v.name(), value)

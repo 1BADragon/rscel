@@ -358,7 +358,7 @@ impl<'a> Interpreter<'a> {
                                     }
                                 },
                             },
-                            #[cfg(protobuf)]
+                            #[cfg(feature = "protobuf")]
                             CelValue::Message(msg) => {
                                 let desc = msg.descriptor_dyn();
 
