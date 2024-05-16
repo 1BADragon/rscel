@@ -29,9 +29,19 @@ describe("Rscel Basic Tests", () => {
 
     expect(res.result).toEqual({ sec: 5n, nsec: 0 });
   });
-});
 
-describe("Rscel Type translation", () => {
+  it("Should serialize nested objects correctly", () => {
+    const res = cel_eval("foo.bar", { foo: { bar: 4 } });
+
+    expect(res.result).toEqual(4n);
+  });
+
+  it("Should return nested objects correctly", () => {
+    const res = cel_eval("foo.bar", { foo: { bar: { baz: 3 } } });
+
+    expect(res.result).toEqual({ baz: 3n });
+  });
+
   it("int type", () => {
     const res = cel_eval("type(foo)", { foo: 3n });
 
