@@ -72,14 +72,16 @@ impl TryFrom<JsValue> for WasmCelValue {
                     (chrono::Utc
                         .with_ymd_and_hms(
                             date.get_utc_full_year() as i32,
-                            date.get_utc_month(),
-                            date.get_utc_day(),
+                            date.get_utc_month() + 1,
+                            date.get_utc_date(),
                             date.get_utc_hours(),
                             date.get_utc_minutes(),
                             date.get_utc_seconds(),
                         )
                         .unwrap()
-                        + chrono::TimeDelta::milliseconds(date.get_utc_milliseconds() as i64))
+                        + chrono::TimeDelta::milliseconds(
+                            date.get_utc_milliseconds() as i64 % 1000,
+                        ))
                     .into(),
                 ))
             } else if value.is_array() {

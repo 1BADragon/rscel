@@ -60,7 +60,7 @@ impl Into<JsValue> for WasmCelValue {
                 let obj = js_sys::Object::new();
 
                 js_sys::Reflect::set(&obj, &"sec".into(), &d.num_seconds().into()).unwrap();
-                js_sys::Reflect::set(&obj, &"nsec".into(), &d.num_nanoseconds().into()).unwrap();
+                js_sys::Reflect::set(&obj, &"nsec".into(), &d.subsec_nanos().into()).unwrap();
 
                 obj.into()
             }
