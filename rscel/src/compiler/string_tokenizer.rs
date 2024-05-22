@@ -9,6 +9,7 @@ pub struct StringTokenizer<'l> {
     scanner: StringScanner<'l>,
 
     current: Option<Token>,
+    current_token_start_loc: (usize, usize),
 
     eof: bool,
 }
@@ -18,6 +19,7 @@ impl<'l> StringTokenizer<'l> {
         StringTokenizer {
             scanner: StringScanner::from_input(input),
             current: None,
+            current_token_start_loc: (0, 0),
             eof: false,
         }
     }
@@ -25,6 +27,8 @@ impl<'l> StringTokenizer<'l> {
     fn collect_next_token(&mut self) -> Result<Option<Token>, SyntaxError> {
         let mut tmp = [0; 4];
         let mut curr_char = self.scanner.next();
+
+        self.current_token_start_loc = self.scanner.location();
 
         if self.eof {
             return Ok(None);
@@ -585,6 +589,6 @@ impl Tokenizer for StringTokenizer<'_> {
     }
 
     fn location(&self) -> (usize, usize) {
-        self.scanner.location()
+        self.current_token_start_loc
     }
 }
