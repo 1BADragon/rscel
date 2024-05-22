@@ -1,15 +1,14 @@
 use super::{
     input_scanner::StringScanner,
     syntax_error::SyntaxError,
-    tokenizer::Tokenizer,
+    tokenizer::{TokenWithLoc, Tokenizer},
     tokens::{FStringSegment, Token},
 };
 
 pub struct StringTokenizer<'l> {
     scanner: StringScanner<'l>,
 
-    current: Option<Token>,
-    current_token_start_loc: (usize, usize),
+    current: Option<TokenWithLoc>,
 
     eof: bool,
 }
@@ -19,24 +18,24 @@ impl<'l> StringTokenizer<'l> {
         StringTokenizer {
             scanner: StringScanner::from_input(input),
             current: None,
-            current_token_start_loc: (0, 0),
             eof: false,
         }
     }
 
-    fn collect_next_token(&mut self) -> Result<Option<Token>, SyntaxError> {
+    fn collect_next_token(&mut self) -> Result<Option<TokenWithLoc>, SyntaxError> {
         let mut tmp = [0; 4];
         let mut curr_char = self.scanner.next();
-
-        self.current_token_start_loc = self.scanner.location();
 
         if self.eof {
             return Ok(None);
         }
 
+        let mut token_start = self.location();
+
         'outer: loop {
             match curr_char {
                 Some(' ') | Some('\t') | Some('\n') => {
+                    token_start = self.location();
                     curr_char = self.scanner.next();
                 }
                 _ => break 'outer,
@@ -154,7 +153,7 @@ impl<'l> StringTokenizer<'l> {
                 '0'..='9' => self.parse_number_or_token(input_char.encode_utf8(&mut tmp)),
                 '\'' | '"' => self.parse_string_literal(input_char, false, false),
                 '_' | 'A'..='Z' | 'a'..='z' => {
-                    return self.parse_keywords_or_ident(&input_char.to_string(), &[]);
+                    self.parse_keywords_or_ident(&input_char.to_string(), &[])
                 }
                 other => {
                     return Err(SyntaxError::from_location(self.scanner.location())
@@ -177,7 +176,7 @@ impl<'l> StringTokenizer<'l> {
             }
         }
 
-        res
+        res.map(|o| o.map(|t| TokenWithLoc::new(t, token_start, self.location())))
     }
 
     fn parse_bytes_literal(&mut self, starting: char) -> Result<Option<Token>, SyntaxError> {
@@ -565,7 +564,7 @@ impl<'l> StringTokenizer<'l> {
 }
 
 impl Tokenizer for StringTokenizer<'_> {
-    fn peek(&mut self) -> Result<Option<Token>, SyntaxError> {
+    fn peek(&mut self) -> Result<Option<TokenWithLoc>, SyntaxError> {
         if let None = self.current {
             match self.collect_next_token() {
                 Ok(token) => self.current = token,
@@ -575,7 +574,7 @@ impl Tokenizer for StringTokenizer<'_> {
         Ok(self.current.clone())
     }
 
-    fn next(&mut self) -> Result<Option<Token>, SyntaxError> {
+    fn next(&mut self) -> Result<Option<TokenWithLoc>, SyntaxError> {
         if let None = self.current {
             self.collect_next_token()
         } else {
@@ -589,6 +588,6 @@ impl Tokenizer for StringTokenizer<'_> {
     }
 
     fn location(&self) -> (usize, usize) {
-        self.current_token_start_loc
+        self.scanner.location()
     }
 }
