@@ -1,5 +1,7 @@
 use super::{
     input_scanner::StringScanner,
+    source_location::SourceLocation,
+    source_range::SourceRange,
     syntax_error::SyntaxError,
     tokenizer::{TokenWithLoc, Tokenizer},
     tokens::{FStringSegment, Token},
@@ -30,17 +32,16 @@ impl<'l> StringTokenizer<'l> {
             return Ok(None);
         }
 
-        let mut token_start = self.location();
-
         'outer: loop {
             match curr_char {
                 Some(' ') | Some('\t') | Some('\n') => {
-                    token_start = self.location();
                     curr_char = self.scanner.next();
                 }
                 _ => break 'outer,
             };
         }
+
+        let token_start = self.location();
 
         let res = if let Some(input_char) = curr_char {
             match input_char {
@@ -176,7 +177,7 @@ impl<'l> StringTokenizer<'l> {
             }
         }
 
-        res.map(|o| o.map(|t| TokenWithLoc::new(t, token_start, self.location())))
+        res.map(|o| o.map(|t| TokenWithLoc::new(t, SourceRange::new(token_start, self.location()))))
     }
 
     fn parse_bytes_literal(&mut self, starting: char) -> Result<Option<Token>, SyntaxError> {
@@ -196,7 +197,6 @@ impl<'l> StringTokenizer<'l> {
                 let escaped = if let Some(curr) = self.scanner.next() {
                     curr
                 } else {
-                    let (_line, _column) = self.scanner.location();
                     return Err(SyntaxError::from_location(self.scanner.location()));
                 };
 
@@ -271,7 +271,6 @@ impl<'l> StringTokenizer<'l> {
                 let escaped = if let Some(curr) = self.scanner.next() {
                     curr
                 } else {
-                    let (_line, _column) = self.scanner.location();
                     return Err(SyntaxError::from_location(self.scanner.location()));
                 };
 
@@ -324,7 +323,6 @@ impl<'l> StringTokenizer<'l> {
                 let escaped = if let Some(curr) = self.scanner.next() {
                     curr
                 } else {
-                    let (_line, _column) = self.scanner.location();
                     return Err(SyntaxError::from_location(self.scanner.location()));
                 };
 
@@ -375,7 +373,6 @@ impl<'l> StringTokenizer<'l> {
                 let escaped = if let Some(curr) = self.scanner.next() {
                     curr
                 } else {
-                    let (_line, _column) = self.scanner.location();
                     return Err(SyntaxError::from_location(self.scanner.location()));
                 };
 
@@ -564,14 +561,14 @@ impl<'l> StringTokenizer<'l> {
 }
 
 impl Tokenizer for StringTokenizer<'_> {
-    fn peek(&mut self) -> Result<Option<TokenWithLoc>, SyntaxError> {
+    fn peek(&mut self) -> Result<Option<&TokenWithLoc>, SyntaxError> {
         if let None = self.current {
             match self.collect_next_token() {
                 Ok(token) => self.current = token,
                 Err(err) => return Err(err),
             };
         }
-        Ok(self.current.clone())
+        Ok(self.current.as_ref())
     }
 
     fn next(&mut self) -> Result<Option<TokenWithLoc>, SyntaxError> {
@@ -587,7 +584,7 @@ impl Tokenizer for StringTokenizer<'_> {
         self.scanner.input()
     }
 
-    fn location(&self) -> (usize, usize) {
+    fn location(&self) -> SourceLocation {
         self.scanner.location()
     }
 }

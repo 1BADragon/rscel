@@ -191,9 +191,9 @@ impl<'a> AstDumper<'a> {
             "{} {} -- '{}'::{},{}",
             spacing,
             std::any::type_name::<T>().split("::").last().unwrap(),
-            &self.source.to_string()[ast.start().1..ast.end().1],
-            ast.start().1,
-            ast.end().1
+            &self.source.to_string()[ast.start().col()..ast.end().col()],
+            ast.start().col(),
+            ast.end().col()
         );
     }
 }

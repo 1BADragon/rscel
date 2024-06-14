@@ -2,31 +2,35 @@ use serde::{Deserialize, Serialize};
 
 use crate::CelValue;
 
+use super::{source_location::SourceLocation, source_range::SourceRange};
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AstNode<T> {
-    start: (usize, usize),
-    end: (usize, usize),
+    loc: SourceRange,
 
     node: T,
     value: Option<CelValue>,
 }
 
 impl<T> AstNode<T> {
-    pub fn new(node: T, start: (usize, usize), end: (usize, usize)) -> AstNode<T> {
+    pub fn new(node: T, loc: SourceRange) -> AstNode<T> {
         AstNode::<T> {
-            start,
-            end,
+            loc,
             node,
             value: None,
         }
     }
 
-    pub fn start(&self) -> (usize, usize) {
-        self.start
+    pub fn start(&self) -> SourceLocation {
+        self.loc.start()
     }
 
-    pub fn end(&self) -> (usize, usize) {
-        self.end
+    pub fn end(&self) -> SourceLocation {
+        self.loc.end()
+    }
+
+    pub fn range(&self) -> SourceRange {
+        self.loc
     }
 
     pub fn node(&self) -> &T {

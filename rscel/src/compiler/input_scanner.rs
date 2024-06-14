@@ -1,5 +1,7 @@
 use std::str::Chars;
 
+use super::source_location::SourceLocation;
+
 pub struct StringScanner<'l> {
     input: &'l str,
     iterator: Chars<'l>,
@@ -37,8 +39,8 @@ impl<'l> StringScanner<'l> {
         }
     }
 
-    pub fn location(&self) -> (usize, usize) {
-        (self.line, self.column)
+    pub fn location(&self) -> SourceLocation {
+        SourceLocation::new(self.line, self.column)
     }
 
     fn collect_next(&mut self) -> Option<char> {

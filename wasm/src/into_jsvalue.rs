@@ -81,8 +81,8 @@ impl Into<JsValue> for WasmCelError {
             }
             CelError::Syntax(err) => {
                 js_sys::Reflect::set(&val, &"type".into(), &"syntax".into()).unwrap();
-                js_sys::Reflect::set(&val, &"line".into(), &err.line.into()).unwrap();
-                js_sys::Reflect::set(&val, &"column".into(), &err.column.into()).unwrap();
+                js_sys::Reflect::set(&val, &"line".into(), &err.loc().line().into()).unwrap();
+                js_sys::Reflect::set(&val, &"column".into(), &err.loc().col().into()).unwrap();
 
                 match err.message() {
                     Some(msg) => {

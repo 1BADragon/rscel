@@ -44,3 +44,11 @@ pub enum FStringSegment {
     Lit(String),
     Expr(String),
 }
+
+pub trait AsToken {
+    fn as_token(&self) -> Option<&Token>;
+}
+
+pub trait IntoToken {
+    fn into_token(self) -> Option<Token>;
+}
