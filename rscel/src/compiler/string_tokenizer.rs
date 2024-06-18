@@ -1,7 +1,7 @@
 use super::{
-    input_scanner::StringScanner,
     source_location::SourceLocation,
     source_range::SourceRange,
+    string_scanner::StringScanner,
     syntax_error::SyntaxError,
     tokenizer::{TokenWithLoc, Tokenizer},
     tokens::{FStringSegment, Token},
@@ -26,6 +26,7 @@ impl<'l> StringTokenizer<'l> {
 
     fn collect_next_token(&mut self) -> Result<Option<TokenWithLoc>, SyntaxError> {
         let mut tmp = [0; 4];
+        let mut token_start = self.location();
         let mut curr_char = self.scanner.next();
 
         if self.eof {
@@ -35,13 +36,12 @@ impl<'l> StringTokenizer<'l> {
         'outer: loop {
             match curr_char {
                 Some(' ') | Some('\t') | Some('\n') => {
+                    token_start = self.location();
                     curr_char = self.scanner.next();
                 }
                 _ => break 'outer,
             };
         }
-
-        let token_start = self.location();
 
         let res = if let Some(input_char) = curr_char {
             match input_char {
@@ -586,5 +586,64 @@ impl Tokenizer for StringTokenizer<'_> {
 
     fn location(&self) -> SourceLocation {
         self.scanner.location()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        compiler::{
+            source_location::SourceLocation, source_range::SourceRange, tokenizer::TokenWithLoc,
+            tokens::Token,
+        },
+        StringTokenizer, Tokenizer,
+    };
+
+    #[test]
+    fn tokens_locations() {
+        let src = "foo + 3";
+
+        let mut tokenizer = StringTokenizer::with_input(src);
+
+        let t = tokenizer.next().unwrap().unwrap();
+        assert_eq!(
+            t,
+            TokenWithLoc {
+                token: Token::Ident("foo".to_owned()),
+                loc: SourceRange::new(SourceLocation::new(0, 0), SourceLocation::new(0, 3))
+            }
+        );
+
+        assert_eq!(&src[t.loc.start().col()..t.loc.end().col()], "foo");
+        assert_eq!(
+            tokenizer.next().unwrap().unwrap(),
+            TokenWithLoc {
+                token: Token::Add,
+                loc: SourceRange::new(SourceLocation::new(0, 4), SourceLocation::new(0, 5))
+            }
+        );
+
+        assert_eq!(
+            tokenizer.next().unwrap().unwrap(),
+            TokenWithLoc {
+                token: Token::IntLit(3),
+                loc: SourceRange::new(SourceLocation::new(0, 6), SourceLocation::new(0, 7))
+            }
+        )
+    }
+
+    #[test]
+    fn string_literal_loc() {
+        let src = "\"this is a test string\"";
+
+        let mut tokenozer = StringTokenizer::with_input(src);
+
+        assert_eq!(
+            tokenozer.next().unwrap().unwrap(),
+            TokenWithLoc {
+                token: Token::StringLit("this is a test string".to_owned()),
+                loc: SourceRange::new(SourceLocation::new(0, 0), SourceLocation::new(0, src.len()))
+            }
+        );
     }
 }

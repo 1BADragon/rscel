@@ -32,10 +32,23 @@ impl<'l> StringScanner<'l> {
     }
 
     pub fn next(&mut self) -> Option<char> {
-        if let None = self.current {
-            self.collect_next()
-        } else {
-            std::mem::replace(&mut self.current, None)
+        if self.current.is_none() {
+            self.current = self.collect_next();
+        }
+
+        match self.current {
+            Some(c) => {
+                if c == '\n' {
+                    self.line += 1;
+                    self.column = 0;
+                } else {
+                    self.column += 1;
+                }
+
+                self.current = None;
+                Some(c)
+            }
+            None => None,
         }
     }
 
@@ -49,17 +62,7 @@ impl<'l> StringScanner<'l> {
         }
 
         match self.iterator.next() {
-            Some(val) => match val {
-                '\n' => {
-                    self.line += 1;
-                    self.column = 0;
-                    Some('\n')
-                }
-                val => {
-                    self.column += 1;
-                    Some(val)
-                }
-            },
+            Some(val) => Some(val),
             None => {
                 self.eof = true;
                 None
@@ -69,5 +72,26 @@ impl<'l> StringScanner<'l> {
 
     pub fn input(&self) -> &'l str {
         self.input
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::compiler::source_location::SourceLocation;
+
+    use super::StringScanner;
+
+    #[test]
+    fn string_scanner_location() {
+        let mut scanner = StringScanner::from_input("foo + bar");
+
+        assert_eq!(scanner.location(), SourceLocation::new(0, 0));
+
+        let c = scanner.peek().unwrap();
+        assert_eq!(c, 'f');
+        assert_eq!(scanner.location(), SourceLocation::new(0, 0));
+
+        let _ = scanner.next().unwrap();
+        assert_eq!(scanner.location(), SourceLocation::new(0, 1));
     }
 }
