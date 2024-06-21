@@ -64,8 +64,8 @@ pub use cel_error::{CelError, CelResult};
 pub use cel_value::CelValue;
 pub use cel_value_dyn::CelValueDyn;
 pub use compiler::{
-    ast_node::AstNode, compiler::CelCompiler, grammar::*, string_tokenizer::StringTokenizer,
-    tokenizer::Tokenizer,
+    ast_node::AstNode, compiler::CelCompiler, grammar::*, source_location::SourceLocation,
+    source_range::SourceRange, string_tokenizer::StringTokenizer, tokenizer::Tokenizer,
 };
 pub use context::{BindContext, CelContext, RsCelFunction, RsCelMacro};
 pub use interp::ByteCode;

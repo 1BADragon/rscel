@@ -736,12 +736,31 @@ impl<'l> CelCompiler<'l> {
                 let expr = self.parse_expression()?;
 
                 // TODO: enforce a closing paran here
-                if let Some(Token::RParen) = self.tokenizer.peek()?.as_token() {
-                    self.tokenizer.next()?;
-                }
+                let next_token = self.tokenizer.next();
+                let rparen_loc = match next_token? {
+                    Some(TokenWithLoc {
+                        token: Token::RParen,
+                        loc,
+                    }) => loc,
+                    Some(TokenWithLoc { token, loc }) => {
+                        return Err(CelError::syntax(
+                            SyntaxError::from_location(loc.start())
+                                .with_message(format!("Expected RPAREN got {:?}", token)),
+                        ))
+                    }
+                    None => {
+                        return Err(CelError::syntax(
+                            SyntaxError::from_location(loc.start())
+                                .with_message("Open paren!".to_owned()),
+                        ))
+                    }
+                };
 
                 Ok(expr.convert_with_ast(|ast| {
-                    AstNode::new(Primary::Parens(ast.expect("Internal Error: no ast")), loc)
+                    AstNode::new(
+                        Primary::Parens(ast.expect("Internal Error: no ast")),
+                        loc.surrounding(rparen_loc),
+                    )
                 }))
             }
             Some(TokenWithLoc {
