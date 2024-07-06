@@ -1,7 +1,11 @@
 // mod wasm_cel_details;
 // mod wasm_cel_error;
-// mod wasm_cel_value;
+mod wasm_cel_value;
 
 // pub use wasm_cel_details::WasmCelDetails;
 // pub use wasm_cel_error::WasmCelError;
-// pub use wasm_cel_value::WasmCelValue;
+pub use wasm_cel_value::WasmCelValue;
+
+mod wasm_binding;
+
+pub use wasm_binding::{ICelBinding, ICelValue};

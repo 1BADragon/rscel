@@ -9,8 +9,6 @@ license = "MIT"
 name = "rscel"
 crate-type = ["cdylib"]
 
-[profile.release]
-lto = true
 
 [dependencies]
 rscel = { path = "../rscel" }
