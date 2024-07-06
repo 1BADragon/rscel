@@ -10,10 +10,6 @@ resolver="2"
 [profile.release-with-debug]
 inherits = "release"
 debug = true
-lto = false # makes things REALY hard to debug
-
-[profile.release]
-lto = true
 
 [workspace.dependencies]
 chrono = { version = "0.4.38", features = ["serde"] }

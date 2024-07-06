@@ -12,6 +12,9 @@ console_error_panic_hook = []
 [lib]
 crate-type = ["cdylib"]
 
+[profile.release]
+lto = true
+
 [dependencies]
 rscel = { path = "../rscel" }
 num = "0.4.2"

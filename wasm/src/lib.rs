@@ -5,7 +5,7 @@ mod wasm_program_details;
 
 use object_iter::ObjectIterator;
 use rscel::{BindContext, CelCompiler, CelContext, StringTokenizer};
-use types::{ICelBinding, ICelValue};
+use types::{WasmCelDetails, WasmCelError, WasmCelValue};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -24,17 +24,15 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub fn cel_eval(prog: &str, binding: ICelBinding) -> Result<ICelValue, WasmCelError> {
+pub fn cel_eval(prog: &str, binding: JsValue) -> Result<WasmCelValue, WasmCelError> {
     let mut ctx = CelContext::new();
     let mut exec_ctx = BindContext::new();
-
-    let binding_js_value: JSValue = binding.into();
 
     if let Err(err) = ctx.add_program_str("entry", prog) {
         return EvalResult::from_error(WasmCelError::new(err).into()).into();
     }
 
-    for (key, value) in ObjectIterator::new(binding_js_value.into()) {
+    for (key, value) in ObjectIterator::new(binding.into()) {
         match TryInto::<WasmCelValue>::try_into(value) {
             Ok(celval) => exec_ctx.bind_param(&key, celval.into_inner()),
             Err(err) => return EvalResult::from_error(WasmCelError::new(err).into()).into(),
