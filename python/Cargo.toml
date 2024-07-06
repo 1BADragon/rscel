@@ -9,6 +9,9 @@ license = "MIT"
 name = "rscel"
 crate-type = ["cdylib"]
 
+[profile.release]
+lto = true
+
 [dependencies]
 rscel = { path = "../rscel" }
 pyo3 = { version = "0.21.2", features = ["extension-module", "chrono"] }

@@ -1,16 +1,11 @@
-mod eval_error;
-mod eval_result;
-mod from_jsvalue;
-mod into_jsvalue;
 mod object_iter;
+mod types;
 mod utils;
 mod wasm_program_details;
 
-use eval_error::WasmCelError;
-use eval_result::EvalResult;
-use from_jsvalue::WasmCelValue;
 use object_iter::ObjectIterator;
 use rscel::{BindContext, CelCompiler, CelContext, StringTokenizer};
+use types::{WasmCelDetails, WasmCelError, WasmCelValue};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -29,7 +24,7 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
+pub fn cel_eval(prog: &str, binding: JsValue) -> Result<WasmCelValue, WasmCelError> {
     let mut ctx = CelContext::new();
     let mut exec_ctx = BindContext::new();
 
@@ -44,17 +39,11 @@ pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
         }
     }
 
-    let res = ctx.exec("entry", &exec_ctx);
-
-    match res {
-        Ok(ok) => EvalResult::from_value(ok),
-        Err(err) => EvalResult::from_error(WasmCelError::new(err).into()),
-    }
-    .into()
+    ctx.exec("entry", &exec_ctx).into()
 }
 
 #[wasm_bindgen]
-pub fn cel_details(source: &str) -> JsValue {
+pub fn cel_details(source: &str) -> WasmCelDetails {
     let mut tokenizer = StringTokenizer::with_input(source);
     match CelCompiler::with_tokenizer(&mut tokenizer).compile() {
         Ok(mut prog) => {

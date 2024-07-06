@@ -5,6 +5,8 @@ edition = "2021"
 description = "Cel interpreter in rust"
 license = "MIT"
 
+[profile.release]
+lto = true
 
 [features]
 default = ["type_prop", "protobuf"]

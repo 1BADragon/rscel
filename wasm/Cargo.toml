@@ -5,8 +5,15 @@ edition = "2021"
 description = "Cel interpreter in rust"
 license = "MIT"
 
+[features]
+default = []
+console_error_panic_hook = []
+
 [lib]
 crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
 
 [dependencies]
 rscel = { path = "../rscel" }
