@@ -1,4 +1,4 @@
-import { cel_details, cel_eval } from "rscel_wasm";
+import { cel_eval } from "rscel_wasm";
 import { describe, it, expect } from "vitest";
 
 describe("Rscel Basic Tests", () => {
@@ -94,13 +94,5 @@ describe("Rscel Basic Tests", () => {
     const res = cel_eval("type(foo)", { foo: { cel_uint: 5 } });
 
     expect(res.result.type).toEqual("uint");
-  });
-
-  it("dumps program ast", () => {
-    const details = cel_details("3+3");
-
-    console.log(details);
-
-    expect(details.details.ast).toBeDefined();
   });
 });
