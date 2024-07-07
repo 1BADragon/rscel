@@ -1,9 +1,9 @@
 [package]
 name = "rscel_python"
-version = "1.0.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 description = "Python bindings for the rscel package"
-license = "MIT"
+license = { workspace = true }
 
 [lib]
 name = "rscel"

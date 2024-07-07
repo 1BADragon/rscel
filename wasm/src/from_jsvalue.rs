@@ -8,6 +8,7 @@ use rscel::{CelError, CelResult, CelValue};
 
 use super::{object_iter::ObjectIterator, values};
 
+#[derive(Clone)]
 pub struct WasmCelValue {
     inner: CelValue,
 }

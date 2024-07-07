@@ -1,17 +1,16 @@
-mod eval_error;
-mod eval_result;
 mod from_jsvalue;
 mod into_jsvalue;
 mod object_iter;
+mod types;
 mod utils;
 mod wasm_program_details;
 
-use eval_error::WasmCelError;
-use eval_result::EvalResult;
 use from_jsvalue::WasmCelValue;
 use object_iter::ObjectIterator;
 use rscel::{BindContext, CelCompiler, CelContext, StringTokenizer};
+use types::{api, EvalResult, WasmCelError};
 use wasm_bindgen::prelude::*;
+use wasm_program_details::WasmProgramDetails;
 
 #[wasm_bindgen]
 extern "C" {
@@ -29,7 +28,7 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
+pub fn cel_eval(prog: &str, binding: api::WasmCelBinding) -> EvalResult {
     let mut ctx = CelContext::new();
     let mut exec_ctx = BindContext::new();
 
@@ -37,7 +36,9 @@ pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
         return EvalResult::from_error(WasmCelError::new(err).into()).into();
     }
 
-    for (key, value) in ObjectIterator::new(binding.into()) {
+    let binding_js: JsValue = binding.into();
+
+    for (key, value) in ObjectIterator::new(binding_js.into()) {
         match TryInto::<WasmCelValue>::try_into(value) {
             Ok(celval) => exec_ctx.bind_param(&key, celval.into_inner()),
             Err(err) => return EvalResult::from_error(WasmCelError::new(err).into()).into(),
@@ -47,23 +48,23 @@ pub fn cel_eval(prog: &str, binding: JsValue) -> JsValue {
     let res = ctx.exec("entry", &exec_ctx);
 
     match res {
-        Ok(ok) => EvalResult::from_value(ok),
+        Ok(ok) => EvalResult::from_value(WasmCelValue::new(ok)),
         Err(err) => EvalResult::from_error(WasmCelError::new(err).into()),
     }
-    .into()
 }
 
 #[wasm_bindgen]
-pub fn cel_details(source: &str) -> JsValue {
+pub fn cel_details(source: &str) -> Result<api::WasmProgramDetails, api::WasmEvalError> {
     let mut tokenizer = StringTokenizer::with_input(source);
     match CelCompiler::with_tokenizer(&mut tokenizer).compile() {
-        Ok(mut prog) => {
+        Ok(prog) => {
             let default_bindings = BindContext::new();
 
-            prog.details_mut().filter_from_bindings(&default_bindings);
+            let mut details = prog.into_details();
+            details.filter_from_bindings(&default_bindings);
 
-            EvalResult::from_program(prog).into()
+            Ok(Into::<JsValue>::into(WasmProgramDetails::new(details)).into())
         }
-        Err(err) => EvalResult::from_error(WasmCelError::new(err).into()).into(),
+        Err(err) => Err(Into::<JsValue>::into(WasmCelError::new(err)).into()),
     }
 }

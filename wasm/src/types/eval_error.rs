@@ -16,13 +16,14 @@ impl WasmCelError {
     }
 }
 
-pub struct EvalError {
+#[derive(Clone)]
+pub struct WasmEvalError {
     kind: String,
     msg: String,
     err: CelError,
 }
 
-impl Into<JsValue> for EvalError {
+impl Into<JsValue> for WasmEvalError {
     fn into(self) -> JsValue {
         let obj = js_sys::Object::new();
 
@@ -34,10 +35,10 @@ impl Into<JsValue> for EvalError {
     }
 }
 
-impl Into<EvalError> for WasmCelError {
-    fn into(self) -> EvalError {
+impl Into<WasmEvalError> for WasmCelError {
+    fn into(self) -> WasmEvalError {
         let inner = self.into_inner();
-        EvalError {
+        WasmEvalError {
             kind: inner.type_string().to_owned(),
             msg: inner.to_string(),
             err: inner,

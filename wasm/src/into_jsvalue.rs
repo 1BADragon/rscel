@@ -2,7 +2,7 @@ use wasm_bindgen::JsValue;
 
 use rscel::{CelError, CelValue};
 
-use crate::{eval_error::WasmCelError, from_jsvalue::WasmCelValue};
+use crate::{from_jsvalue::WasmCelValue, types::WasmCelError};
 
 impl Into<JsValue> for WasmCelValue {
     fn into(self) -> JsValue {

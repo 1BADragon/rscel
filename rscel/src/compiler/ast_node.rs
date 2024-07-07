@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::CelValue;
-
 use super::{source_location::SourceLocation, source_range::SourceRange};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -9,16 +7,11 @@ pub struct AstNode<T> {
     loc: SourceRange,
 
     node: T,
-    value: Option<CelValue>,
 }
 
 impl<T> AstNode<T> {
     pub fn new(node: T, loc: SourceRange) -> AstNode<T> {
-        AstNode::<T> {
-            loc,
-            node,
-            value: None,
-        }
+        AstNode::<T> { loc, node }
     }
 
     pub fn start(&self) -> SourceLocation {

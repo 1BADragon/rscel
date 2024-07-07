@@ -1,9 +1,9 @@
 [package]
 name = "rscel"
-version = "1.0.0"
-edition = "2021"
-description = "Cel interpreter in rust"
-license = "MIT"
+version = {workspace = true}
+edition = {workspace = true}
+description = {workspace = true}
+license = {workspace = true}
 
 
 [features]
