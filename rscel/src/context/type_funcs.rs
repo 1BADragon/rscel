@@ -181,7 +181,7 @@ fn timestamp_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
 
     if let CelValue::String(str_val) = &args[0] {
         match (&str_val).parse::<DateTime<Utc>>() {
-            Ok(val) => CelValue::from_timestamp(&val),
+            Ok(val) => CelValue::from_timestamp(val),
             Err(_) => CelValue::from_err(CelError::value("Invalid timestamp format")),
         }
     } else {
@@ -196,7 +196,7 @@ fn duration_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
 
     if let CelValue::String(str_val) = &args[0] {
         match duration_str::parse_chrono(str_val) {
-            Ok(val) => CelValue::from_duration(&val),
+            Ok(val) => CelValue::from_duration(val),
             Err(_) => CelValue::from_err(CelError::value("Invalid duration format")),
         }
     } else {

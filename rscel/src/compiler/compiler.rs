@@ -147,7 +147,7 @@ impl<'l> CelCompiler<'l> {
                 );
                 current_node = compile!(
                     [ByteCode::And],
-                    current_node.and(&rhs_node),
+                    current_node.and(rhs_node),
                     current_node,
                     jmp_node,
                     rhs_node
@@ -183,7 +183,7 @@ impl<'l> CelCompiler<'l> {
 
                     current_node = compile!(
                         [ByteCode::Lt],
-                        current_node.lt(&rhs_node),
+                        current_node.lt(rhs_node),
                         current_node,
                         rhs_node
                     );
@@ -205,7 +205,7 @@ impl<'l> CelCompiler<'l> {
 
                     current_node = compile!(
                         [ByteCode::Le],
-                        current_node.le(&rhs_node),
+                        current_node.le(rhs_node),
                         current_node,
                         rhs_node
                     );
@@ -249,7 +249,7 @@ impl<'l> CelCompiler<'l> {
 
                     current_node = compile!(
                         [ByteCode::Ne],
-                        current_node.neq(&rhs_node),
+                        current_node.neq(rhs_node),
                         current_node,
                         rhs_node
                     );
@@ -271,7 +271,7 @@ impl<'l> CelCompiler<'l> {
 
                     current_node = compile!(
                         [ByteCode::Ge],
-                        current_node.ge(&rhs_node),
+                        current_node.ge(rhs_node),
                         current_node,
                         rhs_node
                     );
@@ -293,7 +293,7 @@ impl<'l> CelCompiler<'l> {
 
                     current_node = compile!(
                         [ByteCode::Gt],
-                        current_node.gt(&rhs_node),
+                        current_node.gt(rhs_node),
                         current_node,
                         rhs_node
                     );
@@ -314,7 +314,7 @@ impl<'l> CelCompiler<'l> {
                     );
                     current_node = compile!(
                         [ByteCode::In],
-                        current_node.in_(&rhs_node),
+                        current_node.in_(rhs_node),
                         current_node,
                         rhs_node
                     )
@@ -692,7 +692,7 @@ impl<'l> CelCompiler<'l> {
                         }) => {
                             member_prime_node = compile!(
                                 [ByteCode::Index],
-                                member_prime_node.index(&index_node),
+                                member_prime_node.index(index_node),
                                 member_prime_node,
                                 index_node
                             );

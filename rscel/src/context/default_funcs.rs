@@ -357,12 +357,12 @@ fn min_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
         return CelValue::from_err(CelError::argument("min() requires at lease one argument"));
     }
 
-    let mut curr_min = None;
+    let mut curr_min: Option<&CelValue> = None;
 
     for val in args.into_iter() {
         match curr_min {
             Some(curr) => {
-                if val.lt(curr).is_true() {
+                if val.clone().lt(curr.clone()).is_true() {
                     curr_min = Some(val);
                 }
             }
@@ -370,7 +370,10 @@ fn min_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
         }
     }
 
-    curr_min.unwrap().clone()
+    match curr_min {
+        Some(v) => v.clone(),
+        None => CelValue::from_null(),
+    }
 }
 
 fn max_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
@@ -378,20 +381,23 @@ fn max_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
         return CelValue::from_err(CelError::argument("max() requires at lease one argument"));
     }
 
-    let mut curr_min = None;
+    let mut curr_max: Option<&CelValue> = None;
 
     for val in args.into_iter() {
-        match curr_min {
+        match curr_max {
             Some(curr) => {
-                if val.gt(curr).is_true() {
-                    curr_min = Some(val);
+                if val.clone().gt(curr.clone()).is_true() {
+                    curr_max = Some(val);
                 }
             }
-            None => curr_min = Some(val),
+            None => curr_max = Some(val),
         }
     }
 
-    curr_min.unwrap().clone()
+    match curr_max {
+        Some(v) => v.clone(),
+        None => CelValue::from_null(),
+    }
 }
 
 fn get_adjusted_datetime(this: CelValue, args: &[CelValue]) -> CelResult<DateTime<Tz>> {

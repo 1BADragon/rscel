@@ -170,7 +170,7 @@ impl<'a> Interpreter<'a> {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.and(&v2))
+                    stack.push_val(v1.and(v2))
                 }
                 ByteCode::Not => {
                     let v1 = stack.pop_val()?;
@@ -216,13 +216,13 @@ impl<'a> Interpreter<'a> {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.lt(&v2));
+                    stack.push_val(v1.lt(v2));
                 }
                 ByteCode::Le => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.le(&v2));
+                    stack.push_val(v1.le(v2));
                 }
                 ByteCode::Eq => {
                     let v2 = stack.pop_val()?;
@@ -234,25 +234,25 @@ impl<'a> Interpreter<'a> {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.neq(&v2));
+                    stack.push_val(v1.neq(v2));
                 }
                 ByteCode::Ge => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.ge(&v2));
+                    stack.push_val(v1.ge(v2));
                 }
                 ByteCode::Gt => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.gt(&v2));
+                    stack.push_val(v1.gt(v2));
                 }
                 ByteCode::In => {
                     let rhs = stack.pop_val()?;
                     let lhs = stack.pop_val()?;
 
-                    stack.push_val(lhs.in_(&rhs));
+                    stack.push_val(lhs.in_(rhs));
                 }
                 ByteCode::Jmp(dist) => pc = pc + *dist as usize,
                 ByteCode::JmpCond {
@@ -332,7 +332,7 @@ impl<'a> Interpreter<'a> {
                     let index = stack.pop_val()?;
                     let obj = stack.pop_val()?;
 
-                    stack.push_val(obj.index(&index));
+                    stack.push_val(obj.index(index));
                 }
                 ByteCode::Access => {
                     let index = stack.pop_noresolve()?;

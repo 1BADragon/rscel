@@ -336,7 +336,7 @@ fn test_timestamp_functions() {
         .ymd(2024, 01, 10)
         .and_hms_milli_opt(8, 57, 45, 123)
         .unwrap();
-    exec.bind_param("time", CelValue::from_timestamp(&dt));
+    exec.bind_param("time", CelValue::from_timestamp(dt));
 
     let progs = [
         ("time.getDate()", 10),
