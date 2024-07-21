@@ -2,7 +2,7 @@
 name = "rscel_wasm"
 version = { workspace = true }
 edition ={ workspace = true }
-description = "Wasm bindings for RsCEL"
+description = "Wasm bindings for rscel"
 license = { workspace = true }
 
 [lib]
