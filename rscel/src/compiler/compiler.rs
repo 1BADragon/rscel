@@ -13,6 +13,8 @@ use crate::{
     interp::JmpWhen, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, StringTokenizer,
 };
 
+use crate::compile;
+
 pub struct CelCompiler<'l> {
     tokenizer: &'l mut dyn Tokenizer,
 }
@@ -109,11 +111,12 @@ impl<'l> CelCompiler<'l> {
                     },
                     range,
                 );
-                current_node = CompiledNode::with_bytecode(vec![ByteCode::Or]).consume_children3(
+                current_node = compile!(
+                    [ByteCode::Or],
+                    current_node.or(&rhs_node),
                     current_node,
                     jmp_node,
-                    rhs_node,
-                    |lhs, rhs| lhs.or(&rhs),
+                    rhs_node
                 );
             } else {
                 break;
@@ -153,11 +156,12 @@ impl<'l> CelCompiler<'l> {
                     },
                     range,
                 );
-                current_node = CompiledNode::with_bytecode(vec![ByteCode::And]).consume_children3(
+                current_node = compile!(
+                    [ByteCode::And],
+                    current_node.and(&rhs_node),
                     current_node,
                     jmp_node,
-                    rhs_node,
-                    |lhs, rhs| lhs.and(&rhs),
+                    rhs_node
                 );
             } else {
                 break;
@@ -192,8 +196,12 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
 
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Lt])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.lt(&rhs));
+                    current_node = compile!(
+                        [ByteCode::Lt],
+                        current_node.lt(&rhs_node),
+                        current_node,
+                        rhs_node
+                    );
                 }
                 Some(Token::LessEqual) => {
                     self.tokenizer.next()?;
@@ -210,8 +218,12 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
 
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Le])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.le(&rhs));
+                    current_node = compile!(
+                        [ByteCode::Le],
+                        current_node.le(&rhs_node),
+                        current_node,
+                        rhs_node
+                    );
                 }
                 Some(Token::EqualEqual) => {
                     self.tokenizer.next()?;
@@ -228,10 +240,12 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
 
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Eq])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| {
-                            CelValueDyn::eq(&lhs, &rhs)
-                        });
+                    current_node = compile!(
+                        [ByteCode::Eq],
+                        CelValueDyn::eq(&current_node, &rhs_node),
+                        current_node,
+                        rhs_node
+                    );
                 }
                 Some(Token::NotEqual) => {
                     self.tokenizer.next()?;
@@ -248,8 +262,12 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
 
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Ne])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.neq(&rhs));
+                    current_node = compile!(
+                        [ByteCode::Ne],
+                        current_node.neq(&rhs_node),
+                        current_node,
+                        rhs_node
+                    );
                 }
                 Some(Token::GreaterEqual) => {
                     self.tokenizer.next()?;
@@ -266,8 +284,12 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
 
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Ge])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.ge(&rhs));
+                    current_node = compile!(
+                        [ByteCode::Ge],
+                        current_node.ge(&rhs_node),
+                        current_node,
+                        rhs_node
+                    );
                 }
                 Some(Token::GreaterThan) => {
                     self.tokenizer.next()?;
@@ -284,8 +306,12 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
 
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Gt])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.ge(&rhs));
+                    current_node = compile!(
+                        [ByteCode::Gt],
+                        current_node.gt(&rhs_node),
+                        current_node,
+                        rhs_node
+                    );
                 }
                 Some(Token::In) => {
                     self.tokenizer.next()?;
@@ -301,8 +327,12 @@ impl<'l> CelCompiler<'l> {
                         },
                         range,
                     );
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::In])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs.in_(&rhs));
+                    current_node = compile!(
+                        [ByteCode::In],
+                        current_node.in_(&rhs_node),
+                        current_node,
+                        rhs_node
+                    )
                 }
                 _ => break,
             }
@@ -338,8 +368,12 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
 
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Add])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs + rhs);
+                    current_node = compile!(
+                        [ByteCode::Add],
+                        current_node + rhs_node,
+                        current_node,
+                        rhs_node
+                    );
                 }
                 Some(Token::Minus) => {
                     self.tokenizer.next()?;
@@ -357,8 +391,12 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
 
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Sub])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs - rhs);
+                    current_node = compile!(
+                        [ByteCode::Sub],
+                        current_node - rhs_node,
+                        current_node,
+                        rhs_node
+                    );
                 }
                 _ => break,
             }
@@ -392,9 +430,12 @@ impl<'l> CelCompiler<'l> {
                         },
                         range,
                     );
-
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Mul])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs * rhs);
+                    current_node = compile!(
+                        [ByteCode::Mul],
+                        current_node * rhs_node,
+                        current_node,
+                        rhs_node
+                    );
                 }
                 Some(Token::Divide) => {
                     self.tokenizer.next()?;
@@ -412,8 +453,12 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
 
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Div])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs / rhs);
+                    current_node = compile!(
+                        [ByteCode::Div],
+                        current_node / rhs_node,
+                        current_node,
+                        rhs_node
+                    );
                 }
                 Some(Token::Mod) => {
                     self.tokenizer.next()?;
@@ -431,8 +476,12 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
 
-                    current_node = CompiledNode::with_bytecode(vec![ByteCode::Mod])
-                        .consume_children2(current_node, rhs_node, |lhs, rhs| lhs % rhs);
+                    current_node = compile!(
+                        [ByteCode::Mod],
+                        current_node % rhs_node,
+                        current_node,
+                        rhs_node
+                    );
                 }
                 _ => break,
             }
