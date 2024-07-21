@@ -100,6 +100,7 @@ fn test_contains() {
 #[test_case("2 * 3 + 7", 13.into(); "long mixed operation")]
 #[test_case("true && false || true && true", true.into(); "long logic operation")]
 #[test_case("2 + 3 - 1", 4.into(); "long add/sub operation")]
+#[test_case("-2 + 4", 2.into(); "neg pos addition")]
 #[test_case("2 < 3 >= 1", true.into(); "type prop: chained cmp")]
 #[test_case("3 * 2 - 1 / 4 * 2", 6.into(); "large op 2")]
 #[test_case("true || unbound || unbound", true.into(); "Or short cut")]

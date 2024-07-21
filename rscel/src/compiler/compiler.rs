@@ -82,12 +82,7 @@ impl<'l> CelCompiler<'l> {
     }
 
     fn parse_conditional_or(&mut self) -> CelResult<CompiledNode<ConditionalOr>> {
-        let mut current_node = self.parse_conditional_and()?.convert_with_ast(|lhs_ast| {
-            let ast = lhs_ast.expect("Internal Error: no ast");
-            let range = ast.range();
-
-            AstNode::new(ConditionalOr::Unary(ast), range)
-        });
+        let mut current_node = self.parse_conditional_and()?.into_unary();
         let mut current_ast = current_node.yank_ast();
 
         loop {
@@ -127,13 +122,7 @@ impl<'l> CelCompiler<'l> {
     }
 
     fn parse_conditional_and(&mut self) -> CelResult<CompiledNode<ConditionalAnd>> {
-        let mut current_node = self.parse_relation()?.convert_with_ast(|ast_opt| {
-            let ast = ast_opt.expect("Internal Error: no ast");
-            let range = ast.range();
-
-            AstNode::new(ConditionalAnd::Unary(ast), range)
-        });
-
+        let mut current_node = self.parse_relation()?.into_unary();
         let mut current_ast = current_node.yank_ast();
 
         loop {
@@ -171,11 +160,7 @@ impl<'l> CelCompiler<'l> {
     }
 
     fn parse_relation(&mut self) -> CelResult<CompiledNode<Relation>> {
-        let mut current_node = self.parse_addition()?.convert_with_ast(|ast_opt| {
-            let ast = ast_opt.expect("Internal Error: no ast");
-            let range = ast.range();
-            AstNode::new(Relation::Unary(ast), range)
-        });
+        let mut current_node = self.parse_addition()?.into_unary();
         let mut current_ast = current_node.yank_ast();
 
         loop {
@@ -342,12 +327,7 @@ impl<'l> CelCompiler<'l> {
     }
 
     fn parse_addition(&mut self) -> CelResult<CompiledNode<Addition>> {
-        let mut current_node = self.parse_multiplication()?.convert_with_ast(|ast_opt| {
-            let ast = ast_opt.expect("Internal Error: no ast");
-            let range = ast.range();
-
-            AstNode::new(Addition::Unary(ast), range)
-        });
+        let mut current_node = self.parse_multiplication()?.into_unary();
         let mut current_ast = current_node.yank_ast();
 
         loop {
@@ -406,11 +386,7 @@ impl<'l> CelCompiler<'l> {
     }
 
     fn parse_multiplication(&mut self) -> CelResult<CompiledNode<Multiplication>> {
-        let mut current_node = self.parse_unary()?.convert_with_ast(|ast_opt| {
-            let ast = ast_opt.expect("Internal Error: no ast");
-            let range = ast.range();
-            AstNode::new(Multiplication::Unary(ast), range)
-        });
+        let mut current_node = self.parse_unary()?.into_unary();
         let mut current_ast = current_node.yank_ast();
 
         loop {
@@ -511,30 +487,20 @@ impl<'l> CelCompiler<'l> {
             Some(Token::Minus) => {
                 let mut neg = self.parse_neg_list()?;
                 let neg_ast = neg.yank_ast();
-                let member = self.parse_member()?;
+                let mut member = self.parse_member()?;
+                let member_ast = member.yank_ast();
 
-                Ok(member.consume_child(neg).convert_with_ast(|ast_opt| {
-                    let ast = ast_opt.expect("Internal Error: no ast");
-                    let range = ast.range().surrounding(neg_ast.range());
-                    AstNode::new(
-                        Unary::NegMember {
-                            negs: neg_ast,
-                            member: ast,
-                        },
-                        range,
-                    )
-                }))
+                let range = member_ast.range().surrounding(neg_ast.range());
+
+                Ok(member.append_result(neg).add_ast(AstNode::new(
+                    Unary::NegMember {
+                        negs: neg_ast,
+                        member: member_ast,
+                    },
+                    range,
+                )))
             }
-            _ => {
-                let member = self.parse_member()?;
-
-                Ok(member.convert_with_ast(|ast_opt| {
-                    let ast = ast_opt.expect("Internal Error: no ast");
-                    let range = ast.range();
-
-                    AstNode::new(Unary::Member(ast), range)
-                }))
-            }
+            _ => Ok(self.parse_member()?.into_unary()),
         }
     }
 
@@ -546,20 +512,18 @@ impl<'l> CelCompiler<'l> {
             }) => {
                 self.tokenizer.next()?;
 
-                Ok(self
-                    .parse_not_list()?
-                    .consume_child(CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::Not]))
-                    .convert_with_ast(|ast_opt| {
-                        let ast = ast_opt.expect("Internal Error: no ast");
-                        let range = ast.range().surrounding(loc);
+                let mut not_list = self.parse_not_list()?;
+                let ast = not_list.yank_ast();
+                let node = compile!([ByteCode::Not], not_list, not_list);
 
-                        AstNode::new(
-                            NotList::List {
-                                tail: Box::new(ast),
-                            },
-                            range,
-                        )
-                    }))
+                let range = ast.range().surrounding(loc);
+
+                Ok(node.add_ast(AstNode::new(
+                    NotList::List {
+                        tail: Box::new(ast),
+                    },
+                    range,
+                )))
             }
             _ => {
                 let start_loc = self.tokenizer.location();
@@ -578,20 +542,19 @@ impl<'l> CelCompiler<'l> {
                 loc,
             }) => {
                 self.tokenizer.next()?;
-                Ok(self
-                    .parse_neg_list()?
-                    .consume_child(CompiledNode::<NoAst>::with_bytecode(vec![ByteCode::Neg]))
-                    .convert_with_ast(|ast_opt| {
-                        let ast = ast_opt.expect("Internal Error: no ast");
-                        let range = ast.range().surrounding(loc);
 
-                        AstNode::new(
-                            NegList::List {
-                                tail: Box::new(ast),
-                            },
-                            range,
-                        )
-                    }))
+                let mut neg_list = self.parse_neg_list()?;
+                let ast = neg_list.yank_ast();
+                let node = compile!([ByteCode::Neg], neg_list, neg_list);
+
+                let range = ast.range().surrounding(loc);
+
+                Ok(node.add_ast(AstNode::new(
+                    NegList::List {
+                        tail: Box::new(ast),
+                    },
+                    range,
+                )))
             }
             _ => {
                 let start_loc = self.tokenizer.location();
@@ -727,11 +690,11 @@ impl<'l> CelCompiler<'l> {
                             token: Token::RBracket,
                             loc: rbracket_loc,
                         }) => {
-                            member_prime_node = CompiledNode::from_children2_w_bytecode(
+                            member_prime_node = compile!(
+                                [ByteCode::Index],
+                                member_prime_node.index(&index_node),
                                 member_prime_node,
-                                index_node,
-                                vec![ByteCode::Index],
-                                |p, i| p.index(&i),
+                                index_node
                             );
 
                             member_prime_ast.push(AstNode::new(
@@ -782,7 +745,7 @@ impl<'l> CelCompiler<'l> {
                 token: Token::LParen,
                 loc,
             }) => {
-                let expr = self.parse_expression()?;
+                let mut expr = self.parse_expression()?;
 
                 // TODO: enforce a closing paran here
                 let next_token = self.tokenizer.next();
@@ -805,12 +768,11 @@ impl<'l> CelCompiler<'l> {
                     }
                 };
 
-                Ok(expr.convert_with_ast(|ast| {
-                    AstNode::new(
-                        Primary::Parens(ast.expect("Internal Error: no ast")),
-                        loc.surrounding(rparen_loc),
-                    )
-                }))
+                let ast = expr.yank_ast();
+                Ok(CompiledNode::from_node(expr).add_ast(AstNode::new(
+                    Primary::Parens(ast),
+                    loc.surrounding(rparen_loc),
+                )))
             }
             Some(TokenWithLoc {
                 token: Token::LBracket,

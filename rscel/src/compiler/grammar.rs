@@ -1,6 +1,12 @@
 use super::{ast_node::AstNode, tokens::FStringSegment};
 use serde::{Deserialize, Serialize};
 
+pub trait FromUnary {
+    type InputType;
+
+    fn from_unary(inner: AstNode<<Self as FromUnary>::InputType>) -> Self;
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Expr {
     Ternary {
@@ -20,6 +26,14 @@ pub enum ConditionalOr {
     Unary(AstNode<ConditionalAnd>),
 }
 
+impl FromUnary for ConditionalOr {
+    type InputType = ConditionalAnd;
+
+    fn from_unary(inner: AstNode<<Self as FromUnary>::InputType>) -> Self {
+        Self::Unary(inner)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConditionalAnd {
     Binary {
@@ -27,6 +41,14 @@ pub enum ConditionalAnd {
         rhs: AstNode<Relation>,
     },
     Unary(AstNode<Relation>),
+}
+
+impl FromUnary for ConditionalAnd {
+    type InputType = Relation;
+
+    fn from_unary(inner: AstNode<<Self as FromUnary>::InputType>) -> Self {
+        Self::Unary(inner)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -37,6 +59,14 @@ pub enum Relation {
         rhs: AstNode<Addition>,
     },
     Unary(AstNode<Addition>),
+}
+
+impl FromUnary for Relation {
+    type InputType = Addition;
+
+    fn from_unary(inner: AstNode<<Self as FromUnary>::InputType>) -> Self {
+        Self::Unary(inner)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -60,6 +90,14 @@ pub enum Addition {
     Unary(AstNode<Multiplication>),
 }
 
+impl FromUnary for Addition {
+    type InputType = Multiplication;
+
+    fn from_unary(inner: AstNode<<Self as FromUnary>::InputType>) -> Self {
+        Self::Unary(inner)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AddOp {
     Add,
@@ -74,6 +112,14 @@ pub enum Multiplication {
         rhs: AstNode<Unary>,
     },
     Unary(AstNode<Unary>),
+}
+
+impl FromUnary for Multiplication {
+    type InputType = Unary;
+
+    fn from_unary(inner: AstNode<<Self as FromUnary>::InputType>) -> Self {
+        Self::Unary(inner)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -94,6 +140,14 @@ pub enum Unary {
         negs: AstNode<NegList>,
         member: AstNode<Member>,
     },
+}
+
+impl FromUnary for Unary {
+    type InputType = Member;
+
+    fn from_unary(inner: AstNode<<Self as FromUnary>::InputType>) -> Self {
+        Self::Member(inner)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

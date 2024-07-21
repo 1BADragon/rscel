@@ -1,5 +1,6 @@
 use crate::{
-    interp::JmpWhen, program::ProgramDetails, ByteCode, CelError, CelValue, CelValueDyn, Program,
+    interp::JmpWhen, program::ProgramDetails, ByteCode, CelError, CelValue, CelValueDyn, FromUnary,
+    Program,
 };
 
 use super::{
@@ -14,7 +15,7 @@ pub enum NodeValue {
 }
 
 #[derive(Debug)]
-pub struct CompiledNode<T: Clone> {
+pub struct CompiledNode<T> {
     pub inner: NodeValue,
     pub details: ProgramDetails,
     pub ast: Option<AstNode<T>>,
@@ -137,37 +138,6 @@ impl<T: Clone> CompiledNode<T> {
         }
     }
 
-    pub fn from_children2_w_bytecode<T1: Clone, T2: Clone, F>(
-        child1: CompiledNode<T1>,
-        child2: CompiledNode<T2>,
-        bytecode: Vec<ByteCode>,
-        resolve: F,
-    ) -> CompiledNode<T>
-    where
-        F: FnOnce(CelValue, CelValue) -> CelValue,
-    {
-        let new_details = ProgramDetails::joined2(child1.details, child2.details);
-
-        match (child1.inner, child2.inner) {
-            (NodeValue::ConstExpr(c1), NodeValue::ConstExpr(c2)) => CompiledNode {
-                inner: NodeValue::ConstExpr(resolve(c1, c2)),
-                details: new_details,
-                ast: None,
-            },
-            (c1, c2) => CompiledNode {
-                inner: NodeValue::Bytecode(
-                    c1.into_bytecode()
-                        .into_iter()
-                        .chain(c2.into_bytecode().into_iter())
-                        .chain(bytecode.into_iter())
-                        .collect(),
-                ),
-                details: new_details,
-                ast: None,
-            },
-        }
-    }
-
     pub fn from_children2_w_bytecode_cannone<T1: Clone, T2: Clone, F>(
         child1: CompiledNode<T1>,
         child2: CompiledNode<T2>,
@@ -211,14 +181,15 @@ impl<T: Clone> CompiledNode<T> {
         }
     }
 
-    pub fn convert_with_ast<F, O: Clone>(self, ast_builder: F) -> CompiledNode<O>
-    where
-        F: FnOnce(Option<AstNode<T>>) -> AstNode<O>,
-    {
+    #[inline]
+    pub fn into_unary<O: FromUnary<InputType = T>>(self) -> CompiledNode<O> {
+        let ast = self.ast.expect("Internal Error: no ast");
+        let range = ast.range();
+
         CompiledNode {
             inner: self.inner,
             details: self.details,
-            ast: Some(ast_builder(self.ast)),
+            ast: Some(AstNode::new(O::from_unary(ast), range)),
         }
     }
 

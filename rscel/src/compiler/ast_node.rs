@@ -14,6 +14,10 @@ impl<T> AstNode<T> {
         AstNode::<T> { loc, node }
     }
 
+    pub fn into_parts(self) -> (T, SourceRange) {
+        (self.node, self.loc)
+    }
+
     pub fn start(&self) -> SourceLocation {
         self.loc.start()
     }
