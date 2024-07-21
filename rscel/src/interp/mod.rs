@@ -421,7 +421,7 @@ impl<'a> Interpreter<'a> {
                         CelStackValue::BoundCall { callable, value } => match callable {
                             RsCallable::Function(func) => {
                                 let arg_values = self.resolve_args(args)?;
-                                stack.push_val(func(value, &arg_values));
+                                stack.push_val(func(value, arg_values));
                             }
                             RsCallable::Macro(macro_) => {
                                 stack.push_val(self.call_macro(&value, &args, macro_)?);
@@ -431,7 +431,7 @@ impl<'a> Interpreter<'a> {
                             CelValue::Ident(func_name) => {
                                 if let Some(func) = self.get_func_by_name(&func_name) {
                                     let arg_values = self.resolve_args(args)?;
-                                    stack.push_val(func(CelValue::from_null(), &arg_values));
+                                    stack.push_val(func(CelValue::from_null(), arg_values));
                                 } else if let Some(macro_) = self.get_macro_by_name(&func_name) {
                                     stack.push_val(self.call_macro(
                                         &CelValue::from_null(),
@@ -442,7 +442,7 @@ impl<'a> Interpreter<'a> {
                                     self.get_type_by_name(&func_name)
                                 {
                                     let arg_values = self.resolve_args(args)?;
-                                    stack.push_val(construct_type(type_name, &arg_values));
+                                    stack.push_val(construct_type(type_name, arg_values));
                                 } else {
                                     stack.push_val(CelValue::from_err(CelError::runtime(
                                         &format!("{} is not callable", func_name),
@@ -451,7 +451,7 @@ impl<'a> Interpreter<'a> {
                             }
                             CelValue::Type(type_name) => {
                                 let arg_values = self.resolve_args(args)?;
-                                stack.push_val(construct_type(&type_name, &arg_values));
+                                stack.push_val(construct_type(&type_name, arg_values));
                             }
                             other => stack.push_val(
                                 CelValue::from_err(CelError::runtime(&format!(

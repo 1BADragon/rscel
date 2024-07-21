@@ -38,7 +38,7 @@ use super::{default_funcs::load_default_funcs, type_funcs::load_default_types};
 ///     }
 /// }
 /// ```
-pub type RsCelFunction = dyn Fn(CelValue, &[CelValue]) -> CelValue;
+pub type RsCelFunction = dyn Fn(CelValue, Vec<CelValue>) -> CelValue;
 
 /// Prototype for a macro binding.
 ///

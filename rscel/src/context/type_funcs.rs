@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 
 use crate::{BindContext, CelError, CelValue, CelValueDyn};
 
-pub fn construct_type(type_name: &str, args: &[CelValue]) -> CelValue {
+pub fn construct_type(type_name: &str, args: Vec<CelValue>) -> CelValue {
     match type_name {
         "bool" => bool_impl(CelValue::from_null(), args),
         "int" => int_impl(CelValue::from_null(), args),
@@ -35,7 +35,7 @@ pub fn load_default_types(bind_ctx: &mut BindContext) {
     bind_ctx.add_type("dyn", CelValue::dyn_type())
 }
 
-fn bool_impl(_: CelValue, args: &[CelValue]) -> CelValue {
+fn bool_impl(_: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("bool() expects exactly one argument"));
     }
@@ -43,7 +43,7 @@ fn bool_impl(_: CelValue, args: &[CelValue]) -> CelValue {
     args[0].is_truthy().into()
 }
 
-fn int_impl(_: CelValue, args: &[CelValue]) -> CelValue {
+fn int_impl(_: CelValue, args: Vec<CelValue>) -> CelValue {
     use CelValue::*;
 
     if args.len() != 1 {
@@ -70,7 +70,7 @@ fn int_impl(_: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn uint_impl(_: CelValue, args: &[CelValue]) -> CelValue {
+fn uint_impl(_: CelValue, args: Vec<CelValue>) -> CelValue {
     use CelValue::*;
 
     if args.len() != 1 {
@@ -96,7 +96,7 @@ fn uint_impl(_: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn double_impl(_: CelValue, args: &[CelValue]) -> CelValue {
+fn double_impl(_: CelValue, args: Vec<CelValue>) -> CelValue {
     use CelValue::*;
 
     if args.len() != 1 {
@@ -122,7 +122,7 @@ fn double_impl(_: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn bytes_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn bytes_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     use CelValue::*;
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("bytes() expects exactly one argument"));
@@ -137,7 +137,7 @@ fn bytes_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn string_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn string_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     use CelValue::*;
 
     if args.len() != 1 {
@@ -166,7 +166,7 @@ fn string_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn type_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn type_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("type() expects one argument"));
     }
@@ -174,7 +174,7 @@ fn type_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     args[0].as_type()
 }
 
-fn timestamp_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn timestamp_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("timestamp() expect one argument"));
     }
@@ -189,7 +189,7 @@ fn timestamp_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn duration_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn duration_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("duration() expects one argument"));
     }
@@ -204,7 +204,7 @@ fn duration_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn dyn_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn dyn_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("dyn() expects one argument"));
     }
