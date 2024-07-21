@@ -1,0 +1,13 @@
+{
+  "name": "rescel unit tests",
+  "version": "0.1.0",
+  "scripts": {
+    "test": "vitest run ."
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "rscel_wasm": "file:../pkg"
+  }
+}

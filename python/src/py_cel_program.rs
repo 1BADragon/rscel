@@ -71,6 +71,21 @@ impl PyCelProgram {
             Err(PyValueError::new_err("Program source not set"))
         }
     }
+
+    fn details_json(slf: PyRefMut<'_, PyCelProgram>, pretty: bool) -> PyResult<String> {
+        if let Some(program) = &slf.program {
+            match if pretty {
+                serde_json::to_string_pretty(program.details().ast().unwrap())
+            } else {
+                serde_json::to_string(program.details().ast().unwrap())
+            } {
+                Ok(s) => Ok(s),
+                Err(e) => Err(PyValueError::new_err(format!("{e}"))),
+            }
+        } else {
+            Err(PyValueError::new_err("Program source not set"))
+        }
+    }
 }
 
 impl PyCelProgram {

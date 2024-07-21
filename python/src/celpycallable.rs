@@ -12,10 +12,10 @@ impl CelPyCallable {
     }
 }
 
-impl FnOnce<(CelValue, &[CelValue])> for CelPyCallable {
+impl FnOnce<(CelValue, Vec<CelValue>)> for CelPyCallable {
     type Output = CelValue;
 
-    extern "rust-call" fn call_once(self, args: (CelValue, &[CelValue])) -> Self::Output {
+    extern "rust-call" fn call_once(self, args: (CelValue, Vec<CelValue>)) -> Self::Output {
         Python::with_gil(|py| {
             match self.func.call_bound(
                 py,
@@ -28,7 +28,7 @@ impl FnOnce<(CelValue, &[CelValue])> for CelPyCallable {
                         .chain(
                             args.1
                                 .into_iter()
-                                .map(|x| PyCelValueRef::new(x).to_object(py)),
+                                .map(|x| PyCelValueRef::new(&x).to_object(py)),
                         )
                         .collect::<Vec<PyObject>>(),
                 ),
@@ -41,8 +41,8 @@ impl FnOnce<(CelValue, &[CelValue])> for CelPyCallable {
     }
 }
 
-impl FnMut<(CelValue, &[CelValue])> for CelPyCallable {
-    extern "rust-call" fn call_mut(&mut self, args: (CelValue, &[CelValue])) -> Self::Output {
+impl FnMut<(CelValue, Vec<CelValue>)> for CelPyCallable {
+    extern "rust-call" fn call_mut(&mut self, args: (CelValue, Vec<CelValue>)) -> Self::Output {
         Python::with_gil(|py| {
             match self.func.call_bound(
                 py,
@@ -55,7 +55,7 @@ impl FnMut<(CelValue, &[CelValue])> for CelPyCallable {
                         .chain(
                             args.1
                                 .into_iter()
-                                .map(|x| PyCelValueRef::new(x).to_object(py)),
+                                .map(|x| PyCelValueRef::new(&x).to_object(py)),
                         )
                         .collect::<Vec<PyObject>>(),
                 ),
@@ -68,8 +68,8 @@ impl FnMut<(CelValue, &[CelValue])> for CelPyCallable {
     }
 }
 
-impl Fn<(CelValue, &[CelValue])> for CelPyCallable {
-    extern "rust-call" fn call(&self, args: (CelValue, &[CelValue])) -> Self::Output {
+impl Fn<(CelValue, Vec<CelValue>)> for CelPyCallable {
+    extern "rust-call" fn call(&self, args: (CelValue, Vec<CelValue>)) -> Self::Output {
         Python::with_gil(|py| {
             match self.func.call_bound(
                 py,
@@ -82,7 +82,7 @@ impl Fn<(CelValue, &[CelValue])> for CelPyCallable {
                         .chain(
                             args.1
                                 .into_iter()
-                                .map(|x| PyCelValueRef::new(x).to_object(py)),
+                                .map(|x| PyCelValueRef::new(&x).to_object(py)),
                         )
                         .collect::<Vec<PyObject>>(),
                 ),

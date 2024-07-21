@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::{
     any::Any,
-    borrow::Cow,
     cmp::Ordering,
     collections::HashMap,
     fmt,
@@ -14,7 +13,7 @@ use std::{
 
 use serde_json::value::Value;
 
-#[cfg(protobuf)]
+#[cfg(feature = "protobuf")]
 use protobuf::{
     reflect::{EnumDescriptor, MessageDescriptor, ReflectValueRef},
     MessageDyn,
@@ -48,10 +47,10 @@ pub enum CelValue {
     #[serde(skip_serializing, skip_deserializing)]
     Duration(Duration),
     ByteCode(Vec<ByteCode>),
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     #[serde(skip_serializing, skip_deserializing)]
     Message(Box<dyn MessageDyn>),
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     #[serde(skip_serializing, skip_deserializing)]
     Enum {
         descriptor: EnumDescriptor,
@@ -124,12 +123,12 @@ impl CelValue {
         CelValue::Ident(val.to_owned())
     }
 
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     pub fn from_proto_msg(val: Box<dyn MessageDyn>) -> CelValue {
         CelValue::Message(val)
     }
 
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     pub fn from_proto_enum(descriptor: EnumDescriptor, value: i32) -> CelValue {
         CelValue::Enum { descriptor, value }
     }
@@ -138,15 +137,15 @@ impl CelValue {
         CelValue::Type(val.to_owned())
     }
 
-    pub fn from_timestamp(val: &DateTime<Utc>) -> CelValue {
-        CelValue::TimeStamp(val.clone())
+    pub fn from_timestamp(val: DateTime<Utc>) -> CelValue {
+        CelValue::TimeStamp(val)
     }
 
-    pub fn from_duration(val: &Duration) -> CelValue {
-        CelValue::Duration(val.clone())
+    pub fn from_duration(val: Duration) -> CelValue {
+        CelValue::Duration(val)
     }
 
-    pub(crate) fn from_bytecode(val: &[ByteCode]) -> CelValue {
+    pub(crate) fn from_bytecode(val: Vec<ByteCode>) -> CelValue {
         CelValue::ByteCode(val.to_owned())
     }
 
@@ -262,12 +261,12 @@ impl CelValue {
         CelValue::from_type("err")
     }
 
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     pub fn message_type(desc: &MessageDescriptor) -> CelValue {
         CelValue::Type(format!("message-{}", desc.full_name()))
     }
 
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     pub fn enum_type(desc: &EnumDescriptor) -> CelValue {
         CelValue::Type(format!("enum-{}", desc.full_name()))
     }
@@ -280,39 +279,36 @@ impl CelValue {
         }
     }
 
-    fn type_prop<'a>(
-        lhs: Cow<'a, CelValue>,
-        rhs: Cow<'a, CelValue>,
-    ) -> (Cow<'a, CelValue>, Cow<'a, CelValue>) {
-        if let CelValue::Int(l) = lhs.as_ref() {
-            match rhs.as_ref() {
+    fn type_prop(lhs: CelValue, rhs: CelValue) -> (CelValue, CelValue) {
+        if let CelValue::Int(l) = lhs {
+            match rhs {
                 CelValue::Int(_) => (lhs, rhs),
-                CelValue::UInt(u) => (lhs, Cow::Owned((*u as i64).into())),
-                CelValue::Float(_) => (Cow::Owned((*l as f64).into()), rhs),
-                CelValue::Bool(b) => (lhs, Cow::Owned((*b as i64).into())),
+                CelValue::UInt(u) => (lhs, (u as i64).into()),
+                CelValue::Float(_) => ((l as f64).into(), rhs),
+                CelValue::Bool(b) => (lhs, (b as i64).into()),
                 _ => (lhs, rhs),
             }
-        } else if let CelValue::UInt(l) = lhs.as_ref() {
-            match rhs.as_ref() {
-                CelValue::Int(_) => (Cow::Owned((*l as i64).into()), rhs),
+        } else if let CelValue::UInt(l) = lhs {
+            match rhs {
+                CelValue::Int(_) => ((l as i64).into(), rhs),
                 CelValue::UInt(_) => (lhs, rhs),
-                CelValue::Float(_) => (Cow::Owned((*l as f64).into()), rhs),
-                CelValue::Bool(b) => (lhs, Cow::Owned((*b as u64).into())),
+                CelValue::Float(_) => ((l as f64).into(), rhs),
+                CelValue::Bool(b) => (lhs, (b as u64).into()),
                 _ => (lhs, rhs),
             }
-        } else if let CelValue::Float(_) = lhs.as_ref() {
-            match rhs.as_ref() {
-                CelValue::Int(i) => (lhs, Cow::Owned((*i as f64).into())),
-                CelValue::UInt(u) => (lhs, Cow::Owned((*u as f64).into())),
+        } else if let CelValue::Float(_) = lhs {
+            match rhs {
+                CelValue::Int(i) => (lhs, (i as f64).into()),
+                CelValue::UInt(u) => (lhs, (u as f64).into()),
                 CelValue::Float(_) => (lhs, rhs),
-                CelValue::Bool(b) => (lhs, Cow::Owned((if *b { 1.0 } else { 0.0 }).into())),
+                CelValue::Bool(b) => (lhs, (if b { 1.0 } else { 0.0 }).into()),
                 _ => (lhs, rhs),
             }
-        } else if let CelValue::Bool(l) = lhs.as_ref() {
-            match rhs.as_ref() {
-                CelValue::Int(_) => (Cow::Owned((*l as i64).into()), rhs),
-                CelValue::UInt(_) => (Cow::Owned((*l as u64).into()), rhs),
-                CelValue::Float(_) => (Cow::Owned((if *l { 1.0 } else { 0.0 }).into()), rhs),
+        } else if let CelValue::Bool(l) = lhs {
+            match rhs {
+                CelValue::Int(_) => ((l as i64).into(), rhs),
+                CelValue::UInt(_) => ((l as u64).into(), rhs),
+                CelValue::Float(_) => ((if l { 1.0 } else { 0.0 }).into(), rhs),
                 CelValue::Bool(_) => (lhs, rhs),
                 _ => (lhs, rhs),
             }
@@ -321,9 +317,9 @@ impl CelValue {
         }
     }
 
-    pub fn neq(&self, rhs: &CelValue) -> CelValue {
+    pub fn neq(self, rhs: CelValue) -> CelValue {
         self.error_prop_or(rhs, |lhs, rhs| {
-            if let CelValue::Bool(res) = CelValueDyn::eq(lhs, rhs) {
+            if let CelValue::Bool(res) = CelValueDyn::eq(&lhs, &rhs) {
                 return CelValue::from_bool(!res);
             }
 
@@ -331,21 +327,21 @@ impl CelValue {
         })
     }
 
-    fn ord(&self, rhs_value: &CelValue) -> CelResult<Option<Ordering>> {
+    fn ord(self, rhs_value: CelValue) -> CelResult<Option<Ordering>> {
         let type1 = self.as_type();
         let type2 = rhs_value.as_type();
 
-        let (lhs, rhs) = CelValue::type_prop(Cow::Borrowed(self), Cow::Borrowed(rhs_value));
+        let (lhs, rhs) = CelValue::type_prop(self, rhs_value);
 
-        match (lhs.as_ref(), rhs.as_ref()) {
-            (CelValue::Int(l), CelValue::Int(r)) => Ok(l.partial_cmp(r)),
-            (CelValue::UInt(l), CelValue::UInt(r)) => Ok(l.partial_cmp(r)),
-            (CelValue::Float(l), CelValue::Float(r)) => Ok(l.partial_cmp(r)),
-            (CelValue::Bool(l), CelValue::Bool(r)) => Ok(l.partial_cmp(r)),
-            (CelValue::String(l), CelValue::String(r)) => Ok(l.partial_cmp(r)),
-            (CelValue::Bytes(l), CelValue::Bytes(r)) => Ok(l.partial_cmp(r)),
-            (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) => Ok(l.partial_cmp(r)),
-            (CelValue::Duration(l), CelValue::Duration(r)) => Ok(l.partial_cmp(r)),
+        match (lhs, rhs) {
+            (CelValue::Int(l), CelValue::Int(r)) => Ok(l.partial_cmp(&r)),
+            (CelValue::UInt(l), CelValue::UInt(r)) => Ok(l.partial_cmp(&r)),
+            (CelValue::Float(l), CelValue::Float(r)) => Ok(l.partial_cmp(&r)),
+            (CelValue::Bool(l), CelValue::Bool(r)) => Ok(l.partial_cmp(&r)),
+            (CelValue::String(l), CelValue::String(r)) => Ok(l.partial_cmp(&r)),
+            (CelValue::Bytes(l), CelValue::Bytes(r)) => Ok(l.partial_cmp(&r)),
+            (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) => Ok(l.partial_cmp(&r)),
+            (CelValue::Duration(l), CelValue::Duration(r)) => Ok(l.partial_cmp(&r)),
             _ => Err(CelError::invalid_op(&format!(
                 "Invalid op 'ord' between {:?} and {:?}",
                 type1, type2
@@ -353,28 +349,28 @@ impl CelValue {
         }
     }
 
-    pub fn lt(&self, rhs: &CelValue) -> CelValue {
+    pub fn lt(self, rhs: CelValue) -> CelValue {
         self.error_prop_or(rhs, |lhs, rhs| match lhs.ord(rhs) {
             Ok(val) => (val == Some(Ordering::Less)).into(),
             Err(e) => e.into(),
         })
     }
 
-    pub fn gt(&self, rhs: &CelValue) -> CelValue {
+    pub fn gt(self, rhs: CelValue) -> CelValue {
         self.error_prop_or(rhs, |lhs, rhs| match lhs.ord(rhs) {
             Ok(val) => (val == Some(Ordering::Greater)).into(),
             Err(e) => e.into(),
         })
     }
 
-    pub fn le(&self, rhs: &CelValue) -> CelValue {
+    pub fn le(self, rhs: CelValue) -> CelValue {
         self.error_prop_or(rhs, |lhs, rhs| match lhs.ord(rhs) {
             Ok(val) => (val == Some(Ordering::Less) || val == Some(Ordering::Equal)).into(),
             Err(e) => e.into(),
         })
     }
 
-    pub fn ge(&self, rhs: &CelValue) -> CelValue {
+    pub fn ge(self, rhs: CelValue) -> CelValue {
         self.error_prop_or(rhs, |lhs, rhs| match lhs.ord(rhs) {
             Ok(val) => (val == Some(Ordering::Greater) || val == Some(Ordering::Equal)).into(),
             Err(e) => e.into(),
@@ -431,7 +427,7 @@ impl CelValue {
         )))
     }
 
-    pub fn in_(&self, rhs: &CelValue) -> CelValue {
+    pub fn in_(self, rhs: CelValue) -> CelValue {
         self.error_prop_or(rhs, |lhs, rhs| {
             let rhs_type = rhs.as_type();
             let lhs_type = lhs.as_type();
@@ -439,7 +435,7 @@ impl CelValue {
             match rhs {
                 CelValue::List(l) => {
                     for value in l.iter() {
-                        if *lhs == *value {
+                        if lhs == *value {
                             return true.into();
                         }
                     }
@@ -448,7 +444,7 @@ impl CelValue {
                 }
                 CelValue::Map(m) => {
                     if let CelValue::String(r) = lhs {
-                        CelValue::from_bool(m.contains_key(r))
+                        CelValue::from_bool(m.contains_key(&r))
                     } else {
                         CelValue::from_err(CelError::invalid_op(&format!(
                             "Op 'in' invalid between {:?} and {:?}",
@@ -458,7 +454,7 @@ impl CelValue {
                 }
                 CelValue::String(s) => {
                     if let CelValue::String(r) = lhs {
-                        CelValue::from_bool(s.contains(r))
+                        CelValue::from_bool(s.contains(&r))
                     } else {
                         CelValue::from_err(CelError::invalid_op(&format!(
                             "Op 'in' invalid between {:?} and {:?}",
@@ -474,7 +470,7 @@ impl CelValue {
         })
     }
 
-    pub fn and(&self, rhs: &CelValue) -> CelValue {
+    pub fn and(self, rhs: CelValue) -> CelValue {
         self.error_prop_or(rhs, |lhs, rhs| {
             if cfg!(feature = "type_prop") {
                 return (lhs.is_truthy() && rhs.is_truthy()).into();
@@ -482,7 +478,7 @@ impl CelValue {
 
             if let CelValue::Bool(lhs) = lhs {
                 if let CelValue::Bool(rhs) = rhs {
-                    return (*lhs && *rhs).into();
+                    return (lhs && rhs).into();
                 }
             }
 
@@ -495,32 +491,31 @@ impl CelValue {
     }
 
     #[inline]
-    // TODO: This shouldn't borrow
-    fn error_prop_or<F>(&self, rhs: &CelValue, f: F) -> CelValue
+    fn error_prop_or<F>(self, rhs: CelValue, f: F) -> CelValue
     where
-        F: Fn(&CelValue, &CelValue) -> CelValue,
+        F: Fn(CelValue, CelValue) -> CelValue,
     {
         if self.is_err() {
             self.clone()
         } else if rhs.is_err() {
-            rhs.clone()
+            rhs
         } else {
             f(self, rhs)
         }
     }
 
-    pub fn index(&self, ival: &CelValue) -> CelValue {
-        self.error_prop_or(ival, |obj, index| {
-            if let CelValue::List(list) = obj {
+    pub fn index(self, ival: CelValue) -> CelValue {
+        self.error_prop_or(ival, |obj, index| match obj {
+            CelValue::List(list) => {
                 let index = if let CelValue::UInt(ref index) = index {
                     *index as usize
                 } else if let CelValue::Int(index) = index {
-                    if *index < 0 {
+                    if index < 0 {
                         return CelValue::from_err(CelError::value(
                             "Negative index is not allowed",
                         ));
                     }
-                    *index as usize
+                    index as usize
                 } else {
                     return CelValue::from_err(CelError::value(
                         "List index can only be int or uint",
@@ -532,7 +527,8 @@ impl CelValue {
                 }
 
                 return list[index].clone();
-            } else if let CelValue::Map(map) = obj {
+            }
+            CelValue::Map(map) => {
                 if let CelValue::String(index) = index {
                     match map.get(index.as_str()) {
                         Some(val) => return val.clone(),
@@ -540,17 +536,28 @@ impl CelValue {
                             return CelValue::from_err(CelError::attribute("obj", &index));
                         }
                     }
-                }
-            } else if let CelValue::Dyn(d) = obj {
-                if let CelValue::String(index) = index {
-                    return d.access(&index);
+                } else {
+                    CelValue::from_err(CelError::value(&format!(
+                        "Map index operator mush be a string, found {:?}",
+                        index.as_type()
+                    )))
                 }
             }
-            return CelValue::from_err(CelError::value(&format!(
+            CelValue::Dyn(d) => {
+                if let CelValue::String(index) = index {
+                    return d.access(&index);
+                } else {
+                    CelValue::from_err(CelError::value(&format!(
+                        "Dyn index operator mush be a string, found {:?}",
+                        index.as_type()
+                    )))
+                }
+            }
+            _ => CelValue::from_err(CelError::value(&format!(
                 "Index operator invalid between {:?} and {:?}",
                 index.as_type(),
                 obj.as_type()
-            )));
+            ))),
         })
     }
 }
@@ -572,9 +579,9 @@ impl CelValueDyn for CelValue {
             CelValue::TimeStamp(_) => CelValue::timestamp_type(),
             CelValue::Duration(_) => CelValue::duration_type(),
             CelValue::ByteCode(_) => CelValue::bytecode_type(),
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             CelValue::Message(msg) => CelValue::message_type(&msg.descriptor_dyn()),
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             CelValue::Enum {
                 descriptor,
                 value: _value,
@@ -597,7 +604,7 @@ impl CelValueDyn for CelValue {
                 None => CelValue::from_err(CelError::attribute("obj", key)),
             },
             CelValue::Dyn(ref d) => d.access(key),
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             CelValue::Message(msg) => {
                 let desc = msg.descriptor_dyn();
 
@@ -615,119 +622,120 @@ impl CelValueDyn for CelValue {
     }
 
     fn eq(&self, rhs_val: &CelValue) -> CelValue {
-        self.error_prop_or(rhs_val, |lhs_val, rhs_val| {
-            let rhs = if let CelValue::Dyn(d) = rhs_val {
-                match d.any_ref().downcast_ref::<CelValue>() {
-                    Some(v) => v,
-                    None => rhs_val,
-                }
-            } else {
-                rhs_val
-            };
+        self.clone()
+            .error_prop_or(rhs_val.clone(), |lhs_val, rhs_val| {
+                let rhs = if let CelValue::Dyn(d) = rhs_val {
+                    match d.any_ref().downcast_ref::<CelValue>() {
+                        Some(v) => v.clone(),
+                        None => CelValue::Dyn(d),
+                    }
+                } else {
+                    rhs_val
+                };
 
-            let (lhs, rhs) = CelValue::type_prop(Cow::Borrowed(lhs_val), Cow::Borrowed(rhs));
+                let (lhs, rhs) = CelValue::type_prop(lhs_val, rhs);
 
-            match (lhs.as_ref(), rhs.as_ref()) {
-                (CelValue::Int(l), CelValue::Int(r)) => CelValue::from_bool(l == r),
-                (CelValue::UInt(l), CelValue::UInt(r)) => CelValue::from_bool(l == r),
-                (CelValue::Float(l), CelValue::Float(r)) => CelValue::from_bool(l == r),
-                (CelValue::Bool(l), CelValue::Bool(r)) => CelValue::from_bool(l == r),
-                (CelValue::String(l), CelValue::String(r)) => CelValue::from_bool(l == r),
-                (CelValue::Bytes(l), CelValue::Bytes(r)) => CelValue::from_bool(l == r),
-                (CelValue::List(l), CelValue::List(r)) => {
-                    if l.len() != r.len() {
-                        CelValue::false_()
-                    } else {
-                        for (v1, v2) in zip(l, r) {
-                            match CelValueDyn::eq(v1, &v2) {
-                                CelValue::Err(err) => return CelValue::from_err(err),
-                                other => {
-                                    if !other.is_true() {
-                                        return CelValue::false_();
+                match (lhs, rhs) {
+                    (CelValue::Int(l), CelValue::Int(r)) => CelValue::from_bool(l == r),
+                    (CelValue::UInt(l), CelValue::UInt(r)) => CelValue::from_bool(l == r),
+                    (CelValue::Float(l), CelValue::Float(r)) => CelValue::from_bool(l == r),
+                    (CelValue::Bool(l), CelValue::Bool(r)) => CelValue::from_bool(l == r),
+                    (CelValue::String(l), CelValue::String(r)) => CelValue::from_bool(l == r),
+                    (CelValue::Bytes(l), CelValue::Bytes(r)) => CelValue::from_bool(l == r),
+                    (CelValue::List(l), CelValue::List(r)) => {
+                        if l.len() != r.len() {
+                            CelValue::false_()
+                        } else {
+                            for (v1, v2) in zip(l, r) {
+                                match CelValueDyn::eq(&v1, &v2) {
+                                    CelValue::Err(err) => return CelValue::from_err(err),
+                                    other => {
+                                        if !other.is_true() {
+                                            return CelValue::false_();
+                                        }
                                     }
                                 }
                             }
+                            CelValue::true_()
                         }
-                        CelValue::true_()
                     }
-                }
-                (CelValue::Map(l), CelValue::Map(r)) => {
-                    let mut r = r.clone();
+                    (CelValue::Map(l), CelValue::Map(r)) => {
+                        let mut r = r.clone();
 
-                    for (k, v1) in l.into_iter() {
-                        if let Some(v2) = r.remove(k) {
-                            if !CelValueDyn::eq(v1, &v2).is_true() {
+                        for (k, v1) in l.into_iter() {
+                            if let Some(v2) = r.remove(&k) {
+                                if !CelValueDyn::eq(&v1, &v2).is_true() {
+                                    return CelValue::false_();
+                                }
+                            } else {
                                 return CelValue::false_();
                             }
-                        } else {
+                        }
+
+                        if !r.is_empty() {
                             return CelValue::false_();
                         }
-                    }
 
-                    if !r.is_empty() {
-                        return CelValue::false_();
-                    }
-
-                    CelValue::true_()
-                }
-                (&CelValue::Null, &CelValue::Null) => CelValue::true_(),
-                (CelValue::Null, _) => CelValue::false_(),
-                (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) => CelValue::from_bool(l == r),
-                (CelValue::Duration(l), CelValue::Duration(r)) => CelValue::from_bool(l == r),
-                (CelValue::Type(l), CelValue::Type(r)) => CelValue::from_bool(l == r),
-                #[cfg(protobuf)]
-                (CelValue::Message(l), CelValue::Message(r)) => {
-                    CelValue::from_bool(l.descriptor_dyn().eq(l.as_ref(), r.as_ref()))
-                }
-                #[cfg(protobuf)]
-                (
-                    CelValue::Enum {
-                        descriptor: l_desc,
-                        value: l_value,
-                    },
-                    CelValue::Enum {
-                        descriptor: r_desc,
-                        value: r_value,
-                    },
-                ) => CelValue::from_bool(l_value == r_value && l_desc == r_desc),
-                #[cfg(protobuf)]
-                (
-                    CelValue::Enum {
-                        descriptor: _l_desc,
-                        value: l_value,
-                    },
-                    CelValue::Int(intval),
-                ) => CelValue::from_bool(*intval == (*l_value as i64)),
-                #[cfg(protobuf)]
-                (
-                    CelValue::Enum {
-                        descriptor: _l_desc,
-                        value: l_value,
-                    },
-                    CelValue::UInt(intval),
-                ) => CelValue::from_bool(*intval == (*l_value as u64)),
-                #[cfg(protobuf)]
-                (
-                    CelValue::Enum {
-                        descriptor: l_desc,
-                        value: _l_value,
-                    },
-                    CelValue::String(strval),
-                ) => {
-                    if let Some(_) = l_desc.value_by_name(strval) {
                         CelValue::true_()
-                    } else {
-                        CelValue::false_()
                     }
+                    (CelValue::Null, CelValue::Null) => CelValue::true_(),
+                    (CelValue::Null, _) => CelValue::false_(),
+                    (CelValue::TimeStamp(l), CelValue::TimeStamp(r)) => CelValue::from_bool(l == r),
+                    (CelValue::Duration(l), CelValue::Duration(r)) => CelValue::from_bool(l == r),
+                    (CelValue::Type(l), CelValue::Type(r)) => CelValue::from_bool(l == r),
+                    #[cfg(feature = "protobuf")]
+                    (CelValue::Message(l), CelValue::Message(r)) => {
+                        CelValue::from_bool(l.descriptor_dyn().eq(l.as_ref(), r.as_ref()))
+                    }
+                    #[cfg(feature = "protobuf")]
+                    (
+                        CelValue::Enum {
+                            descriptor: l_desc,
+                            value: l_value,
+                        },
+                        CelValue::Enum {
+                            descriptor: r_desc,
+                            value: r_value,
+                        },
+                    ) => CelValue::from_bool(l_value == r_value && l_desc == r_desc),
+                    #[cfg(feature = "protobuf")]
+                    (
+                        CelValue::Enum {
+                            descriptor: _l_desc,
+                            value: l_value,
+                        },
+                        CelValue::Int(intval),
+                    ) => CelValue::from_bool(intval == (l_value as i64)),
+                    #[cfg(feature = "protobuf")]
+                    (
+                        CelValue::Enum {
+                            descriptor: _l_desc,
+                            value: l_value,
+                        },
+                        CelValue::UInt(intval),
+                    ) => CelValue::from_bool(intval == (l_value as u64)),
+                    #[cfg(feature = "protobuf")]
+                    (
+                        CelValue::Enum {
+                            descriptor: l_desc,
+                            value: _l_value,
+                        },
+                        CelValue::String(strval),
+                    ) => {
+                        if let Some(_) = l_desc.value_by_name(&strval) {
+                            CelValue::true_()
+                        } else {
+                            CelValue::false_()
+                        }
+                    }
+                    (CelValue::Dyn(d), rhs) => d.eq(&rhs),
+                    // (_a, _b) => CelValue::from_err(CelError::invalid_op(&format!(
+                    //     "Invalid op '==' between {:?} and {:?}",
+                    //     type1, type2
+                    // ))),
+                    (_a, _b) => CelValue::false_(),
                 }
-                (CelValue::Dyn(d), rhs) => d.eq(rhs),
-                // (_a, _b) => CelValue::from_err(CelError::invalid_op(&format!(
-                //     "Invalid op '==' between {:?} and {:?}",
-                //     type1, type2
-                // ))),
-                (_a, _b) => CelValue::false_(),
-            }
-        })
+            })
     }
 
     fn is_truthy(&self) -> bool {
@@ -744,12 +752,12 @@ impl CelValueDyn for CelValue {
             CelValue::Type(_) => true,
             CelValue::TimeStamp(_) => true,
             CelValue::Duration(_) => true,
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             CelValue::Enum {
                 descriptor: _,
                 value,
             } => *value != 0,
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             CelValue::Message(_) => true,
             CelValue::Dyn(obj) => obj.is_truthy(),
             CelValue::Err(_) => false,
@@ -838,7 +846,7 @@ impl From<Value> for CelValue {
     }
 }
 
-#[cfg(protobuf)]
+#[cfg(feature = "protobuf")]
 impl<'a> From<ReflectValueRef<'a>> for CelValue {
     fn from(value: ReflectValueRef) -> Self {
         match value {
@@ -1060,13 +1068,13 @@ impl TryInto<HashMap<String, CelValue>> for CelValue {
 
 impl From<DateTime<Utc>> for CelValue {
     fn from(val: DateTime<Utc>) -> CelValue {
-        CelValue::from_timestamp(&val)
+        CelValue::from_timestamp(val)
     }
 }
 
 impl From<DateTime<FixedOffset>> for CelValue {
     fn from(val: DateTime<FixedOffset>) -> CelValue {
-        CelValue::from_timestamp(&(val.into()))
+        CelValue::from_timestamp(val.into())
     }
 }
 
@@ -1084,7 +1092,7 @@ impl TryInto<DateTime<Utc>> for CelValue {
 
 impl From<Duration> for CelValue {
     fn from(val: Duration) -> CelValue {
-        CelValue::from_duration(&val)
+        CelValue::from_duration(val)
     }
 }
 
@@ -1102,7 +1110,7 @@ impl TryInto<Duration> for CelValue {
 
 impl From<Vec<ByteCode>> for CelValue {
     fn from(val: Vec<ByteCode>) -> CelValue {
-        CelValue::from_bytecode(&val)
+        CelValue::from_bytecode(val)
     }
 }
 
@@ -1150,11 +1158,11 @@ impl PartialEq for CelValue {
             lhs == rhs
         } else {
             match (self, other) {
-                #[cfg(protbuf)]
+                #[cfg(feature = "protobuf")]
                 (CelValue::Message(lhs), CelValue::Message(rhs)) => {
                     lhs.descriptor_dyn().eq(lhs.as_ref(), rhs.as_ref())
                 }
-                #[cfg(protbuf)]
+                #[cfg(feature = "protobuf")]
                 (
                     CelValue::Enum {
                         descriptor: lhs_descriptor,
@@ -1175,60 +1183,60 @@ impl Add for CelValue {
     type Output = CelValue;
 
     fn add(self, rhs_val: Self) -> Self::Output {
-        self.error_prop_or(&rhs_val, |lhs_val, rhs_val| {
+        self.error_prop_or(rhs_val, |lhs_val, rhs_val| {
             let type1 = lhs_val.as_type();
             let type2 = rhs_val.as_type();
 
             let (lhs, rhs) = if cfg!(feature = "type_prop") {
-                CelValue::type_prop(Cow::Borrowed(lhs_val), Cow::Borrowed(rhs_val))
+                CelValue::type_prop(lhs_val, rhs_val)
             } else {
-                (Cow::Borrowed(lhs_val), Cow::Borrowed(rhs_val))
+                (lhs_val, rhs_val)
             };
 
-            match lhs.into_owned() {
+            match lhs {
                 CelValue::Int(val1) => {
-                    if let CelValue::Int(val2) = rhs.into_owned() {
+                    if let CelValue::Int(val2) = rhs {
                         return CelValue::from(val1 + val2);
                     }
                 }
                 CelValue::UInt(val1) => {
-                    if let CelValue::UInt(val2) = rhs.into_owned() {
+                    if let CelValue::UInt(val2) = rhs {
                         return CelValue::from(val1 + val2);
                     }
                 }
                 CelValue::Float(val1) => {
-                    if let CelValue::Float(val2) = rhs.into_owned() {
+                    if let CelValue::Float(val2) = rhs {
                         return CelValue::from(val1 + val2);
                     }
                 }
                 CelValue::String(val1) => {
-                    if let CelValue::String(val2) = rhs.into_owned() {
+                    if let CelValue::String(val2) = rhs {
                         let mut res = val1;
                         res.push_str(&val2);
                         return CelValue::from_str(res.as_ref());
                     }
                 }
                 CelValue::Bytes(val1) => {
-                    if let CelValue::Bytes(val2) = rhs.into_owned() {
+                    if let CelValue::Bytes(val2) = rhs {
                         let mut res = val1;
                         res.extend_from_slice(&val2);
                         return CelValue::from_byte_slice(res.as_ref());
                     }
                 }
                 CelValue::List(val1) => {
-                    if let CelValue::List(val2) = rhs.into_owned() {
+                    if let CelValue::List(val2) = rhs {
                         let mut res = val1;
                         res.extend_from_slice(&val2);
                         return CelValue::from_val_slice(res.as_ref());
                     }
                 }
                 CelValue::TimeStamp(v1) => {
-                    if let CelValue::Duration(v2) = rhs.into_owned() {
-                        return CelValue::from_timestamp(&(v1 + v2));
+                    if let CelValue::Duration(v2) = rhs {
+                        return CelValue::from_timestamp(v1 + v2);
                     }
                 }
-                CelValue::Duration(v1) => match rhs.into_owned() {
-                    CelValue::TimeStamp(v2) => return CelValue::from_timestamp(&(v2 + v1)),
+                CelValue::Duration(v1) => match rhs {
+                    CelValue::TimeStamp(v2) => return CelValue::from_timestamp(v2 + v1),
                     CelValue::Duration(v2) => return CelValue::Duration(v1 + v2),
                     _ => {}
                 },
@@ -1247,40 +1255,40 @@ impl Sub for CelValue {
     type Output = CelValue;
 
     fn sub(self, rhs_val: Self) -> Self::Output {
-        self.error_prop_or(&rhs_val, |lhs_val, rhs_val| {
+        self.error_prop_or(rhs_val, |lhs_val, rhs_val| {
             let type1 = lhs_val.as_type();
             let type2 = rhs_val.as_type();
 
             let (lhs, rhs) = if cfg!(feature = "type_prop") {
-                CelValue::type_prop(Cow::Borrowed(lhs_val), Cow::Borrowed(rhs_val))
+                CelValue::type_prop(lhs_val, rhs_val)
             } else {
-                (Cow::Borrowed(lhs_val), Cow::Borrowed(rhs_val))
+                (lhs_val, rhs_val)
             };
 
-            match lhs.into_owned() {
+            match lhs {
                 CelValue::Int(val1) => {
-                    if let CelValue::Int(val2) = rhs.into_owned() {
+                    if let CelValue::Int(val2) = rhs {
                         return CelValue::from(val1 - val2);
                     }
                 }
                 CelValue::UInt(val1) => {
-                    if let CelValue::UInt(val2) = rhs.into_owned() {
+                    if let CelValue::UInt(val2) = rhs {
                         return CelValue::from(val1 - val2);
                     }
                 }
                 CelValue::Float(val1) => {
-                    if let CelValue::Float(val2) = rhs.into_owned() {
+                    if let CelValue::Float(val2) = rhs {
                         return CelValue::from(val1 - val2);
                     }
                 }
                 CelValue::TimeStamp(v1) => {
-                    if let CelValue::Duration(v2) = rhs.into_owned() {
-                        return CelValue::from_timestamp(&(v1 - v2));
+                    if let CelValue::Duration(v2) = rhs {
+                        return CelValue::from_timestamp(v1 - v2);
                     }
                 }
-                CelValue::Duration(v1) => match rhs.into_owned() {
-                    CelValue::TimeStamp(v2) => return CelValue::from_timestamp(&(v2 - v1)),
-                    CelValue::Duration(v2) => return CelValue::from_duration(&(v1 - v2)),
+                CelValue::Duration(v1) => match rhs {
+                    CelValue::TimeStamp(v2) => return CelValue::from_timestamp(v2 - v1),
+                    CelValue::Duration(v2) => return CelValue::from_duration(v1 - v2),
                     _ => {}
                 },
                 _ => {}
@@ -1298,29 +1306,29 @@ impl Mul for CelValue {
     type Output = CelValue;
 
     fn mul(self, rhs_val: Self) -> Self::Output {
-        self.error_prop_or(&rhs_val, |lhs_val, rhs_val| {
-            let type1 = self.as_type();
+        self.error_prop_or(rhs_val, |lhs_val, rhs_val| {
+            let type1 = lhs_val.as_type();
             let type2 = rhs_val.as_type();
 
             let (lhs, rhs) = if cfg!(feature = "type_prop") {
-                CelValue::type_prop(Cow::Borrowed(lhs_val), Cow::Borrowed(rhs_val))
+                CelValue::type_prop(lhs_val, rhs_val)
             } else {
-                (Cow::Borrowed(lhs_val), Cow::Borrowed(rhs_val))
+                (lhs_val, rhs_val)
             };
 
-            match lhs.into_owned() {
+            match lhs {
                 CelValue::Int(val1) => {
-                    if let CelValue::Int(val2) = rhs.into_owned() {
+                    if let CelValue::Int(val2) = rhs {
                         return CelValue::from(val1 * val2);
                     }
                 }
                 CelValue::UInt(val1) => {
-                    if let CelValue::UInt(val2) = rhs.into_owned() {
+                    if let CelValue::UInt(val2) = rhs {
                         return CelValue::from(val1 * val2);
                     }
                 }
                 CelValue::Float(val1) => {
-                    if let CelValue::Float(val2) = rhs.into_owned() {
+                    if let CelValue::Float(val2) = rhs {
                         return CelValue::from(val1 * val2);
                     }
                 }
@@ -1339,19 +1347,19 @@ impl Div for CelValue {
     type Output = CelValue;
 
     fn div(self, rhs_val: Self) -> Self::Output {
-        self.error_prop_or(&rhs_val, |lhs_val, rhs_val| {
+        self.error_prop_or(rhs_val, |lhs_val, rhs_val| {
             let type1 = lhs_val.as_type();
             let type2 = rhs_val.as_type();
 
             let (lhs, rhs) = if cfg!(feature = "type_prop") {
-                CelValue::type_prop(Cow::Borrowed(lhs_val), Cow::Borrowed(rhs_val))
+                CelValue::type_prop(lhs_val, rhs_val)
             } else {
-                (Cow::Borrowed(lhs_val), Cow::Borrowed(rhs_val))
+                (lhs_val, rhs_val)
             };
 
-            match lhs.into_owned() {
+            match lhs {
                 CelValue::Int(val1) => {
-                    if let CelValue::Int(val2) = rhs.into_owned() {
+                    if let CelValue::Int(val2) = rhs {
                         if val2 == 0 {
                             return CelValue::from_err(CelError::DivideByZero);
                         }
@@ -1360,7 +1368,7 @@ impl Div for CelValue {
                     }
                 }
                 CelValue::UInt(val1) => {
-                    if let CelValue::UInt(val2) = rhs.into_owned() {
+                    if let CelValue::UInt(val2) = rhs {
                         if val2 == 0 {
                             return CelValue::from_err(CelError::DivideByZero);
                         }
@@ -1369,7 +1377,7 @@ impl Div for CelValue {
                     }
                 }
                 CelValue::Float(val1) => {
-                    if let CelValue::Float(val2) = rhs.into_owned() {
+                    if let CelValue::Float(val2) = rhs {
                         return CelValue::from(val1 / val2);
                     }
                 }
@@ -1388,24 +1396,24 @@ impl Rem for CelValue {
     type Output = CelValue;
 
     fn rem(self, rhs_val: Self) -> Self::Output {
-        self.error_prop_or(&rhs_val, |lhs_val, rhs_val| {
+        self.error_prop_or(rhs_val, |lhs_val, rhs_val| {
             let type1 = lhs_val.as_type();
             let type2 = rhs_val.as_type();
 
             let (lhs, rhs) = if cfg!(feature = "type_prop") {
-                CelValue::type_prop(Cow::Borrowed(lhs_val), Cow::Borrowed(rhs_val))
+                CelValue::type_prop(lhs_val, rhs_val)
             } else {
-                (Cow::Borrowed(lhs_val), Cow::Borrowed(rhs_val))
+                (lhs_val, rhs_val)
             };
 
-            match lhs.into_owned() {
+            match lhs {
                 CelValue::Int(val1) => {
-                    if let CelValue::Int(val2) = rhs.into_owned() {
+                    if let CelValue::Int(val2) = rhs {
                         return CelValue::from(val1 % val2);
                     }
                 }
                 CelValue::UInt(val1) => {
-                    if let CelValue::UInt(val2) = rhs.into_owned() {
+                    if let CelValue::UInt(val2) = rhs {
                         return CelValue::from(val1 % val2);
                     }
                 }
@@ -1499,9 +1507,9 @@ impl fmt::Display for CelValue {
             TimeStamp(val) => write!(f, "{}", val),
             Duration(val) => write!(f, "{}", val),
             ByteCode(val) => write!(f, "{:?}", val),
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             Message(msg) => write!(f, "{}", msg.as_ref()),
-            #[cfg(protobuf)]
+            #[cfg(feature = "protobuf")]
             Enum { descriptor, value } => {
                 if let Some(v) = descriptor.value_by_number(*value) {
                     write!(f, "{}::{} ({})", descriptor.full_name(), v.name(), value)

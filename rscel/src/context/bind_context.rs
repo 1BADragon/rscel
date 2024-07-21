@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[cfg(protobuf)]
+#[cfg(feature = "protobuf")]
 use protobuf::MessageDyn;
 use serde_json::Value;
 
@@ -38,7 +38,7 @@ use super::{default_funcs::load_default_funcs, type_funcs::load_default_types};
 ///     }
 /// }
 /// ```
-pub type RsCelFunction = dyn Fn(CelValue, &[CelValue]) -> CelValue;
+pub type RsCelFunction = dyn Fn(CelValue, Vec<CelValue>) -> CelValue;
 
 /// Prototype for a macro binding.
 ///
@@ -100,7 +100,7 @@ impl<'a> BindContext<'a> {
         Ok(())
     }
 
-    #[cfg(protobuf)]
+    #[cfg(feature = "protobuf")]
     pub fn bind_param_proto_msg(&mut self, name: &str, msg: Box<dyn MessageDyn>) {
         self.params
             .insert(name.to_owned(), CelValue::from_proto_msg(msg));

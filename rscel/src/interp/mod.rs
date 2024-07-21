@@ -170,7 +170,7 @@ impl<'a> Interpreter<'a> {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.and(&v2))
+                    stack.push_val(v1.and(v2))
                 }
                 ByteCode::Not => {
                     let v1 = stack.pop_val()?;
@@ -216,13 +216,13 @@ impl<'a> Interpreter<'a> {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.lt(&v2));
+                    stack.push_val(v1.lt(v2));
                 }
                 ByteCode::Le => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.le(&v2));
+                    stack.push_val(v1.le(v2));
                 }
                 ByteCode::Eq => {
                     let v2 = stack.pop_val()?;
@@ -234,25 +234,25 @@ impl<'a> Interpreter<'a> {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.neq(&v2));
+                    stack.push_val(v1.neq(v2));
                 }
                 ByteCode::Ge => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.ge(&v2));
+                    stack.push_val(v1.ge(v2));
                 }
                 ByteCode::Gt => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
 
-                    stack.push_val(v1.gt(&v2));
+                    stack.push_val(v1.gt(v2));
                 }
                 ByteCode::In => {
                     let rhs = stack.pop_val()?;
                     let lhs = stack.pop_val()?;
 
-                    stack.push_val(lhs.in_(&rhs));
+                    stack.push_val(lhs.in_(rhs));
                 }
                 ByteCode::Jmp(dist) => pc = pc + *dist as usize,
                 ByteCode::JmpCond {
@@ -332,7 +332,7 @@ impl<'a> Interpreter<'a> {
                     let index = stack.pop_val()?;
                     let obj = stack.pop_val()?;
 
-                    stack.push_val(obj.index(&index));
+                    stack.push_val(obj.index(index));
                 }
                 ByteCode::Access => {
                     let index = stack.pop_noresolve()?;
@@ -358,7 +358,7 @@ impl<'a> Interpreter<'a> {
                                     }
                                 },
                             },
-                            #[cfg(protobuf)]
+                            #[cfg(feature = "protobuf")]
                             CelValue::Message(msg) => {
                                 let desc = msg.descriptor_dyn();
 
@@ -421,7 +421,7 @@ impl<'a> Interpreter<'a> {
                         CelStackValue::BoundCall { callable, value } => match callable {
                             RsCallable::Function(func) => {
                                 let arg_values = self.resolve_args(args)?;
-                                stack.push_val(func(value, &arg_values));
+                                stack.push_val(func(value, arg_values));
                             }
                             RsCallable::Macro(macro_) => {
                                 stack.push_val(self.call_macro(&value, &args, macro_)?);
@@ -431,7 +431,7 @@ impl<'a> Interpreter<'a> {
                             CelValue::Ident(func_name) => {
                                 if let Some(func) = self.get_func_by_name(&func_name) {
                                     let arg_values = self.resolve_args(args)?;
-                                    stack.push_val(func(CelValue::from_null(), &arg_values));
+                                    stack.push_val(func(CelValue::from_null(), arg_values));
                                 } else if let Some(macro_) = self.get_macro_by_name(&func_name) {
                                     stack.push_val(self.call_macro(
                                         &CelValue::from_null(),
@@ -442,7 +442,7 @@ impl<'a> Interpreter<'a> {
                                     self.get_type_by_name(&func_name)
                                 {
                                     let arg_values = self.resolve_args(args)?;
-                                    stack.push_val(construct_type(type_name, &arg_values));
+                                    stack.push_val(construct_type(type_name, arg_values));
                                 } else {
                                     stack.push_val(CelValue::from_err(CelError::runtime(
                                         &format!("{} is not callable", func_name),
@@ -451,7 +451,7 @@ impl<'a> Interpreter<'a> {
                             }
                             CelValue::Type(type_name) => {
                                 let arg_values = self.resolve_args(args)?;
-                                stack.push_val(construct_type(&type_name, &arg_values));
+                                stack.push_val(construct_type(&type_name, arg_values));
                             }
                             other => stack.push_val(
                                 CelValue::from_err(CelError::runtime(&format!(
@@ -462,6 +462,25 @@ impl<'a> Interpreter<'a> {
                             ),
                         },
                     };
+                }
+                ByteCode::FmtString(nsegments) => {
+                    let mut segments = Vec::new();
+                    for _ in 0..*nsegments {
+                        segments.push(stack.pop_val()?);
+                    }
+
+                    let mut working = String::new();
+                    for seg in segments.into_iter().rev() {
+                        if let CelValue::String(s) = seg {
+                            working.push_str(&s)
+                        } else {
+                            return Err(CelError::Runtime(
+                                "Expected string from format string specifier".to_string(),
+                            ));
+                        }
+                    }
+
+                    stack.push_val(CelValue::String(working));
                 }
             };
         }

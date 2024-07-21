@@ -1,11 +1,16 @@
 use super::{
-    input_scanner::StringScanner, syntax_error::SyntaxError, tokenizer::Tokenizer, tokens::Token,
+    source_location::SourceLocation,
+    source_range::SourceRange,
+    string_scanner::StringScanner,
+    syntax_error::SyntaxError,
+    tokenizer::{TokenWithLoc, Tokenizer},
+    tokens::{FStringSegment, Token},
 };
 
 pub struct StringTokenizer<'l> {
     scanner: StringScanner<'l>,
 
-    current: Option<Token>,
+    current: Option<TokenWithLoc>,
 
     eof: bool,
 }
@@ -19,8 +24,9 @@ impl<'l> StringTokenizer<'l> {
         }
     }
 
-    fn collect_next_token(&mut self) -> Result<Option<Token>, SyntaxError> {
+    fn collect_next_token(&mut self) -> Result<Option<TokenWithLoc>, SyntaxError> {
         let mut tmp = [0; 4];
+        let mut token_start = self.location();
         let mut curr_char = self.scanner.next();
 
         if self.eof {
@@ -30,6 +36,7 @@ impl<'l> StringTokenizer<'l> {
         'outer: loop {
             match curr_char {
                 Some(' ') | Some('\t') | Some('\n') => {
+                    token_start = self.location();
                     curr_char = self.scanner.next();
                 }
                 _ => break 'outer,
@@ -119,25 +126,35 @@ impl<'l> StringTokenizer<'l> {
                         self.parse_keywords_or_ident("b", &[])
                     }
                 }
-                'f' => self.parse_keywords_or_ident("f", &[("false", Token::BoolLit(false))]),
+                'f' => {
+                    if let Some('\'') = self.scanner.peek() {
+                        self.scanner.next();
+                        self.parse_string_literal('\'', false, true)
+                    } else if let Some('"') = self.scanner.peek() {
+                        self.scanner.next();
+                        self.parse_string_literal('"', false, true)
+                    } else {
+                        self.parse_keywords_or_ident("f", &[("false", Token::BoolLit(false))])
+                    }
+                }
                 'i' => self.parse_keywords_or_ident("i", &[("in", Token::In)]),
                 'n' => self.parse_keywords_or_ident("n", &[("null", Token::Null)]),
                 'r' => {
                     if let Some('\'') = self.scanner.peek() {
                         self.scanner.next();
-                        self.parse_string_literal('\'', true)
+                        self.parse_string_literal('\'', true, false)
                     } else if let Some('"') = self.scanner.peek() {
                         self.scanner.next();
-                        self.parse_string_literal('"', true)
+                        self.parse_string_literal('"', true, false)
                     } else {
                         self.parse_keywords_or_ident("r", &[])
                     }
                 }
                 't' => self.parse_keywords_or_ident("t", &[("true", Token::BoolLit(true))]),
                 '0'..='9' => self.parse_number_or_token(input_char.encode_utf8(&mut tmp)),
-                '\'' | '"' => self.parse_string_literal(input_char, false),
+                '\'' | '"' => self.parse_string_literal(input_char, false, false),
                 '_' | 'A'..='Z' | 'a'..='z' => {
-                    return self.parse_keywords_or_ident(&input_char.to_string(), &[]);
+                    self.parse_keywords_or_ident(&input_char.to_string(), &[])
                 }
                 other => {
                     return Err(SyntaxError::from_location(self.scanner.location())
@@ -160,7 +177,7 @@ impl<'l> StringTokenizer<'l> {
             }
         }
 
-        res
+        res.map(|o| o.map(|t| TokenWithLoc::new(t, SourceRange::new(token_start, self.location()))))
     }
 
     fn parse_bytes_literal(&mut self, starting: char) -> Result<Option<Token>, SyntaxError> {
@@ -180,7 +197,6 @@ impl<'l> StringTokenizer<'l> {
                 let escaped = if let Some(curr) = self.scanner.next() {
                     curr
                 } else {
-                    let (_line, _column) = self.scanner.location();
                     return Err(SyntaxError::from_location(self.scanner.location()));
                 };
 
@@ -237,8 +253,10 @@ impl<'l> StringTokenizer<'l> {
         &mut self,
         starting: char,
         is_raw: bool,
+        is_format: bool,
     ) -> Result<Option<Token>, SyntaxError> {
         let mut working = String::new();
+        let mut segments = Vec::new();
 
         'outer: loop {
             let curr = if let Some(curr) = self.scanner.next() {
@@ -253,7 +271,6 @@ impl<'l> StringTokenizer<'l> {
                 let escaped = if let Some(curr) = self.scanner.next() {
                     curr
                 } else {
-                    let (_line, _column) = self.scanner.location();
                     return Err(SyntaxError::from_location(self.scanner.location()));
                 };
 
@@ -302,12 +319,82 @@ impl<'l> StringTokenizer<'l> {
                     }
                     other => working.push(other),
                 }
+            } else if curr == '{' && is_format {
+                let escaped = if let Some(curr) = self.scanner.next() {
+                    curr
+                } else {
+                    return Err(SyntaxError::from_location(self.scanner.location()));
+                };
+
+                match escaped {
+                    '{' => working.push('{'),
+                    c => {
+                        if !working.is_empty() {
+                            segments.push(FStringSegment::Lit(working));
+                            working = String::new();
+                        }
+
+                        if c == '}' {
+                            return Err(SyntaxError::from_location(self.scanner.location())
+                                .with_message("Empty format specifier".to_string()));
+                        }
+
+                        working.push(c);
+                        let mut bracket_count = 1;
+                        while bracket_count > 0 {
+                            if let Some(c) = self.scanner.next() {
+                                match c {
+                                    '}' => {
+                                        bracket_count -= 1;
+                                        if bracket_count > 0 {
+                                            working.push('}');
+                                        }
+                                    }
+                                    '{' => {
+                                        bracket_count += 1;
+                                        working.push('{');
+                                    }
+                                    other => working.push(other),
+                                }
+                            } else {
+                                return Err(SyntaxError::from_location(self.scanner.location()));
+                            }
+                        }
+
+                        if working.is_empty() {
+                            return Err(SyntaxError::from_location(self.scanner.location()));
+                        }
+
+                        segments.push(FStringSegment::Expr(working));
+                        working = String::new();
+                    }
+                }
+            } else if curr == '}' && is_format {
+                let escaped = if let Some(curr) = self.scanner.next() {
+                    curr
+                } else {
+                    return Err(SyntaxError::from_location(self.scanner.location()));
+                };
+
+                if escaped == '}' {
+                    working.push('}');
+                } else {
+                    return Err(SyntaxError::from_location(self.scanner.location())
+                        .with_message("Single } not allowed".to_string()));
+                }
             } else {
                 working.push(curr);
             }
         }
 
-        Ok(Some(Token::StringLit(working)))
+        if segments.is_empty() {
+            Ok(Some(Token::StringLit(working)))
+        } else {
+            if !working.is_empty() {
+                segments.push(FStringSegment::Lit(working))
+            }
+            Ok(Some(Token::FStringLit(segments)))
+        }
     }
 
     fn parse_keywords_or_ident(
@@ -474,17 +561,17 @@ impl<'l> StringTokenizer<'l> {
 }
 
 impl Tokenizer for StringTokenizer<'_> {
-    fn peek(&mut self) -> Result<Option<Token>, SyntaxError> {
+    fn peek(&mut self) -> Result<Option<&TokenWithLoc>, SyntaxError> {
         if let None = self.current {
             match self.collect_next_token() {
                 Ok(token) => self.current = token,
                 Err(err) => return Err(err),
             };
         }
-        Ok(self.current.clone())
+        Ok(self.current.as_ref())
     }
 
-    fn next(&mut self) -> Result<Option<Token>, SyntaxError> {
+    fn next(&mut self) -> Result<Option<TokenWithLoc>, SyntaxError> {
         if let None = self.current {
             self.collect_next_token()
         } else {
@@ -497,7 +584,66 @@ impl Tokenizer for StringTokenizer<'_> {
         self.scanner.input()
     }
 
-    fn location(&self) -> (usize, usize) {
+    fn location(&self) -> SourceLocation {
         self.scanner.location()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        compiler::{
+            source_location::SourceLocation, source_range::SourceRange, tokenizer::TokenWithLoc,
+            tokens::Token,
+        },
+        StringTokenizer, Tokenizer,
+    };
+
+    #[test]
+    fn tokens_locations() {
+        let src = "foo + 3";
+
+        let mut tokenizer = StringTokenizer::with_input(src);
+
+        let t = tokenizer.next().unwrap().unwrap();
+        assert_eq!(
+            t,
+            TokenWithLoc {
+                token: Token::Ident("foo".to_owned()),
+                loc: SourceRange::new(SourceLocation::new(0, 0), SourceLocation::new(0, 3))
+            }
+        );
+
+        assert_eq!(&src[t.loc.start().col()..t.loc.end().col()], "foo");
+        assert_eq!(
+            tokenizer.next().unwrap().unwrap(),
+            TokenWithLoc {
+                token: Token::Add,
+                loc: SourceRange::new(SourceLocation::new(0, 4), SourceLocation::new(0, 5))
+            }
+        );
+
+        assert_eq!(
+            tokenizer.next().unwrap().unwrap(),
+            TokenWithLoc {
+                token: Token::IntLit(3),
+                loc: SourceRange::new(SourceLocation::new(0, 6), SourceLocation::new(0, 7))
+            }
+        )
+    }
+
+    #[test]
+    fn string_literal_loc() {
+        let src = "\"this is a test string\"";
+
+        let mut tokenozer = StringTokenizer::with_input(src);
+
+        assert_eq!(
+            tokenozer.next().unwrap().unwrap(),
+            TokenWithLoc {
+                token: Token::StringLit("this is a test string".to_owned()),
+                loc: SourceRange::new(SourceLocation::new(0, 0), SourceLocation::new(0, src.len()))
+            }
+        );
     }
 }

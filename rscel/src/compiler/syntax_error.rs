@@ -1,21 +1,18 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use super::source_location::SourceLocation;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SyntaxError {
-    pub line: usize,
-    pub column: usize,
+    loc: SourceLocation,
 
     message: Option<String>,
 }
 
 impl SyntaxError {
-    pub fn from_location(loc: (usize, usize)) -> SyntaxError {
-        SyntaxError {
-            line: loc.0,
-            column: loc.1,
-            message: None,
-        }
+    pub fn from_location(loc: SourceLocation) -> SyntaxError {
+        SyntaxError { loc, message: None }
     }
 
     pub fn with_message(mut self, msg: String) -> SyntaxError {
@@ -26,10 +23,14 @@ impl SyntaxError {
     pub fn message<'a>(&'a self) -> Option<&'a str> {
         self.message.as_deref()
     }
+
+    pub fn loc(&self) -> SourceLocation {
+        self.loc
+    }
 }
 
 impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "line {}, column {}", self.line, self.column)
+        write!(f, "line {}, column {}", self.loc.line(), self.loc.col())
     }
 }

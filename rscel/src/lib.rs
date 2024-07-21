@@ -29,7 +29,7 @@
 //!   int32 x = 1;
 //!   int32 y = 2;
 //! }
-//!   
+//!
 //! ```
 //! The following code can be used to evaluate a CEL expression on a Point message:
 //!
@@ -48,7 +48,7 @@
 //! exec_ctx.bind_protobuf_msg("p", p);
 //!
 //! assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), 7.into());
-//!   
+//!
 //! ```
 mod cel_error;
 mod cel_value;
@@ -64,7 +64,8 @@ pub use cel_error::{CelError, CelResult};
 pub use cel_value::CelValue;
 pub use cel_value_dyn::CelValueDyn;
 pub use compiler::{
-    compiler::CelCompiler, string_tokenizer::StringTokenizer, tokenizer::Tokenizer,
+    ast_node::AstNode, compiler::CelCompiler, grammar::*, source_location::SourceLocation,
+    source_range::SourceRange, string_tokenizer::StringTokenizer, tokenizer::Tokenizer,
 };
 pub use context::{BindContext, CelContext, RsCelFunction, RsCelMacro};
 pub use interp::ByteCode;

@@ -47,7 +47,7 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
 
 macro_rules! string_func {
     ($cel_func_name: ident, $func_name:ident, $str_func:ident) => {
-        fn $func_name(this: CelValue, args: &[CelValue]) -> CelValue {
+        fn $func_name(this: CelValue, args: Vec<CelValue>) -> CelValue {
             if args.len() > 0 {
                 return CelValue::from_err(CelError::argument(
                     "$cel_func_name does not take any argments",
@@ -71,7 +71,7 @@ pub fn load_default_funcs(exec_ctx: &mut BindContext) {
     }
 }
 
-fn contains_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn contains_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument(
             "contains() expects exactly one argument",
@@ -89,7 +89,7 @@ fn contains_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn contains_i_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn contains_i_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument(
             "contains() expects exactly one argument",
@@ -107,7 +107,7 @@ fn contains_i_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn size_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn size_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("size() expects exactly one argument"));
     }
@@ -125,7 +125,7 @@ fn size_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     })
 }
 
-fn matches_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn matches_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let (vc_lhs, vc_rhs) = if let CelValue::Null = this {
         if args.len() != 2 {
             return CelValue::from_err(CelError::argument(
@@ -161,7 +161,7 @@ fn matches_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     ))
 }
 
-fn starts_with_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn starts_with_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument(
             "endsWith() expects exactly one argument",
@@ -177,7 +177,7 @@ fn starts_with_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_err(CelError::value("endsWith must be form string.(string)"))
 }
 
-fn ends_with_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn ends_with_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument(
             "endsWith() expects exactly one argument",
@@ -193,7 +193,7 @@ fn ends_with_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_err(CelError::value("endsWith must be form string.(string)"))
 }
 
-fn starts_with_i_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn starts_with_i_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument(
             "endsWith() expects exactly one argument",
@@ -209,7 +209,7 @@ fn starts_with_i_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_err(CelError::value("endsWith must be form string.(string)"))
 }
 
-fn ends_with_i_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn ends_with_i_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument(
             "endsWith() expects exactly one argument",
@@ -231,7 +231,7 @@ string_func!(trim, trim_impl, trim);
 string_func!(trimStart, trim_start_impl, trim_start);
 string_func!(trimEnd, trim_end_impl, trim_end);
 
-fn split_whitespace_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn split_whitespace_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 0 {
         return CelValue::from_err(CelError::argument(
             "split_whitespace() expects no arguments",
@@ -248,7 +248,7 @@ fn split_whitespace_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn abs_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn abs_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("abs() expects one argument"));
     }
@@ -261,7 +261,7 @@ fn abs_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn sqrt_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn sqrt_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("sqrt() expects one argument"));
     }
@@ -272,7 +272,7 @@ fn sqrt_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn pow_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn pow_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 2 {
         return CelValue::from_err(CelError::argument("pow() expects two argument"));
     }
@@ -300,7 +300,7 @@ fn pow_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn log_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn log_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("log() expects one argument"));
     }
@@ -313,7 +313,7 @@ fn log_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn ceil_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn ceil_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("ceil() expects on argument"));
     }
@@ -326,7 +326,7 @@ fn ceil_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn floor_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn floor_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("floor() expects on argument"));
     }
@@ -339,7 +339,7 @@ fn floor_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn round_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn round_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
         return CelValue::from_err(CelError::argument("round() expects on argument"));
     }
@@ -352,49 +352,55 @@ fn round_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
     }
 }
 
-fn min_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn min_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() == 0 {
         return CelValue::from_err(CelError::argument("min() requires at lease one argument"));
     }
 
-    let mut curr_min = None;
+    let mut curr_min: Option<&CelValue> = None;
 
-    for val in args.into_iter() {
+    for val in args.iter() {
         match curr_min {
             Some(curr) => {
-                if val.lt(curr).is_true() {
-                    curr_min = Some(val);
+                if val.clone().lt(curr.clone()).is_true() {
+                    curr_min = Some(&val);
                 }
             }
-            None => curr_min = Some(val),
+            None => curr_min = Some(&val),
         }
     }
 
-    curr_min.unwrap().clone()
+    match curr_min {
+        Some(v) => v.clone(),
+        None => CelValue::from_null(),
+    }
 }
 
-fn max_impl(_this: CelValue, args: &[CelValue]) -> CelValue {
+fn max_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() == 0 {
         return CelValue::from_err(CelError::argument("max() requires at lease one argument"));
     }
 
-    let mut curr_min = None;
+    let mut curr_max: Option<&CelValue> = None;
 
-    for val in args.into_iter() {
-        match curr_min {
+    for val in args.iter() {
+        match curr_max {
             Some(curr) => {
-                if val.gt(curr).is_true() {
-                    curr_min = Some(val);
+                if val.clone().gt(curr.clone()).is_true() {
+                    curr_max = Some(val);
                 }
             }
-            None => curr_min = Some(val),
+            None => curr_max = Some(val),
         }
     }
 
-    curr_min.unwrap().clone()
+    match curr_max {
+        Some(v) => v.clone(),
+        None => CelValue::from_null(),
+    }
 }
 
-fn get_adjusted_datetime(this: CelValue, args: &[CelValue]) -> CelResult<DateTime<Tz>> {
+fn get_adjusted_datetime(this: CelValue, args: Vec<CelValue>) -> CelResult<DateTime<Tz>> {
     if let CelValue::TimeStamp(ts) = this {
         if args.len() == 0 {
             return Ok(ts.with_timezone(&Tz::UTC));
@@ -416,7 +422,7 @@ fn get_adjusted_datetime(this: CelValue, args: &[CelValue]) -> CelResult<DateTim
     }
 }
 
-fn get_date_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn get_date_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let date = match get_adjusted_datetime(this, args) {
         Ok(it) => it,
         Err(err) => return err.into(),
@@ -426,7 +432,7 @@ fn get_date_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_int(day_of_month as i64)
 }
 
-fn get_day_of_month_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn get_day_of_month_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let date = match get_adjusted_datetime(this, args) {
         Ok(it) => it,
         Err(err) => return err.into(),
@@ -436,7 +442,7 @@ fn get_day_of_month_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_int(day_of_month as i64)
 }
 
-fn get_day_of_week_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn get_day_of_week_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let date = match get_adjusted_datetime(this, args) {
         Ok(it) => it,
         Err(err) => return err.into(),
@@ -446,7 +452,7 @@ fn get_day_of_week_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_int(day_of_week as i64)
 }
 
-fn get_day_of_year_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn get_day_of_year_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let date = match get_adjusted_datetime(this, args) {
         Ok(it) => it,
         Err(err) => return err.into(),
@@ -456,7 +462,7 @@ fn get_day_of_year_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_int(day_of_year as i64)
 }
 
-fn get_full_year_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn get_full_year_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let date = match get_adjusted_datetime(this, args) {
         Ok(it) => it,
         Err(err) => return err.into(),
@@ -466,7 +472,7 @@ fn get_full_year_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_int(year as i64)
 }
 
-fn get_hours_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn get_hours_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let date = match get_adjusted_datetime(this, args) {
         Ok(it) => it,
         Err(err) => return err.into(),
@@ -476,7 +482,7 @@ fn get_hours_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_int(hours as i64)
 }
 
-fn get_milliseconds_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn get_milliseconds_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let date = match get_adjusted_datetime(this, args) {
         Ok(it) => it,
         Err(err) => return err.into(),
@@ -486,7 +492,7 @@ fn get_milliseconds_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_int(milliseconds as i64)
 }
 
-fn get_minutes_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn get_minutes_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let date = match get_adjusted_datetime(this, args) {
         Ok(it) => it,
         Err(err) => return err.into(),
@@ -496,7 +502,7 @@ fn get_minutes_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_int(minutes as i64)
 }
 
-fn get_month_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn get_month_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let date = match get_adjusted_datetime(this, args) {
         Ok(it) => it,
         Err(err) => return err.into(),
@@ -506,7 +512,7 @@ fn get_month_impl(this: CelValue, args: &[CelValue]) -> CelValue {
     CelValue::from_int(month as i64)
 }
 
-fn get_seconds_impl(this: CelValue, args: &[CelValue]) -> CelValue {
+fn get_seconds_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let date = match get_adjusted_datetime(this, args) {
         Ok(it) => it,
         Err(err) => return err.into(),

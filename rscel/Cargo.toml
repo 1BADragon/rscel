@@ -1,9 +1,9 @@
 [package]
 name = "rscel"
-version = "1.0.0"
-edition = "2021"
-description = "Cel interpreter in rust"
-license = "MIT"
+version = {workspace = true}
+edition = {workspace = true}
+description = {workspace = true}
+license = {workspace = true}
 
 
 [features]
@@ -14,8 +14,8 @@ type_prop = []
 protobuf = ["dep:protobuf"]
 
 [build-dependencies]
-protobuf-codegen = "3.4.0"
-protoc-bin-vendored = "3.0.0"
+protobuf-codegen = { version = "3.4.0" }
+protoc-bin-vendored = { version = "3.0.0" }
 
 [dependencies]
 test-case = "3.3.1"

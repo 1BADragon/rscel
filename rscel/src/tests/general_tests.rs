@@ -100,6 +100,7 @@ fn test_contains() {
 #[test_case("2 * 3 + 7", 13.into(); "long mixed operation")]
 #[test_case("true && false || true && true", true.into(); "long logic operation")]
 #[test_case("2 + 3 - 1", 4.into(); "long add/sub operation")]
+#[test_case("-2 + 4", 2.into(); "neg pos addition")]
 #[test_case("2 < 3 >= 1", true.into(); "type prop: chained cmp")]
 #[test_case("3 * 2 - 1 / 4 * 2", 6.into(); "large op 2")]
 #[test_case("true || unbound || unbound", true.into(); "Or short cut")]
@@ -149,6 +150,9 @@ fn test_contains() {
 #[test_case(r#"'foo   bar\t\tbaz'.splitWhiteSpace()"#, CelValue::from_val_slice(&["foo".into(), "bar".into(), "baz".into()]); "test splitWhiteSpace")]
 #[test_case("{'foo': x}.map(k, k)", CelValue::from_val_slice(&["foo".into()]); "test map on map")]
 #[test_case("{'foo': x, 'bar': y}.filter(k, k == 'foo')", CelValue::from_val_slice(&["foo".into()]); "test filter on map")]
+#[test_case(r#"f"{3}""#, "3".into(); "test basic format string")]
+#[test_case(r#"f"{({"foo": 3}).foo)}""#, "3".into(); "test fstring with map")]
+#[test_case(r#"f"{[1,2,3][2]}""#, "3".into(); "test fstring with list")]
 fn test_equation(prog: &str, res: CelValue) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
@@ -332,7 +336,7 @@ fn test_timestamp_functions() {
         .ymd(2024, 01, 10)
         .and_hms_milli_opt(8, 57, 45, 123)
         .unwrap();
-    exec.bind_param("time", CelValue::from_timestamp(&dt));
+    exec.bind_param("time", CelValue::from_timestamp(dt));
 
     let progs = [
         ("time.getDate()", 10),

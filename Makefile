@@ -14,13 +14,13 @@ build:
 
 wasm-binding:
 	$(MAKE_COMMAND) -C wasm wasm-binding
-	
+
 wasm-binding-release:
 	$(MAKE_COMMAND) -C wasm wasm-binding-release
 
 python-binding: .env
 	. .env/bin/activate && cd python && maturin build $(CARGO_ARGS)
-	
+
 python-binding-release: .env
 	. .env/bin/activate && cd python && maturin build --release $(CARGO_ARGS)
 
@@ -50,6 +50,9 @@ run-all-python-tests: .env python-binding
 	pip install --force-reinstall target/wheels/$(shell ls target/wheels) && \
 	cd test && \
 	python -m pytest test*.py $(PYTEST_ARGS)
-	
+
+run-wasm-tests:
+	$(MAKE_COMMAND) -C wasm wasm-tests
+
 .PHONY: run-all-tests
-run-all-tests: run-tests run-no-feature-tests run-python-tests
+run-all-tests: run-tests run-no-feature-tests run-python-tests run-wasm-tests

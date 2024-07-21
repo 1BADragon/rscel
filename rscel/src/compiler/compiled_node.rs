@@ -1,5 +1,6 @@
 use crate::{
-    interp::JmpWhen, program::ProgramDetails, ByteCode, CelError, CelValue, CelValueDyn, Program,
+    interp::JmpWhen, program::ProgramDetails, ByteCode, CelError, CelValue, CelValueDyn, FromUnary,
+    Program,
 };
 
 use super::{
@@ -14,10 +15,56 @@ pub enum NodeValue {
 }
 
 #[derive(Debug)]
-pub struct CompiledNode<T: Clone> {
-    inner: NodeValue,
-    details: ProgramDetails,
-    ast: Option<AstNode<T>>,
+pub struct CompiledNode<T> {
+    pub inner: NodeValue,
+    pub details: ProgramDetails,
+    pub ast: Option<AstNode<T>>,
+}
+
+#[macro_export]
+macro_rules! compile {
+    ($bytecode:expr, $const_expr:expr, $( $child : ident),+) => {
+        {
+            use crate::compiler::compiled_node::NodeValue;
+            use crate::program::ProgramDetails;
+
+            let mut new_details = ProgramDetails::new();
+
+            $(
+                new_details.union_from($child.details);
+            )+
+
+            match ($($child.inner,)+) {
+                #[allow(unused_variables)]
+                ($(NodeValue::ConstExpr($child),)+) => {
+                    let resolved_const = $const_expr;
+
+                    CompiledNode {
+                        inner: NodeValue::ConstExpr(resolved_const),
+                        details: new_details,
+                        ast: None
+                    }
+                }
+                ($($child,)+) => {
+                let mut new_bytecode = Vec::new();
+
+                $(
+                    new_bytecode.append(&mut $child.into_bytecode());
+                )+
+
+                new_bytecode.extend_from_slice(&$bytecode);
+
+                CompiledNode {
+                    inner: NodeValue::Bytecode(new_bytecode),
+                    details: new_details,
+                    ast: None
+                }
+
+                }
+
+            }
+        }
+    };
 }
 
 impl<T: Clone> CompiledNode<T> {
@@ -91,37 +138,6 @@ impl<T: Clone> CompiledNode<T> {
         }
     }
 
-    pub fn from_children2_w_bytecode<T1: Clone, T2: Clone, F>(
-        child1: CompiledNode<T1>,
-        child2: CompiledNode<T2>,
-        bytecode: Vec<ByteCode>,
-        resolve: F,
-    ) -> CompiledNode<T>
-    where
-        F: FnOnce(CelValue, CelValue) -> CelValue,
-    {
-        let new_details = ProgramDetails::joined2(child1.details, child2.details);
-
-        match (child1.inner, child2.inner) {
-            (NodeValue::ConstExpr(c1), NodeValue::ConstExpr(c2)) => CompiledNode {
-                inner: NodeValue::ConstExpr(resolve(c1, c2)),
-                details: new_details,
-                ast: None,
-            },
-            (c1, c2) => CompiledNode {
-                inner: NodeValue::Bytecode(
-                    c1.into_bytecode()
-                        .into_iter()
-                        .chain(c2.into_bytecode().into_iter())
-                        .chain(bytecode.into_iter())
-                        .collect(),
-                ),
-                details: new_details,
-                ast: None,
-            },
-        }
-    }
-
     pub fn from_children2_w_bytecode_cannone<T1: Clone, T2: Clone, F>(
         child1: CompiledNode<T1>,
         child2: CompiledNode<T2>,
@@ -165,14 +181,15 @@ impl<T: Clone> CompiledNode<T> {
         }
     }
 
-    pub fn convert_with_ast<F, O: Clone>(self, ast_builder: F) -> CompiledNode<O>
-    where
-        F: FnOnce(Option<AstNode<T>>) -> AstNode<O>,
-    {
+    #[inline]
+    pub fn into_unary<O: FromUnary<InputType = T>>(self) -> CompiledNode<O> {
+        let ast = self.ast.expect("Internal Error: no ast");
+        let range = ast.range();
+
         CompiledNode {
             inner: self.inner,
             details: self.details,
-            ast: Some(ast_builder(self.ast)),
+            ast: Some(AstNode::new(O::from_unary(ast), range)),
         }
     }
 
@@ -224,81 +241,6 @@ impl<T: Clone> CompiledNode<T> {
 
         r.ast = ast;
         r
-    }
-
-    pub fn consume_children2<T1: Clone, T2: Clone, F>(
-        self,
-        child1: CompiledNode<T1>,
-        child2: CompiledNode<T2>,
-        resolve_const: F,
-    ) -> CompiledNode<T>
-    where
-        F: FnOnce(CelValue, CelValue) -> CelValue,
-    {
-        let mut new_details = self.details;
-
-        new_details.union_from(child1.details);
-        new_details.union_from(child2.details);
-
-        match (child1.inner, child2.inner) {
-            (NodeValue::ConstExpr(c1), NodeValue::ConstExpr(c2)) => CompiledNode {
-                inner: NodeValue::ConstExpr(resolve_const(c1, c2)),
-                details: new_details,
-                ast: None,
-            },
-            (c1, c2) => {
-                let mut new_bytecode = Vec::new();
-
-                new_bytecode.append(&mut c1.into_bytecode());
-                new_bytecode.append(&mut c2.into_bytecode());
-                new_bytecode.append(&mut self.inner.into_bytecode());
-
-                CompiledNode {
-                    inner: NodeValue::Bytecode(new_bytecode),
-                    details: new_details,
-                    ast: None,
-                }
-            }
-        }
-    }
-
-    pub fn consume_children3<T1: Clone, T2: Clone, T3: Clone, F>(
-        self,
-        lhs: CompiledNode<T1>,
-        jmp: CompiledNode<T2>,
-        rhs: CompiledNode<T3>,
-        resolve_const: F,
-    ) -> CompiledNode<T>
-    where
-        F: FnOnce(CelValue, CelValue) -> CelValue,
-    {
-        let mut new_details = self.details;
-
-        new_details.union_from(lhs.details);
-        new_details.union_from(jmp.details);
-        new_details.union_from(rhs.details);
-
-        match (lhs.inner, rhs.inner) {
-            (NodeValue::ConstExpr(c1), NodeValue::ConstExpr(c2)) => CompiledNode {
-                inner: NodeValue::ConstExpr(resolve_const(c1, c2)),
-                details: new_details,
-                ast: None,
-            },
-            (li, ri) => {
-                let mut new_bytecode = Vec::new();
-
-                new_bytecode.append(&mut li.into_bytecode());
-                new_bytecode.append(&mut jmp.inner.into_bytecode());
-                new_bytecode.append(&mut ri.into_bytecode());
-                new_bytecode.append(&mut self.inner.into_bytecode());
-
-                CompiledNode {
-                    inner: NodeValue::Bytecode(new_bytecode),
-                    details: new_details,
-                    ast: None,
-                }
-            }
-        }
     }
 
     pub fn into_turnary(
@@ -417,14 +359,11 @@ impl<T: Clone> CompiledNode<T> {
 }
 
 impl NodeValue {
-    fn is_const(&self) -> bool {
-        match self {
-            NodeValue::ConstExpr(_) => true,
-            NodeValue::Bytecode(_) => false,
-        }
+    pub fn is_const(&self) -> bool {
+        matches!(*self, NodeValue::ConstExpr(_))
     }
 
-    fn into_bytecode(self) -> Vec<ByteCode> {
+    pub fn into_bytecode(self) -> Vec<ByteCode> {
         match self {
             NodeValue::Bytecode(b) => b,
             NodeValue::ConstExpr(c) => [ByteCode::Push(c)].to_vec(),

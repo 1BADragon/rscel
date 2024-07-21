@@ -2,7 +2,7 @@ use wasm_bindgen::JsValue;
 
 use rscel::{CelError, CelValue};
 
-use crate::{eval_error::WasmCelError, from_jsvalue::WasmCelValue};
+use crate::{from_jsvalue::WasmCelValue, types::WasmCelError};
 
 impl Into<JsValue> for WasmCelValue {
     fn into(self) -> JsValue {
@@ -60,7 +60,7 @@ impl Into<JsValue> for WasmCelValue {
                 let obj = js_sys::Object::new();
 
                 js_sys::Reflect::set(&obj, &"sec".into(), &d.num_seconds().into()).unwrap();
-                js_sys::Reflect::set(&obj, &"nsec".into(), &d.num_nanoseconds().into()).unwrap();
+                js_sys::Reflect::set(&obj, &"nsec".into(), &d.subsec_nanos().into()).unwrap();
 
                 obj.into()
             }
@@ -81,8 +81,8 @@ impl Into<JsValue> for WasmCelError {
             }
             CelError::Syntax(err) => {
                 js_sys::Reflect::set(&val, &"type".into(), &"syntax".into()).unwrap();
-                js_sys::Reflect::set(&val, &"line".into(), &err.line.into()).unwrap();
-                js_sys::Reflect::set(&val, &"column".into(), &err.column.into()).unwrap();
+                js_sys::Reflect::set(&val, &"line".into(), &err.loc().line().into()).unwrap();
+                js_sys::Reflect::set(&val, &"column".into(), &err.loc().col().into()).unwrap();
 
                 match err.message() {
                     Some(msg) => {
