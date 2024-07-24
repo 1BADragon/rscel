@@ -2,7 +2,7 @@
   "name": "rescel unit tests",
   "version": "0.1.0",
   "scripts": {
-    "test": "vitest run ."
+    "test": "vitest run . --no-file-parallelism --disable-console-intercept"
   },
   "devDependencies": {
     "vitest": "^1.6.0"

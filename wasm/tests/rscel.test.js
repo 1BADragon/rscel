@@ -101,4 +101,14 @@ describe("Rscel Basic Tests", () => {
 
     expect(dets.params).toContain("foo");
   });
+
+  it("detials syntax error", () => {
+    try {
+      const dets = cel_details("3 +");
+    } catch (error) {
+      console.dir(error);
+      expect(error).toContain("kind");
+      expect(error).toContain("msg");
+    }
+  });
 });

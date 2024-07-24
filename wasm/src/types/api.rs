@@ -2,35 +2,35 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_INT: &'static str = r#"
-interface CelInt {
+extern interface CelInt {
     'cel_int': number | bigint;
 }
 "#;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_UINT: &'static str = r#"
-interface CelUint {
+extern interface CelUint {
     'cel_uint': number | bigint;
 }
 "#;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_FLOAT: &'static str = r#"
-interface CelFloat {
+extern interface CelFloat {
     'cel_float': number;
 }
 "#;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_TYPE: &'static str = r#"
-interface CelType {
+extern interface CelType {
     type: 'string' | 'int' | 'uint' | 'bool' | 'date' | 'duration' | 'null' | 'float'
 }
 "#;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_VALUE: &'static str = r#"
-type CelValue =
+extern type CelValue =
     number 
     | string 
     | bigint 
@@ -41,19 +41,20 @@ type CelValue =
     | CelFloat
     | {[key: string]: CelValue}
     | CelValue[]
-    | CelType;
+    | CelType
+    | undefined;
 "#;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_BINDING: &'static str = r#"
-interface CelBinding {
+extern interface CelBinding {
     [key: string]: CelValue;
 }
 "#;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_EVAL_ERROR: &'static str = r#"
-interface CelEvalError {
+extern interface CelEvalError {
     kind: string,
     msg: string,
     err: any
@@ -62,7 +63,7 @@ interface CelEvalError {
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_PROGRAM_DETAILS: &'static str = r#"
-interface CelProgramDetails {
+extern interface CelProgramDetails {
     source?: string;
     params: string[];
     ast?: any;
