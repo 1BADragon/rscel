@@ -2,35 +2,53 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_INT: &'static str = r#"
-extern interface CelInt {
+export interface CelInt {
     'cel_int': number | bigint;
 }
 "#;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_UINT: &'static str = r#"
-extern interface CelUint {
+export interface CelUint {
     'cel_uint': number | bigint;
 }
 "#;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_FLOAT: &'static str = r#"
-extern interface CelFloat {
+export interface CelFloat {
     'cel_float': number;
 }
 "#;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_TYPE: &'static str = r#"
-extern interface CelType {
-    type: 'string' | 'int' | 'uint' | 'bool' | 'date' | 'duration' | 'null' | 'float'
+export interface CelType {
+    type: 'int' 
+        | 'uint'
+        | 'float'
+        | 'bool'
+        | 'string'
+        | 'bytes'
+        | 'list'
+        | 'map'
+        | 'null'
+        | 'ident'
+        | 'type'
+        | 'timestamp'
+        | 'duration'
+        | 'bytecode'
+        | 'message'
+        | 'enum'
+        | 'dyn'
+        | 'err'
+        ;
 }
 "#;
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_VALUE: &'static str = r#"
-extern type CelValue =
+export type CelValue =
     number 
     | string 
     | bigint 
@@ -47,23 +65,14 @@ extern type CelValue =
 
 #[wasm_bindgen(typescript_custom_section)]
 const ICEL_BINDING: &'static str = r#"
-extern interface CelBinding {
+export interface CelBinding {
     [key: string]: CelValue;
 }
 "#;
 
 #[wasm_bindgen(typescript_custom_section)]
-const ICEL_EVAL_ERROR: &'static str = r#"
-extern interface CelEvalError {
-    kind: string,
-    msg: string,
-    err: any
-}
-"#;
-
-#[wasm_bindgen(typescript_custom_section)]
 const ICEL_PROGRAM_DETAILS: &'static str = r#"
-extern interface CelProgramDetails {
+export interface CelProgramDetails {
     source?: string;
     params: string[];
     ast?: any;
@@ -77,9 +86,6 @@ extern "C" {
 
     #[wasm_bindgen(typescript_type = "CelBinding")]
     pub type WasmCelBinding;
-
-    #[wasm_bindgen(typescript_type = "CelEvalError")]
-    pub type WasmEvalError;
 
     #[wasm_bindgen(typescript_type = "CelProgramDetails")]
     pub type WasmProgramDetails;

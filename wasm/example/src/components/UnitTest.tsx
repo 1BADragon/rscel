@@ -1,10 +1,11 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
+import { CelEvalResult, CelValue } from "rscel";
 
 export interface UnitTestProps {
   name: string;
-  test: () => any;
-  expected: any;
+  test: () => CelEvalResult;
+  expected: CelValue;
 }
 
 export const UnitTest = (props: UnitTestProps) => {
@@ -16,14 +17,15 @@ export const UnitTest = (props: UnitTestProps) => {
   const EPSILON = 0.0000001;
 
   useEffect(() => {
-    const result = test();
+    const test_result = test();
 
-    if (result.success) {
-      if (typeof result.result === "number" && typeof expected === "number") {
-        setResult(result.result);
-        setTestPassed(Math.abs(result.result - expected) < EPSILON);
+    if (test_result.isSuccess()) {
+      const val = test_result.result();
+      if (typeof val === "number" && typeof expected === "number") {
+        setResult(val);
+        setTestPassed(Math.abs(val - expected) < EPSILON);
       } else {
-        setTestPassed(result.result === expected);
+        setTestPassed(val === expected);
       }
     } else {
       setTestPassed(false);

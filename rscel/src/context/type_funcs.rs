@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 
 use crate::{BindContext, CelError, CelValue, CelValueDyn};
 
@@ -190,17 +190,29 @@ fn timestamp_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
 }
 
 fn duration_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
-    if args.len() != 1 {
-        return CelValue::from_err(CelError::argument("duration() expects one argument"));
-    }
-
-    if let CelValue::String(str_val) = &args[0] {
-        match duration_str::parse_chrono(str_val) {
-            Ok(val) => CelValue::from_duration(val),
-            Err(_) => CelValue::from_err(CelError::value("Invalid duration format")),
+    if args.len() == 1 {
+        match &args[0] {
+            CelValue::String(str_val) => match duration_str::parse_chrono(str_val) {
+                Ok(val) => CelValue::from_duration(val),
+                Err(_) => CelValue::from_err(CelError::value("Invalid duration format")),
+            },
+            CelValue::Int(int_val) => match Duration::new(*int_val, 0) {
+                Some(d) => d.into(),
+                None => CelValue::from_err(CelError::value("Invalid argument for duration")),
+            },
+            _ => CelValue::from_err(CelError::value("Duration expects either string or int")),
+        }
+    } else if args.len() == 2 {
+        if let (CelValue::Int(sec), CelValue::Int(nsec)) = (&args[0], &args[1]) {
+            match Duration::new(*sec, *nsec as u32) {
+                Some(d) => d.into(),
+                None => CelValue::from_err(CelError::value("Invalid argument for duration")),
+            }
+        } else {
+            CelValue::from_err(CelError::value("Duration expects 2 ints"))
         }
     } else {
-        CelValue::from_err(CelError::value("duration() expects a string argument"))
+        CelValue::from_err(CelError::value("duration call not correct"))
     }
 }
 
