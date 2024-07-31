@@ -968,7 +968,10 @@ impl<'l> CelCompiler<'l> {
                 )),
             ),
             _ => Err(SyntaxError::from_location(self.tokenizer.location())
-                .with_message(format!("unexpected!!! {:?}", self.tokenizer.peek()))
+                .with_message(format!(
+                    "unexpected {:?}! expecting PRIMARY",
+                    self.tokenizer.peek()
+                ))
                 .into()),
         }
     }

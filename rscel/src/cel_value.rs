@@ -1281,11 +1281,11 @@ impl Sub for CelValue {
                         return CelValue::from(val1 - val2);
                     }
                 }
-                CelValue::TimeStamp(v1) => {
-                    if let CelValue::Duration(v2) = rhs {
-                        return CelValue::from_timestamp(v1 - v2);
-                    }
-                }
+                CelValue::TimeStamp(v1) => match rhs {
+                    CelValue::Duration(v2) => return CelValue::from_timestamp(v1 - v2),
+                    CelValue::TimeStamp(v2) => return CelValue::from_duration(v1 - v2),
+                    _ => {}
+                },
                 CelValue::Duration(v1) => match rhs {
                     CelValue::TimeStamp(v2) => return CelValue::from_timestamp(v2 - v1),
                     CelValue::Duration(v2) => return CelValue::from_duration(v1 - v2),

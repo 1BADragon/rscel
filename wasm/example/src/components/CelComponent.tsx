@@ -1,8 +1,8 @@
 import * as React from "react";
 import "./CelComponent.css";
 
-import init, { cel_eval, cel_details } from "rscel";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { celDetails, celEval } from "rscel";
 
 export default function CelComponent() {
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -18,12 +18,11 @@ export default function CelComponent() {
           <label>{val}</label>
           <input
             style={{ marginLeft: "auto" }}
-            onChange={(event) => {
+            onBlur={(event) => {
               setParamVals((old: any) => {
                 try {
                   let newObj = { ...old };
                   newObj[val] = JSON.parse(event.target.value, (_, val) => {
-                    console.log(val);
                     return typeof val === "string" && val.endsWith("n")
                       ? BigInt(val.slice(0, -1))
                       : val;
@@ -43,7 +42,6 @@ export default function CelComponent() {
   };
 
   const renderResult = (currResult: any): JSX.Element => {
-    console.log("render", currResult, typeof currResult);
     switch (typeof currResult) {
       case "number":
         return <label>{currResult.toString()}</label>;
@@ -98,20 +96,15 @@ export default function CelComponent() {
       <div style={{ display: "flex", rowGap: "10px", justifyContent: "right" }}>
         <button
           onClick={() => {
-            const res = cel_details(prog);
+            const res = celDetails(prog);
 
-            if (res.success) {
-              console.log(res);
-              const details = res.details;
-              setParams(details.params);
+            if (res.isSuccess()) {
+              setParams(res.details().params);
               setErrorMessage("");
               setLastResult(undefined);
             } else {
-              setErrorMessage(
-                res.error
-                  ? `${res.error.kind}: ${res.error.msg}`
-                  : "Unknown error"
-              );
+              setParams([]);
+              setErrorMessage(res.error().toString());
               setLastResult(undefined);
             }
           }}
@@ -120,19 +113,14 @@ export default function CelComponent() {
         </button>
         <button
           onClick={() => {
-            console.log(paramVals);
-            const result = cel_eval(prog, paramVals);
-            console.log(result);
+            const result = celEval(prog, paramVals);
 
-            if (result.success) {
-              setLastResult(result.result);
+            if (result.isSuccess()) {
+              setLastResult(result.result());
               setErrorMessage("");
             } else {
-              setErrorMessage(
-                result.error
-                  ? `${result.error.kind}: ${result.error.msg}`
-                  : "Unknown error"
-              );
+              setLastResult(undefined);
+              setErrorMessage(result.error().toString());
             }
           }}
         >

@@ -2,7 +2,7 @@ use crate::{
     compiler::{compiler::CelCompiler, string_tokenizer::StringTokenizer},
     BindContext, CelContext, CelError, CelValue, Program,
 };
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use serde_json::Value;
 use std::{assert, assert_eq, collections::HashMap, str::FromStr, sync::Arc};
 use test_case::test_case;
@@ -153,6 +153,8 @@ fn test_contains() {
 #[test_case(r#"f"{3}""#, "3".into(); "test basic format string")]
 #[test_case(r#"f"{({"foo": 3}).foo)}""#, "3".into(); "test fstring with map")]
 #[test_case(r#"f"{[1,2,3][2]}""#, "3".into(); "test fstring with list")]
+#[test_case("timestamp('2024-07-30 12:00:00+00:00') - timestamp('2024-07-30 11:55:00+00:00') == duration('5m')", true.into(); "test timestamp sub 1")]
+#[test_case("timestamp('2024-07-30 11:55:00+00:00') - timestamp('2024-07-30 12:00:00+00:00')", Duration::new(-300, 0).unwrap().into(); "test timestamp sub 2")]
 fn test_equation(prog: &str, res: CelValue) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

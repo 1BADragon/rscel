@@ -1,4 +1,4 @@
-use pyo3::{exceptions::PyRuntimeError, PyErr};
+use pyo3::{exceptions::PyException, PyErr};
 use rscel::CelError;
 
 pub struct PyCelError {
@@ -13,6 +13,6 @@ impl PyCelError {
 
 impl From<PyCelError> for PyErr {
     fn from(err: PyCelError) -> PyErr {
-        PyErr::new::<PyRuntimeError, _>(format!("{}", err.inner))
+        PyErr::new::<PyException, _>(format!("{}", err.inner))
     }
 }

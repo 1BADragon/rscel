@@ -1,8 +1,6 @@
+use crate::from_jsvalue::WasmCelValue;
+use rscel::CelValue;
 use wasm_bindgen::JsValue;
-
-use rscel::{CelError, CelValue};
-
-use crate::{from_jsvalue::WasmCelValue, types::WasmCelError};
 
 impl Into<JsValue> for WasmCelValue {
     fn into(self) -> JsValue {
@@ -67,65 +65,5 @@ impl Into<JsValue> for WasmCelValue {
             CelValue::ByteCode(_) => js_sys::Object::new().into(),
             _ => unimplemented!(),
         }
-    }
-}
-
-impl Into<JsValue> for WasmCelError {
-    fn into(self) -> JsValue {
-        let val = js_sys::Object::new();
-
-        match self.into_inner() {
-            CelError::Misc(err) => {
-                js_sys::Reflect::set(&val, &"type".into(), &"misc".into()).unwrap();
-                js_sys::Reflect::set(&val, &"msg".into(), &err.into()).unwrap();
-            }
-            CelError::Syntax(err) => {
-                js_sys::Reflect::set(&val, &"type".into(), &"syntax".into()).unwrap();
-                js_sys::Reflect::set(&val, &"line".into(), &err.loc().line().into()).unwrap();
-                js_sys::Reflect::set(&val, &"column".into(), &err.loc().col().into()).unwrap();
-
-                match err.message() {
-                    Some(msg) => {
-                        js_sys::Reflect::set(&val, &"message".into(), &msg.into()).unwrap()
-                    }
-                    None => js_sys::Reflect::set(&val, &"message".into(), &JsValue::undefined())
-                        .unwrap(),
-                };
-            }
-            CelError::Value(msg) => {
-                js_sys::Reflect::set(&val, &"type".into(), &"value".into()).unwrap();
-                js_sys::Reflect::set(&val, &"msg".into(), &msg.into()).unwrap();
-            }
-            CelError::Argument(msg) => {
-                js_sys::Reflect::set(&val, &"type".into(), &"argument".into()).unwrap();
-                js_sys::Reflect::set(&val, &"msg".into(), &msg.into()).unwrap();
-            }
-            CelError::InvalidOp(msg) => {
-                js_sys::Reflect::set(&val, &"type".into(), &"invalidOp".into()).unwrap();
-                js_sys::Reflect::set(&val, &"msg".into(), &msg.into()).unwrap();
-            }
-            CelError::Runtime(msg) => {
-                js_sys::Reflect::set(&val, &"type".into(), &"runtime".into()).unwrap();
-                js_sys::Reflect::set(&val, &"msg".into(), &msg.into()).unwrap();
-            }
-            CelError::Binding { symbol } => {
-                js_sys::Reflect::set(&val, &"type".into(), &"binding".into()).unwrap();
-                js_sys::Reflect::set(&val, &"symbol".into(), &symbol.into()).unwrap();
-            }
-            CelError::Internal(msg) => {
-                js_sys::Reflect::set(&val, &"type".into(), &"internal".into()).unwrap();
-                js_sys::Reflect::set(&val, &"msg".into(), &msg.into()).unwrap();
-            }
-            CelError::Attribute { parent, field } => {
-                js_sys::Reflect::set(&val, &"type".into(), &"attribute".into()).unwrap();
-                js_sys::Reflect::set(&val, &"parent".into(), &parent.into()).unwrap();
-                js_sys::Reflect::set(&val, &"field".into(), &field.into()).unwrap();
-            }
-            CelError::DivideByZero => {
-                js_sys::Reflect::set(&val, &"type".into(), &"divide by zero".into()).unwrap();
-            }
-        };
-
-        val.into()
     }
 }

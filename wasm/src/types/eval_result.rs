@@ -1,49 +1,57 @@
+use rscel::{CelError, CelValue};
 use wasm_bindgen::prelude::*;
 
-use crate::{from_jsvalue::WasmCelValue, types::api};
+use crate::{
+    from_jsvalue::WasmCelValue,
+    types::{api, WasmCelError},
+};
 
-use super::eval_error::WasmEvalError;
-
-#[wasm_bindgen]
-pub struct EvalResult {
-    result: Option<WasmCelValue>,
-    error: Option<WasmEvalError>,
-}
-
-impl EvalResult {
-    pub fn from_error(err: WasmEvalError) -> EvalResult {
-        EvalResult {
-            result: None,
-            error: Some(err),
-        }
-    }
-
-    pub fn from_value(value: WasmCelValue) -> EvalResult {
-        EvalResult {
-            result: Some(value),
-            error: None,
-        }
-    }
+enum CelEvalResultInner {
+    Result(CelValue),
+    Error(WasmCelError),
 }
 
 #[wasm_bindgen]
-impl EvalResult {
-    #[wasm_bindgen]
+pub struct CelEvalResult {
+    inner: CelEvalResultInner,
+}
+
+impl CelEvalResult {
+    pub fn from_error(err: CelError) -> CelEvalResult {
+        CelEvalResult {
+            inner: CelEvalResultInner::Error(WasmCelError::new(err)),
+        }
+    }
+
+    pub fn from_value(value: CelValue) -> CelEvalResult {
+        CelEvalResult {
+            inner: CelEvalResultInner::Result(value),
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl CelEvalResult {
+    #[wasm_bindgen(js_name=isSuccess)]
     pub fn is_success(&self) -> bool {
-        return self.result.is_some();
+        matches!(self.inner, CelEvalResultInner::Result(_))
     }
 
     #[wasm_bindgen]
     pub fn result(&self) -> Option<api::WasmCelValue> {
-        self.result
-            .as_ref()
-            .map(|v| Into::<JsValue>::into(v.clone()).into())
+        match &self.inner {
+            CelEvalResultInner::Result(r) => {
+                Some(Into::<JsValue>::into(WasmCelValue::new(r.clone())).into())
+            }
+            _ => None,
+        }
     }
 
     #[wasm_bindgen]
-    pub fn error(&self) -> Option<api::WasmEvalError> {
-        self.error
-            .as_ref()
-            .map(|v| Into::<JsValue>::into(v.clone()).into())
+    pub fn error(&self) -> Option<WasmCelError> {
+        match &self.inner {
+            CelEvalResultInner::Error(e) => Some(e.clone()),
+            _ => None,
+        }
     }
 }
