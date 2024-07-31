@@ -5,7 +5,7 @@ use py_cel_value::PyCelValue;
 use rscel::{BindContext, CelContext, CelValue};
 
 use pyo3::{
-    exceptions::PyRuntimeError,
+    exceptions::PyException,
     prelude::*,
     types::{PyDict, PyString},
 };
@@ -64,7 +64,7 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &Bound<PyDict>) -> PyResult<
 
     match res {
         Ok(res) => Ok(PyCelValue::new(res).to_object(py)),
-        Err(err) => Err(PyRuntimeError::new_err(err.to_string())),
+        Err(err) => Err(PyException::new_err(err.to_string())),
     }
 }
 

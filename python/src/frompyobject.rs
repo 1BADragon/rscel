@@ -2,12 +2,13 @@ use std::{collections::HashMap, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 use pyo3::{
+    conversion::FromPyObject,
     exceptions::PyValueError,
     types::{
         timezone_utc_bound, PyBool, PyBytes, PyDateTime, PyDelta, PyDict, PyFloat, PyInt, PyList,
         PyString, PyTuple,
     },
-    FromPyObject, PyAny, PyErr, PyResult, PyTypeCheck, Python,
+    PyAny, PyErr, PyResult, PyTypeCheck, Python,
 };
 
 use rscel::CelValue;
@@ -94,7 +95,7 @@ impl WrappedDowncast for &PyAny {
 }
 
 fn extract_celval_recurse<'source>(
-    ob: &'source PyAny,
+    ob: &PyAny,
     current_path: &'source [&'source str],
 ) -> Result<PyCelValue, WrappedError> {
     match ob.get_type().name() {
@@ -222,7 +223,7 @@ fn extract_celval_recurse<'source>(
 }
 
 impl<'source> FromPyObject<'source> for PyCelValue {
-    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+    fn extract(ob: &PyAny) -> PyResult<Self> {
         match extract_celval_recurse(ob, &[]) {
             Ok(val) => Ok(val),
             Err(WrappedError { err, path }) => Err(PyValueError::new_err(format!(
