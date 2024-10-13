@@ -3,7 +3,7 @@ use std::str::FromStr;
 use super::bind_context::RsCelFunction;
 use crate::{
     cel_error::{CelError, CelResult},
-    BindContext, CelValue,
+    BindContext, CelValue, CelValueDyn,
 };
 use chrono::{DateTime, Datelike, Timelike};
 use chrono_tz::Tz;
@@ -107,20 +107,32 @@ fn contains_i_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     }
 }
 
-fn size_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
-    if args.len() != 1 {
-        return CelValue::from_err(CelError::argument("size() expects exactly one argument"));
+fn size_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
+    if args.len() > 1 {
+        return CelValue::from_err(CelError::argument("size() expects at most one argument"));
     }
 
-    CelValue::from_uint(match &args[0] {
+    let val = if args.len() == 1 {
+        if !matches!(this, CelValue::Null) {
+            return CelValue::from_err(CelError::argument(
+                "size() expects either `this` or one argument, not both",
+            ));
+        }
+        &args[0]
+    } else {
+        &this
+    };
+
+    CelValue::from_uint(match val {
         CelValue::String(s) => s.len() as u64,
         CelValue::Bytes(b) => b.len() as u64,
         CelValue::List(l) => l.len() as u64,
         CelValue::Map(m) => m.len() as u64,
-        _ => {
-            return CelValue::from_err(CelError::value(
-                "size() only available for types {string, bytes, list, map}",
-            ))
+        other => {
+            return CelValue::from_err(CelError::value(&format!(
+                "size() only available for types {{string, bytes, list, map}}, got {}",
+                other.as_type()
+            )))
         }
     })
 }

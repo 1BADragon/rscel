@@ -595,7 +595,13 @@ impl<'l> CelCompiler<'l> {
                                 |o, c| {
                                     if let CelValue::Ident(s) = c {
                                         if o.is_obj() {
-                                            Some(o.access(&s))
+                                            // So if this fails we should break the const
+                                            // status and let the compiler generate some
+                                            // bytecode for function discovery and such.
+                                            match o.access(&s) {
+                                                CelValue::Err(_) => None,
+                                                o => Some(o),
+                                            }
                                         } else {
                                             None
                                         }
@@ -747,7 +753,6 @@ impl<'l> CelCompiler<'l> {
             }) => {
                 let mut expr = self.parse_expression()?;
 
-                // TODO: enforce a closing paran here
                 let next_token = self.tokenizer.next();
                 let rparen_loc = match next_token? {
                     Some(TokenWithLoc {

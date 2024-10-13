@@ -892,18 +892,6 @@ impl From<i8> for CelValue {
     }
 }
 
-impl TryInto<i64> for CelValue {
-    type Error = CelError;
-
-    fn try_into(self) -> CelResult<i64> {
-        if let CelValue::Int(val) = self {
-            return Ok(val);
-        }
-
-        Err(CelError::internal("Convertion Error"))
-    }
-}
-
 impl From<u64> for CelValue {
     fn from(val: u64) -> CelValue {
         CelValue::from_uint(val)
@@ -928,33 +916,9 @@ impl From<u8> for CelValue {
     }
 }
 
-impl TryInto<u64> for CelValue {
-    type Error = CelError;
-
-    fn try_into(self) -> CelResult<u64> {
-        if let CelValue::UInt(val) = self {
-            return Ok(val);
-        }
-
-        Err(CelError::internal("Convertion Error"))
-    }
-}
-
 impl From<f64> for CelValue {
     fn from(val: f64) -> CelValue {
         CelValue::from_float(val)
-    }
-}
-
-impl TryInto<f64> for CelValue {
-    type Error = CelError;
-
-    fn try_into(self) -> CelResult<f64> {
-        if let CelValue::Float(val) = self {
-            return Ok(val);
-        }
-
-        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -964,15 +928,9 @@ impl From<bool> for CelValue {
     }
 }
 
-impl TryInto<bool> for CelValue {
-    type Error = CelError;
-
-    fn try_into(self) -> CelResult<bool> {
-        if let CelValue::Bool(val) = self {
-            return Ok(val);
-        }
-
-        Err(CelError::internal("Convertion Error"))
+impl From<Duration> for CelValue {
+    fn from(val: Duration) -> CelValue {
+        CelValue::from_duration(val)
     }
 }
 
@@ -988,18 +946,6 @@ impl From<String> for CelValue {
     }
 }
 
-impl TryInto<String> for CelValue {
-    type Error = CelError;
-
-    fn try_into(self) -> CelResult<String> {
-        if let CelValue::String(val) = self {
-            return Ok(val);
-        }
-
-        Err(CelError::internal("Convertion Error"))
-    }
-}
-
 impl From<&[u8]> for CelValue {
     fn from(val: &[u8]) -> CelValue {
         CelValue::from_bytes(val.to_owned())
@@ -1009,18 +955,6 @@ impl From<&[u8]> for CelValue {
 impl From<Vec<u8>> for CelValue {
     fn from(val: Vec<u8>) -> CelValue {
         CelValue::Bytes(val).into()
-    }
-}
-
-impl TryInto<Vec<u8>> for CelValue {
-    type Error = CelError;
-
-    fn try_into(self) -> CelResult<Vec<u8>> {
-        if let CelValue::Bytes(val) = self {
-            return Ok(val);
-        }
-
-        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -1036,6 +970,88 @@ impl From<Vec<CelValue>> for CelValue {
     }
 }
 
+impl From<HashMap<String, CelValue>> for CelValue {
+    fn from(val: HashMap<String, CelValue>) -> CelValue {
+        CelValue::from_map(val)
+    }
+}
+
+impl From<DateTime<Utc>> for CelValue {
+    fn from(val: DateTime<Utc>) -> CelValue {
+        CelValue::from_timestamp(val)
+    }
+}
+
+impl From<DateTime<FixedOffset>> for CelValue {
+    fn from(val: DateTime<FixedOffset>) -> CelValue {
+        CelValue::from_timestamp(val.into())
+    }
+}
+impl From<Vec<ByteCode>> for CelValue {
+    fn from(val: Vec<ByteCode>) -> CelValue {
+        CelValue::from_bytecode(val)
+    }
+}
+impl TryInto<u64> for CelValue {
+    type Error = CelError;
+
+    fn try_into(self) -> CelResult<u64> {
+        if let CelValue::UInt(val) = self {
+            return Ok(val);
+        }
+
+        Err(CelError::internal("Convertion Error"))
+    }
+}
+
+impl TryInto<f64> for CelValue {
+    type Error = CelError;
+
+    fn try_into(self) -> CelResult<f64> {
+        if let CelValue::Float(val) = self {
+            return Ok(val);
+        }
+
+        Err(CelError::internal("Convertion Error"))
+    }
+}
+
+impl TryInto<bool> for CelValue {
+    type Error = CelError;
+
+    fn try_into(self) -> CelResult<bool> {
+        if let CelValue::Bool(val) = self {
+            return Ok(val);
+        }
+
+        Err(CelError::internal("Convertion Error"))
+    }
+}
+
+impl TryInto<String> for CelValue {
+    type Error = CelError;
+
+    fn try_into(self) -> CelResult<String> {
+        if let CelValue::String(val) = self {
+            return Ok(val);
+        }
+
+        Err(CelError::internal("Convertion Error"))
+    }
+}
+
+impl TryInto<Vec<u8>> for CelValue {
+    type Error = CelError;
+
+    fn try_into(self) -> CelResult<Vec<u8>> {
+        if let CelValue::Bytes(val) = self {
+            return Ok(val);
+        }
+
+        Err(CelError::internal("Convertion Error"))
+    }
+}
+
 impl TryInto<Vec<CelValue>> for CelValue {
     type Error = CelError;
 
@@ -1045,12 +1061,6 @@ impl TryInto<Vec<CelValue>> for CelValue {
         }
 
         Err(CelError::internal("Convertion Error"))
-    }
-}
-
-impl From<HashMap<String, CelValue>> for CelValue {
-    fn from(val: HashMap<String, CelValue>) -> CelValue {
-        CelValue::from_map(val)
     }
 }
 
@@ -1066,18 +1076,6 @@ impl TryInto<HashMap<String, CelValue>> for CelValue {
     }
 }
 
-impl From<DateTime<Utc>> for CelValue {
-    fn from(val: DateTime<Utc>) -> CelValue {
-        CelValue::from_timestamp(val)
-    }
-}
-
-impl From<DateTime<FixedOffset>> for CelValue {
-    fn from(val: DateTime<FixedOffset>) -> CelValue {
-        CelValue::from_timestamp(val.into())
-    }
-}
-
 impl TryInto<DateTime<Utc>> for CelValue {
     type Error = CelError;
 
@@ -1090,9 +1088,15 @@ impl TryInto<DateTime<Utc>> for CelValue {
     }
 }
 
-impl From<Duration> for CelValue {
-    fn from(val: Duration) -> CelValue {
-        CelValue::from_duration(val)
+impl TryInto<i64> for CelValue {
+    type Error = CelError;
+
+    fn try_into(self) -> CelResult<i64> {
+        if let CelValue::Int(val) = self {
+            return Ok(val);
+        }
+
+        Err(CelError::internal("Convertion Error"))
     }
 }
 
@@ -1105,12 +1109,6 @@ impl TryInto<Duration> for CelValue {
         }
 
         Err(CelError::internal("Convertion Error"))
-    }
-}
-
-impl From<Vec<ByteCode>> for CelValue {
-    fn from(val: Vec<ByteCode>) -> CelValue {
-        CelValue::from_bytecode(val)
     }
 }
 

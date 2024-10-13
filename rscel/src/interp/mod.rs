@@ -336,7 +336,6 @@ impl<'a> Interpreter<'a> {
                 }
                 ByteCode::Access => {
                     let index = stack.pop_noresolve()?;
-
                     if let CelValue::Ident(ident) = index.as_value()? {
                         let obj = stack.pop()?.into_value()?;
                         match obj {
