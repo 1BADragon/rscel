@@ -594,6 +594,9 @@ impl<'l> CelCompiler<'l> {
                                 vec![ByteCode::Access],
                                 |o, c| {
                                     if let CelValue::Ident(s) = c {
+                                        // Allow for const eval for obj members in the
+                                        // off chance a user does somthing like this
+                                        // `{'a': 3}.a`. Its const value will be 3.
                                         if o.is_obj() {
                                             // So if this fails we should break the const
                                             // status and let the compiler generate some
