@@ -1,6 +1,6 @@
 use crate::{
-    cel_error::CelError, interp::Interpreter, utils::eval_ident, BindContext, ByteCode, CelContext,
-    CelValue, CelValueDyn,
+    interp::Interpreter, utils::eval_ident, BindContext, ByteCode, CelContext, CelError, CelValue,
+    CelValueDyn,
 };
 
 use super::bind_context::RsCelMacro;

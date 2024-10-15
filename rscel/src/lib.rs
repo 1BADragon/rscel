@@ -50,19 +50,14 @@
 //! assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), 7.into());
 //!
 //! ```
-mod cel_error;
-mod cel_value;
-mod cel_value_dyn;
 mod compiler;
 mod context;
 mod interp;
 mod program;
+mod types;
 
 // Export some public interface
 pub mod utils;
-pub use cel_error::{CelError, CelResult};
-pub use cel_value::CelValue;
-pub use cel_value_dyn::CelValueDyn;
 pub use compiler::{
     ast_node::AstNode, compiler::CelCompiler, grammar::*, source_location::SourceLocation,
     source_range::SourceRange, string_tokenizer::StringTokenizer, tokenizer::Tokenizer,
@@ -70,6 +65,7 @@ pub use compiler::{
 pub use context::{BindContext, CelContext, RsCelFunction, RsCelMacro};
 pub use interp::ByteCode;
 pub use program::{Program, ProgramDetails};
+pub use types::{CelError, CelResult, CelValue, CelValueDyn};
 
 // Some re-exports to allow a consistent use of serde
 pub use serde;

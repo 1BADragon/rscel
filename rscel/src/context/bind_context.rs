@@ -5,9 +5,8 @@ use protobuf::MessageDyn;
 use serde_json::Value;
 
 use crate::{
-    cel_error::CelResult,
     interp::{ByteCode, Interpreter},
-    CelError, CelValue,
+    CelError, CelResult, CelValue,
 };
 
 use super::default_macros::load_default_macros;

@@ -1,10 +1,7 @@
 use std::str::FromStr;
 
 use super::bind_context::RsCelFunction;
-use crate::{
-    cel_error::{CelError, CelResult},
-    BindContext, CelValue, CelValueDyn,
-};
+use crate::{BindContext, CelError, CelResult, CelValue, CelValueDyn};
 use chrono::{DateTime, Datelike, Timelike};
 use chrono_tz::Tz;
 use regex::Regex;
