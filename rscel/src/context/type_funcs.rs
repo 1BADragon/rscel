@@ -8,6 +8,7 @@ pub fn construct_type(type_name: &str, args: Vec<CelValue>) -> CelValue {
         "int" => int_impl(CelValue::from_null(), args),
         "uint" => uint_impl(CelValue::from_null(), args),
         "float" => double_impl(CelValue::from_null(), args),
+        "double" => double_impl(CelValue::from_null(), args),
         "bytes" => bytes_impl(CelValue::from_null(), args),
         "string" => string_impl(CelValue::from_null(), args),
         "type" => type_impl(CelValue::from_null(), args),

@@ -1,6 +1,6 @@
-use chrono::{offset::Utc, DateTime, Duration, FixedOffset};
+use chrono::{offset::Utc, serde::ts_milliseconds, DateTime, Duration, FixedOffset};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
+use serde_with::{serde_as, DeserializeAs, DurationMilliSeconds, SerializeAs};
 use std::{
     any::Any,
     cmp::Ordering,
@@ -27,7 +27,8 @@ use crate::{interp::ByteCode, CelError, CelResult, CelValueDyn};
 /// interpreter
 // Only the enum values that are also part of the language are serializable, aka int
 // because int literals can exist. If you can't represent it as part of the language
-// it doesn't need to be serialized
+// it doesn't need to be serialized. The time types will be serialized to
+// milliseconds resolution.
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum CelValue {
@@ -42,9 +43,12 @@ pub enum CelValue {
     Null,
     Ident(String),
     Type(String),
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(with = "ts_milliseconds")]
     TimeStamp(DateTime<Utc>),
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(
+        serialize_with = "DurationMilliSeconds::<i64>::serialize_as",
+        deserialize_with = "DurationMilliSeconds::<i64>::deserialize_as"
+    )]
     Duration(Duration),
     ByteCode(Vec<ByteCode>),
     #[cfg(feature = "protobuf")]

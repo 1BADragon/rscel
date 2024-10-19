@@ -10,18 +10,28 @@ use super::{
     tokens::{AsToken, FStringSegment, IntoToken, Token},
 };
 use crate::{
-    interp::JmpWhen, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, StringTokenizer,
+    interp::{Interpreter, JmpWhen},
+    BindContext, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, StringTokenizer,
 };
 
 use crate::compile;
 
 pub struct CelCompiler<'l> {
     tokenizer: &'l mut dyn Tokenizer,
+    bindings: BindContext<'l>,
 }
 
 impl<'l> CelCompiler<'l> {
-    pub fn with_tokenizer(tokenizer: &'l mut dyn Tokenizer) -> CelCompiler<'l> {
-        CelCompiler { tokenizer }
+    pub fn with_tokenizer(tokenizer: &'l mut dyn Tokenizer) -> Self {
+        CelCompiler {
+            tokenizer,
+            bindings: BindContext::for_compile(),
+        }
+    }
+
+    pub fn with_bind_context<'o: 'l>(&mut self, ctx: BindContext<'o>) -> &mut Self {
+        self.bindings = ctx;
+        self
     }
 
     pub fn compile(mut self) -> CelResult<Program> {
@@ -649,10 +659,10 @@ impl<'l> CelCompiler<'l> {
                         loc: rparen_loc,
                     }) = token
                     {
-                        let mut args_node = CompiledNode::<ExprList>::empty();
-                        let mut args_ast = Vec::new();
                         let args_len = args.len();
 
+                        let mut args_ast = Vec::new();
+                        let mut args_node = CompiledNode::<ExprList>::empty();
                         // Arguments are evaluated backwards so they get popped off the stack in order
                         for mut a in args.into_iter().rev() {
                             args_ast.push(a.yank_ast());
@@ -667,6 +677,9 @@ impl<'l> CelCompiler<'l> {
                             .consume_child(CompiledNode::<NoAst>::with_bytecode(vec![
                                 ByteCode::Call(args_len as u32),
                             ]));
+
+                        member_prime_node = self.check_for_const(member_prime_node);
+
                         member_prime_ast.push(AstNode::new(
                             MemberPrime::Call {
                                 call: AstNode::new(
@@ -1044,6 +1057,19 @@ impl<'l> CelCompiler<'l> {
         }
 
         Ok(inits)
+    }
+
+    #[inline]
+    fn check_for_const<T: Clone>(&self, member_prime_node: CompiledNode<T>) -> CompiledNode<T> {
+        let mut i = Interpreter::empty();
+        i.add_bindings(&self.bindings);
+        let bc = member_prime_node.into_bytecode();
+        let r = i.run_raw(&bc, true);
+
+        match r {
+            Ok(v) => CompiledNode::with_const(v),
+            Err(_) => CompiledNode::with_bytecode(bc),
+        }
     }
 }
 

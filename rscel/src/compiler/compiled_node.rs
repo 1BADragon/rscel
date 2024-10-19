@@ -8,13 +8,13 @@ use super::{
     grammar::{ConditionalOr, Expr},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NodeValue {
     Bytecode(Vec<ByteCode>),
     ConstExpr(CelValue),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompiledNode<T> {
     pub inner: NodeValue,
     pub details: ProgramDetails,
