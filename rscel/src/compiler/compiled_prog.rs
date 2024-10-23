@@ -1,11 +1,5 @@
 use crate::{
-    interp::JmpWhen, program::ProgramDetails, ByteCode, CelError, CelValue, CelValueDyn, FromUnary,
-    Program,
-};
-
-use super::{
-    ast_node::AstNode,
-    grammar::{ConditionalOr, Expr},
+    interp::JmpWhen, program::ProgramDetails, ByteCode, CelError, CelValue, CelValueDyn, Program,
 };
 
 #[derive(Debug, Clone)]
@@ -15,17 +9,16 @@ pub enum NodeValue {
 }
 
 #[derive(Debug, Clone)]
-pub struct CompiledNode<T> {
+pub struct CompiledProg {
     pub inner: NodeValue,
     pub details: ProgramDetails,
-    pub ast: Option<AstNode<T>>,
 }
 
 #[macro_export]
 macro_rules! compile {
     ($bytecode:expr, $const_expr:expr, $( $child : ident),+) => {
         {
-            use crate::compiler::compiled_node::NodeValue;
+            use crate::compiler::compiled_prog::NodeValue;
             use crate::program::ProgramDetails;
 
             let mut new_details = ProgramDetails::new();
@@ -39,10 +32,9 @@ macro_rules! compile {
                 ($(NodeValue::ConstExpr($child),)+) => {
                     let resolved_const = $const_expr;
 
-                    CompiledNode {
+                    CompiledProg {
                         inner: NodeValue::ConstExpr(resolved_const),
                         details: new_details,
-                        ast: None
                     }
                 }
                 ($($child,)+) => {
@@ -54,10 +46,9 @@ macro_rules! compile {
 
                 new_bytecode.extend_from_slice(&$bytecode);
 
-                CompiledNode {
+                CompiledProg {
                     inner: NodeValue::Bytecode(new_bytecode),
                     details: new_details,
-                    ast: None
                 }
 
                 }
@@ -67,44 +58,40 @@ macro_rules! compile {
     };
 }
 
-impl<T: Clone> CompiledNode<T> {
-    pub fn empty() -> CompiledNode<T> {
-        CompiledNode {
+impl CompiledProg {
+    pub fn empty() -> CompiledProg {
+        CompiledProg {
             inner: NodeValue::Bytecode(Vec::new()),
             details: ProgramDetails::new(),
-            ast: None,
         }
     }
 
-    pub fn from_node<I: Clone>(other: CompiledNode<I>) -> Self {
-        CompiledNode {
+    pub fn from_node(other: CompiledProg) -> Self {
+        CompiledProg {
             inner: other.inner,
             details: other.details,
-            ast: None,
         }
     }
 
-    pub fn with_bytecode(bytecode: Vec<ByteCode>) -> CompiledNode<T> {
-        CompiledNode {
+    pub fn with_bytecode(bytecode: Vec<ByteCode>) -> CompiledProg {
+        CompiledProg {
             inner: NodeValue::Bytecode(bytecode),
             details: ProgramDetails::new(),
-            ast: None,
         }
     }
 
-    pub fn with_const(val: CelValue) -> CompiledNode<T> {
-        CompiledNode {
+    pub fn with_const(val: CelValue) -> CompiledProg {
+        CompiledProg {
             inner: NodeValue::ConstExpr(val),
             details: ProgramDetails::new(),
-            ast: None,
         }
     }
 
-    pub fn from_children_w_bytecode<T1: Clone, F>(
-        children: Vec<CompiledNode<T1>>,
+    pub fn from_children_w_bytecode<F>(
+        children: Vec<CompiledProg>,
         bytecode: Vec<ByteCode>,
         resolve: F,
-    ) -> CompiledNode<T>
+    ) -> CompiledProg
     where
         F: FnOnce(Vec<CelValue>) -> CelValue,
     {
@@ -131,19 +118,15 @@ impl<T: Clone> CompiledNode<T> {
             )
         };
 
-        CompiledNode {
-            inner,
-            details,
-            ast: None,
-        }
+        CompiledProg { inner, details }
     }
 
-    pub fn from_children2_w_bytecode_cannone<T1: Clone, T2: Clone, F>(
-        child1: CompiledNode<T1>,
-        child2: CompiledNode<T2>,
+    pub fn from_children2_w_bytecode_cannone<F>(
+        child1: CompiledProg,
+        child2: CompiledProg,
         bytecode: Vec<ByteCode>,
         resolve: F,
-    ) -> CompiledNode<T>
+    ) -> CompiledProg
     where
         F: FnOnce(&CelValue, &CelValue) -> Option<CelValue>,
     {
@@ -151,12 +134,11 @@ impl<T: Clone> CompiledNode<T> {
 
         match (child1.inner, child2.inner) {
             (NodeValue::ConstExpr(c1), NodeValue::ConstExpr(c2)) => match resolve(&c1, &c2) {
-                Some(res) => CompiledNode {
+                Some(res) => CompiledProg {
                     inner: NodeValue::ConstExpr(res),
                     details: new_details,
-                    ast: None,
                 },
-                None => CompiledNode {
+                None => CompiledProg {
                     inner: NodeValue::Bytecode(
                         [ByteCode::Push(c1), ByteCode::Push(c2)]
                             .into_iter()
@@ -164,10 +146,9 @@ impl<T: Clone> CompiledNode<T> {
                             .collect(),
                     ),
                     details: new_details,
-                    ast: None,
                 },
             },
-            (c1, c2) => CompiledNode {
+            (c1, c2) => CompiledProg {
                 inner: NodeValue::Bytecode(
                     c1.into_bytecode()
                         .into_iter()
@@ -176,45 +157,23 @@ impl<T: Clone> CompiledNode<T> {
                         .collect(),
                 ),
                 details: new_details,
-                ast: None,
             },
         }
     }
 
-    #[inline]
-    pub fn into_unary<O: FromUnary<InputType = T>>(self) -> CompiledNode<O> {
-        let ast = self.ast.expect("Internal Error: no ast");
-        let range = ast.range();
-
-        CompiledNode {
-            inner: self.inner,
-            details: self.details,
-            ast: Some(AstNode::new(O::from_unary(ast), range)),
-        }
-    }
-
-    pub fn add_ast(mut self, ast: AstNode<T>) -> Self {
-        self.ast = Some(ast);
-        self
-    }
-
-    pub fn into_program(node: CompiledNode<Expr>, source: String) -> Program {
-        let mut details = node.details;
+    pub fn into_program(self, source: String) -> Program {
+        let mut details = self.details;
         details.add_source(source);
 
-        if let Some(ast) = node.ast {
-            details.add_ast(ast);
-        }
-
-        Program::new(details, node.inner.into_bytecode())
+        Program::new(details, self.inner.into_bytecode())
     }
 
-    pub fn add_ident(mut self, ident: &str) -> CompiledNode<T> {
+    pub fn add_ident(mut self, ident: &str) -> CompiledProg {
         self.details.add_param(ident);
         self
     }
 
-    pub fn append_result<T1: Clone, O: Clone>(self, other: CompiledNode<T1>) -> CompiledNode<O> {
+    pub fn append_result(self, other: CompiledProg) -> CompiledProg {
         let my_bytecode = self.inner.into_bytecode();
         let other_bytecode = other.inner.into_bytecode();
 
@@ -226,75 +185,63 @@ impl<T: Clone> CompiledNode<T> {
             .chain(other_bytecode.into_iter())
             .collect();
 
-        CompiledNode {
+        CompiledProg {
             inner: NodeValue::Bytecode(new_bytecode),
             details: new_details,
-            ast: None,
         }
     }
 
-    pub fn consume_child<T1: Clone>(mut self, child: CompiledNode<T1>) -> CompiledNode<T> {
-        let mut ast = None;
-        std::mem::swap(&mut ast, &mut self.ast);
-
-        let mut r = self.append_result(child);
-
-        r.ast = ast;
+    pub fn consume_child(self, child: CompiledProg) -> CompiledProg {
+        let r = self.append_result(child);
         r
     }
 
     pub fn into_turnary(
         mut self,
-        true_clause: CompiledNode<ConditionalOr>,
-        false_clause: CompiledNode<Expr>,
-    ) -> CompiledNode<Expr> {
+        true_clause: CompiledProg,
+        false_clause: CompiledProg,
+    ) -> CompiledProg {
         self.details.union_from(true_clause.details);
         self.details.union_from(false_clause.details);
 
         if let NodeValue::ConstExpr(i) = self.inner {
             if i.is_err() {
-                CompiledNode {
+                CompiledProg {
                     inner: NodeValue::ConstExpr(i),
                     details: self.details,
-                    ast: None,
                 }
             } else {
                 if cfg!(feature = "type_prop") {
                     if i.is_truthy() {
-                        CompiledNode {
+                        CompiledProg {
                             inner: true_clause.inner,
                             details: self.details,
-                            ast: None,
                         }
                     } else {
-                        CompiledNode {
+                        CompiledProg {
                             inner: false_clause.inner,
                             details: self.details,
-                            ast: None,
                         }
                     }
                 } else {
                     if let CelValue::Bool(b) = i {
                         if b {
-                            CompiledNode {
+                            CompiledProg {
                                 inner: true_clause.inner,
                                 details: self.details,
-                                ast: None,
                             }
                         } else {
-                            CompiledNode {
+                            CompiledProg {
                                 inner: false_clause.inner,
                                 details: self.details,
-                                ast: None,
                             }
                         }
                     } else {
-                        CompiledNode {
+                        CompiledProg {
                             inner: NodeValue::ConstExpr(CelValue::from_err(CelError::Value(
                                 format!("{} cannot be converted to bool", i.as_type()),
                             ))),
                             details: self.details,
-                            ast: None,
                         }
                     }
                 }
@@ -302,7 +249,7 @@ impl<T: Clone> CompiledNode<T> {
         } else {
             let true_clause_bytecode = true_clause.inner.into_bytecode();
             let false_clause_bytecode = false_clause.inner.into_bytecode();
-            CompiledNode {
+            CompiledProg {
                 inner: NodeValue::Bytecode(
                     self.inner
                         .into_bytecode()
@@ -321,17 +268,8 @@ impl<T: Clone> CompiledNode<T> {
                         .collect(),
                 ),
                 details: self.details,
-                ast: None,
             }
         }
-    }
-
-    #[inline]
-    pub fn yank_ast(&mut self) -> AstNode<T> {
-        let mut moved_ast = None;
-        std::mem::swap(&mut moved_ast, &mut self.ast);
-
-        moved_ast.expect("Internal error, no ast")
     }
 
     #[inline]
