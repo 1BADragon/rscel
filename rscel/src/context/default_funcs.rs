@@ -482,13 +482,18 @@ fn get_full_year_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
 }
 
 fn get_hours_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
-    let date = match get_adjusted_datetime(this, args) {
-        Ok(it) => it,
-        Err(err) => return err.into(),
-    };
+    match this {
+        CelValue::Duration(d) => d.num_hours().into(),
+        other => {
+            let date = match get_adjusted_datetime(other, args) {
+                Ok(it) => it,
+                Err(err) => return err.into(),
+            };
 
-    let hours = date.time().hour();
-    CelValue::from_int(hours as i64)
+            let hours = date.time().hour();
+            CelValue::from_int(hours as i64)
+        }
+    }
 }
 
 fn get_milliseconds_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {

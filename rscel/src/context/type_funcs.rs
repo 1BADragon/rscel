@@ -221,9 +221,14 @@ fn timestamp_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     }
 
     if let CelValue::String(str_val) = &args[0] {
-        match (&str_val).parse::<DateTime<Utc>>() {
-            Ok(val) => CelValue::from_timestamp(val),
-            Err(_) => CelValue::from_err(CelError::value("Invalid timestamp format")),
+        if let Ok(val) = str_val.parse::<DateTime<Utc>>() {
+            CelValue::from_timestamp(val)
+        } else if let Ok(val) = DateTime::parse_from_rfc2822(str_val) {
+            CelValue::from_timestamp(val.to_utc())
+        } else if let Ok(val) = DateTime::parse_from_rfc3339(str_val) {
+            CelValue::from_timestamp(val.to_utc())
+        } else {
+            CelValue::from_err(CelError::value("Invalid timestamp format"))
         }
     } else if let CelValue::Int(i) = args[0] {
         use chrono::MappedLocalTime;
