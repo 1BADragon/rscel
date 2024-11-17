@@ -180,7 +180,7 @@ fn test_contains() {
 #[test_case("[1, 2, 3, 4].all(x, x < 5) && [1, 2, 3, 4].exists(x, x == 3)", true.into(); "all and exists")]
 #[test_case("coalesce(null, null, 'hello', null) == 'hello'", true.into(); "coalesce with multiple nulls")]
 #[test_case("duration('3h').getHours()", 3.into(); "duration.getHours")]
-#[test_case("duration('1.234s').getMilliseconds()", 234.into(); "duration.getMilliseconds")]
+#[test_case("duration('1s234ms').getMilliseconds()", 234.into(); "duration.getMilliseconds")]
 #[test_case("duration('1h30m').getMinutes()", 90.into(); "duration.getMinutes")]
 #[test_case("duration('1m30s').getSeconds()", 90.into(); "duration.getSeconds")]
 fn test_equation(prog: &str, res: CelValue) {
