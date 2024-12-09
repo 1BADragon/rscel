@@ -5,11 +5,10 @@ mod default_funcs;
 mod default_macros;
 mod type_funcs;
 use crate::{
-    cel_error::CelResult,
     compiler::{compiler::CelCompiler, string_tokenizer::StringTokenizer},
     interp::Interpreter,
     program::{Program, ProgramDetails},
-    CelValue,
+    CelResult, CelValue,
 };
 pub use bind_context::{BindContext, RsCelFunction, RsCelMacro};
 pub use type_funcs::construct_type;

@@ -50,6 +50,15 @@ fn test_equation_float(prog: &str, res: f64) {
 #[test_case("[1] ? 1 : 2", 1.into(); "type prop: full list as bool")]
 #[test_case("{\"foo\": 1} ? 1 : 2", 1.into(); "type prop: full obj as bool")]
 #[test_case("5 + (5 == 10 || 10 - 5 == 5) && false", false.into(); "Complex mixed precedence")]
+#[test_case("bool('3')", true.into(); "bool nonempty string")]
+#[test_case("bool('')", false.into(); "bool empty string")]
+#[test_case("bool([])", false.into(); "bool empty list")]
+#[test_case("bool([1])", true.into(); "bool nonempty list")]
+#[test_case("bool(null)", false.into(); "bool null")]
+#[test_case("bool({})", false.into(); "bool empty map")]
+#[test_case("bool({'foo': 42})", true.into(); "bool nonempty map")]
+#[test_case("bool(0)", false.into(); "bool zero")]
+#[test_case("bool(1)", true.into(); "bool nonzero")]
 fn test_equation(prog: &str, res: CelValue) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

@@ -5,12 +5,11 @@ use protobuf::MessageDyn;
 use serde_json::Value;
 
 use crate::{
-    cel_error::CelResult,
     interp::{ByteCode, Interpreter},
-    CelError, CelValue,
+    CelError, CelResult, CelValue,
 };
 
-use super::default_macros::load_default_macros;
+use super::default_macros::{load_compile_macros, load_default_macros};
 use super::{default_funcs::load_default_funcs, type_funcs::load_default_types};
 
 /// Prototype for a function binding.
@@ -76,6 +75,20 @@ impl<'a> BindContext<'a> {
         };
 
         load_default_macros(&mut ctx);
+        load_default_funcs(&mut ctx);
+        load_default_types(&mut ctx);
+        ctx
+    }
+
+    pub fn for_compile() -> BindContext<'a> {
+        let mut ctx = BindContext {
+            params: HashMap::new(),
+            funcs: HashMap::new(),
+            macros: HashMap::new(),
+            types: HashMap::new(),
+        };
+
+        load_compile_macros(&mut ctx);
         load_default_funcs(&mut ctx);
         load_default_types(&mut ctx);
         ctx

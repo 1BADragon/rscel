@@ -1,10 +1,7 @@
 use std::str::FromStr;
 
 use super::bind_context::RsCelFunction;
-use crate::{
-    cel_error::{CelError, CelResult},
-    BindContext, CelValue, CelValueDyn,
-};
+use crate::{BindContext, CelError, CelResult, CelValue, CelValueDyn};
 use chrono::{DateTime, Datelike, Timelike};
 use chrono_tz::Tz;
 use regex::Regex;
@@ -429,6 +426,8 @@ fn get_adjusted_datetime(this: CelValue, args: Vec<CelValue>) -> CelResult<DateT
         } else {
             Err(CelError::argument("Expected either 0 or 1 argumnets"))
         }
+    } else if let CelValue::Err(e) = this {
+        Err(e)
     } else {
         Err(CelError::argument("First parameter is not a timestamp"))
     }
@@ -485,33 +484,48 @@ fn get_full_year_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
 }
 
 fn get_hours_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
-    let date = match get_adjusted_datetime(this, args) {
-        Ok(it) => it,
-        Err(err) => return err.into(),
-    };
+    match this {
+        CelValue::Duration(d) => d.num_hours().into(),
+        other => {
+            let date = match get_adjusted_datetime(other, args) {
+                Ok(it) => it,
+                Err(err) => return err.into(),
+            };
 
-    let hours = date.time().hour();
-    CelValue::from_int(hours as i64)
+            let hours = date.time().hour();
+            CelValue::from_int(hours as i64)
+        }
+    }
 }
 
 fn get_milliseconds_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
-    let date = match get_adjusted_datetime(this, args) {
-        Ok(it) => it,
-        Err(err) => return err.into(),
-    };
+    match this {
+        CelValue::Duration(d) => (d.subsec_nanos() / 1000000).into(),
+        other => {
+            let date = match get_adjusted_datetime(other, args) {
+                Ok(it) => it,
+                Err(err) => return err.into(),
+            };
 
-    let milliseconds = date.timestamp_subsec_millis();
-    CelValue::from_int(milliseconds as i64)
+            let milliseconds = date.timestamp_subsec_millis();
+            CelValue::from_int(milliseconds as i64)
+        }
+    }
 }
 
 fn get_minutes_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
-    let date = match get_adjusted_datetime(this, args) {
-        Ok(it) => it,
-        Err(err) => return err.into(),
-    };
+    match this {
+        CelValue::Duration(d) => d.num_minutes().into(),
+        other => {
+            let date = match get_adjusted_datetime(other, args) {
+                Ok(it) => it,
+                Err(err) => return err.into(),
+            };
 
-    let minutes = date.time().minute();
-    CelValue::from_int(minutes as i64)
+            let minutes = date.time().minute();
+            CelValue::from_int(minutes as i64)
+        }
+    }
 }
 
 fn get_month_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
@@ -525,11 +539,16 @@ fn get_month_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
 }
 
 fn get_seconds_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
-    let date = match get_adjusted_datetime(this, args) {
-        Ok(it) => it,
-        Err(err) => return err.into(),
-    };
+    match this {
+        CelValue::Duration(d) => d.num_seconds().into(),
+        other => {
+            let date = match get_adjusted_datetime(other, args) {
+                Ok(it) => it,
+                Err(err) => return err.into(),
+            };
 
-    let second = date.time().second();
-    CelValue::from_int(second as i64)
+            let second = date.time().second();
+            CelValue::from_int(second as i64)
+        }
+    }
 }

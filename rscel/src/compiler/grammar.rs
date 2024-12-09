@@ -1,10 +1,20 @@
-use super::{ast_node::AstNode, tokens::FStringSegment};
+use super::{ast_node::AstNode, compiled_prog::CompiledProg, tokens::FStringSegment};
 use serde::{Deserialize, Serialize};
 
 pub trait FromUnary {
     type InputType;
 
     fn from_unary(inner: AstNode<<Self as FromUnary>::InputType>) -> Self;
+}
+
+#[inline]
+pub fn into_unary<T, U: FromUnary<InputType = T>>(
+    v: (CompiledProg, AstNode<T>),
+) -> (CompiledProg, AstNode<U>) {
+    let (prog, ast) = v;
+    let loc = ast.range();
+
+    (prog, AstNode::new(U::from_unary(ast), loc))
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

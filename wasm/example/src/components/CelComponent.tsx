@@ -43,6 +43,8 @@ export default function CelComponent() {
 
   const renderResult = (currResult: any): JSX.Element => {
     switch (typeof currResult) {
+      case "boolean":
+        return <label>{currResult ? "true" : "false"}</label>;
       case "number":
         return <label>{currResult.toString()}</label>;
       case "bigint":

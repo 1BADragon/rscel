@@ -1,6 +1,6 @@
 use crate::{
-    cel_error::CelError, interp::Interpreter, utils::eval_ident, BindContext, ByteCode, CelContext,
-    CelValue, CelValueDyn,
+    interp::Interpreter, utils::eval_ident, BindContext, ByteCode, CelContext, CelError, CelValue,
+    CelValueDyn,
 };
 
 use super::bind_context::RsCelMacro;
@@ -16,8 +16,23 @@ const DEFAULT_MACROS: &[(&str, &'static RsCelMacro)] = &[
     ("coalesce", &coalesce_impl),
 ];
 
+const COMPILE_MACROS: &[(&str, &'static RsCelMacro)] = &[
+    ("all", &all_impl),
+    ("exists", &exists_impl),
+    ("exists_one", &exists_one_impl),
+    ("filter", &filter_impl),
+    ("map", &map_impl),
+    ("reduce", &reduce_impl),
+];
+
 pub fn load_default_macros(exec_ctx: &mut BindContext) {
     for (name, macro_) in DEFAULT_MACROS.iter() {
+        exec_ctx.bind_macro(name, *macro_)
+    }
+}
+
+pub fn load_compile_macros(exec_ctx: &mut BindContext) {
+    for (name, macro_) in COMPILE_MACROS.iter() {
         exec_ctx.bind_macro(name, *macro_)
     }
 }
