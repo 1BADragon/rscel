@@ -2,7 +2,8 @@
 members = [
   "rscel",
   "python",
-  "wasm"
+  "wasm",
+  "rscel-macro"
 ]
 default-members = ["rscel"]
 resolver="2"

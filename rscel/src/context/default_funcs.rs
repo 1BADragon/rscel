@@ -1,15 +1,17 @@
 use std::str::FromStr;
 
 use super::bind_context::RsCelFunction;
-use crate::{BindContext, CelError, CelResult, CelValue, CelValueDyn};
+use crate::{BindContext, CelError, CelResult, CelValue};
 use chrono::{DateTime, Datelike, Timelike};
 use chrono_tz::Tz;
 use regex::Regex;
 
+mod size;
+
 const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("contains", &contains_impl),
     ("containsI", &contains_i_impl),
-    ("size", &size_impl),
+    ("size", &size::size),
     ("startsWith", &starts_with_impl),
     ("endsWith", &ends_with_impl),
     ("matches", &matches_impl),
@@ -102,36 +104,6 @@ fn contains_i_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     } else {
         CelValue::from_err(CelError::value("containsI() can only operate on string"))
     }
-}
-
-fn size_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
-    if args.len() > 1 {
-        return CelValue::from_err(CelError::argument("size() expects at most one argument"));
-    }
-
-    let val = if args.len() == 1 {
-        if !matches!(this, CelValue::Null) {
-            return CelValue::from_err(CelError::argument(
-                "size() expects either `this` or one argument, not both",
-            ));
-        }
-        &args[0]
-    } else {
-        &this
-    };
-
-    CelValue::from_uint(match val {
-        CelValue::String(s) => s.len() as u64,
-        CelValue::Bytes(b) => b.len() as u64,
-        CelValue::List(l) => l.len() as u64,
-        CelValue::Map(m) => m.len() as u64,
-        other => {
-            return CelValue::from_err(CelError::value(&format!(
-                "size() only available for types {{string, bytes, list, map}}, got {}",
-                other.as_type()
-            )))
-        }
-    })
 }
 
 fn matches_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {

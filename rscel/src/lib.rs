@@ -71,5 +71,7 @@ pub use types::{CelError, CelResult, CelValue, CelValueDyn};
 pub use serde;
 pub use serde_json;
 
+pub use rscel_macro as macros;
+
 #[cfg(test)]
 mod tests;

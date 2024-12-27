@@ -161,6 +161,40 @@ impl CelValue {
         CelValue::Err(val)
     }
 
+    pub fn value_error(msg: &str) -> CelValue {
+        CelError::Value(msg.to_owned()).into()
+    }
+
+    pub fn argument_error(msg: &str) -> CelValue {
+        CelError::Argument(msg.to_owned()).into()
+    }
+
+    pub fn internal_error(msg: &str) -> CelValue {
+        CelError::Internal(msg.to_owned()).into()
+    }
+
+    pub fn invalid_op_error(msg: &str) -> CelValue {
+        CelError::InvalidOp(msg.to_owned()).into()
+    }
+
+    pub fn runtime_error(msg: &str) -> CelValue {
+        CelError::Runtime(msg.to_owned()).into()
+    }
+
+    pub fn binding_error(sym_name: &str) -> CelValue {
+        CelError::Binding {
+            symbol: sym_name.to_owned(),
+        }
+        .into()
+    }
+
+    pub fn attribute(parent_name: &str, field_name: &str) -> CelError {
+        CelError::Attribute {
+            parent: parent_name.to_string(),
+            field: field_name.to_string(),
+        }
+    }
+
     pub fn into_result(self) -> CelResult<CelValue> {
         match self {
             CelValue::Err(e) => Err(e),
