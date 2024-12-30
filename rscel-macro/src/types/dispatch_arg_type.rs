@@ -13,6 +13,7 @@ pub enum DispatchArgType {
     Map,
     Timestamp,
     Duration,
+    CelResult,
 }
 
 impl DispatchArgType {
@@ -48,6 +49,9 @@ impl DispatchArgType {
                             _ => panic!("Vec arg must be either CelValue or u8"),
                         },
                         "Map" => DispatchArgType::Map,
+                        "DateTime" => DispatchArgType::Timestamp,
+                        "Duration" => DispatchArgType::Duration,
+                        "CelResult" => DispatchArgType::CelResult,
                         other => panic!("Unknown type: {}", other),
                     },
                     None => panic!("No type info"),
@@ -69,6 +73,7 @@ impl DispatchArgType {
             DispatchArgType::Map => 'm',
             DispatchArgType::Timestamp => 't',
             DispatchArgType::Duration => 'y',
+            DispatchArgType::CelResult => 'r',
         }
     }
 
@@ -84,6 +89,7 @@ impl DispatchArgType {
             DispatchArgType::Map => "Map",
             DispatchArgType::Timestamp => "TimeStamp",
             DispatchArgType::Duration => "Duration",
+            _ => unreachable!(),
         }
     }
 }

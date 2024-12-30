@@ -1565,8 +1565,8 @@ impl From<CelError> for CelValue {
     }
 }
 
-impl From<CelResult<CelValue>> for CelValue {
-    fn from(value: CelResult<CelValue>) -> Self {
+impl<T: Into<CelValue>> From<CelResult<T>> for CelValue {
+    fn from(value: CelResult<T>) -> Self {
         match value {
             Ok(val) => val.into(),
             Err(e) => e.into(),

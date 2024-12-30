@@ -197,7 +197,7 @@ fn string_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
             Result::Err(_) => CelValue::from_err(CelError::value("Bad bytes in utf8 convertion")),
         },
         TimeStamp(ts) => ts.to_rfc3339().into(),
-        Duration(d) => d.to_string().into(),
+        Duration(d) => format!("{}s", d.num_nanoseconds().unwrap() as f64 / 1_000_000_000.0).into(),
         _ => {
             return CelValue::from_err(CelError::value(&format!(
                 "string() invalid for {:?}",
