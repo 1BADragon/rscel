@@ -4,7 +4,7 @@ default-members = ["rscel"]
 resolver = "3"
 
 [workspace.package]
-version = "1.0.3"
+version = "1.0.4"
 edition = "2021"
 description = "Cel interpreter in rust"
 license = "MIT"
