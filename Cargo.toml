@@ -1,12 +1,7 @@
 [workspace]
-members = [
-  "rscel",
-  "python",
-  "wasm",
-  "rscel-macro"
-]
+members = ["rscel", "python", "wasm", "rscel-macro"]
 default-members = ["rscel"]
-resolver="2"
+resolver = "3"
 
 [workspace.package]
 version = "1.0.3"
@@ -25,4 +20,3 @@ lto = true
 [workspace.dependencies]
 chrono = { version = "0.4.38", features = ["serde"] }
 serde_json = { version = "1.0.121", features = ["raw_value"] }
-
