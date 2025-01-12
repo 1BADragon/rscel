@@ -21,6 +21,8 @@ use protobuf::{
 
 use crate::{interp::ByteCode, CelError, CelResult, CelValueDyn};
 
+use super::{cel_byte_code::CelByteCode, CelBytes};
+
 /// The basic value of the CEL interpreter.
 ///
 /// Houses all possible types and implements most of the valid operations within the
@@ -37,7 +39,7 @@ pub enum CelValue {
     Float(f64),
     Bool(bool),
     String(String),
-    Bytes(Vec<u8>),
+    Bytes(CelBytes),
     List(Vec<CelValue>),
     Map(HashMap<String, CelValue>),
     Null,
@@ -50,7 +52,7 @@ pub enum CelValue {
         deserialize_with = "DurationMilliSeconds::<i64>::deserialize_as"
     )]
     Duration(Duration),
-    ByteCode(Vec<ByteCode>),
+    ByteCode(CelByteCode),
     #[cfg(feature = "protobuf")]
     #[serde(skip_serializing, skip_deserializing)]
     Message(Box<dyn MessageDyn>),
@@ -100,11 +102,11 @@ impl CelValue {
     }
 
     pub fn from_bytes(val: Vec<u8>) -> CelValue {
-        CelValue::Bytes(val)
+        CelValue::Bytes(val.into())
     }
 
     pub fn from_byte_slice(val: &[u8]) -> CelValue {
-        CelValue::Bytes(val.to_owned())
+        CelValue::Bytes(val.to_owned().into())
     }
 
     pub fn from_list(val: Vec<CelValue>) -> CelValue {
@@ -150,7 +152,7 @@ impl CelValue {
     }
 
     pub(crate) fn from_bytecode(val: Vec<ByteCode>) -> CelValue {
-        CelValue::ByteCode(val.to_owned())
+        CelValue::ByteCode(val.into())
     }
 
     pub fn from_dyn(val: Arc<dyn CelValueDyn>) -> CelValue {
@@ -159,6 +161,40 @@ impl CelValue {
 
     pub fn from_err(val: CelError) -> CelValue {
         CelValue::Err(val)
+    }
+
+    pub fn value_error(msg: &str) -> CelValue {
+        CelError::Value(msg.to_owned()).into()
+    }
+
+    pub fn argument_error(msg: &str) -> CelValue {
+        CelError::Argument(msg.to_owned()).into()
+    }
+
+    pub fn internal_error(msg: &str) -> CelValue {
+        CelError::Internal(msg.to_owned()).into()
+    }
+
+    pub fn invalid_op_error(msg: &str) -> CelValue {
+        CelError::InvalidOp(msg.to_owned()).into()
+    }
+
+    pub fn runtime_error(msg: &str) -> CelValue {
+        CelError::Runtime(msg.to_owned()).into()
+    }
+
+    pub fn binding_error(sym_name: &str) -> CelValue {
+        CelError::Binding {
+            symbol: sym_name.to_owned(),
+        }
+        .into()
+    }
+
+    pub fn attribute(parent_name: &str, field_name: &str) -> CelError {
+        CelError::Attribute {
+            parent: parent_name.to_string(),
+            field: field_name.to_string(),
+        }
     }
 
     pub fn into_result(self) -> CelResult<CelValue> {
@@ -862,7 +898,7 @@ impl<'a> From<ReflectValueRef<'a>> for CelValue {
             ReflectValueRef::F64(f) => CelValue::Float(f),
             ReflectValueRef::Bool(b) => CelValue::Bool(b),
             ReflectValueRef::String(s) => CelValue::String(s.to_string()),
-            ReflectValueRef::Bytes(b) => CelValue::Bytes(b.to_owned()),
+            ReflectValueRef::Bytes(b) => CelValue::Bytes(b.to_owned().into()),
             ReflectValueRef::Enum(desc, value) => CelValue::Enum {
                 descriptor: desc,
                 value,
@@ -956,21 +992,9 @@ impl From<&[u8]> for CelValue {
     }
 }
 
-impl From<Vec<u8>> for CelValue {
-    fn from(val: Vec<u8>) -> CelValue {
-        CelValue::Bytes(val).into()
-    }
-}
-
 impl From<&[CelValue]> for CelValue {
     fn from(val: &[CelValue]) -> CelValue {
         CelValue::from_list(val.to_vec())
-    }
-}
-
-impl From<Vec<CelValue>> for CelValue {
-    fn from(val: Vec<CelValue>) -> CelValue {
-        CelValue::List(val).into()
     }
 }
 
@@ -1044,18 +1068,6 @@ impl TryInto<String> for CelValue {
     }
 }
 
-impl TryInto<Vec<u8>> for CelValue {
-    type Error = CelError;
-
-    fn try_into(self) -> CelResult<Vec<u8>> {
-        if let CelValue::Bytes(val) = self {
-            return Ok(val);
-        }
-
-        Err(CelError::internal("Convertion Error"))
-    }
-}
-
 impl TryInto<Vec<CelValue>> for CelValue {
     type Error = CelError;
 
@@ -1121,7 +1133,7 @@ impl TryInto<Vec<ByteCode>> for CelValue {
 
     fn try_into(self) -> CelResult<Vec<ByteCode>> {
         if let CelValue::ByteCode(val) = self {
-            return Ok(val);
+            return Ok(val.into());
         }
 
         Err(CelError::internal("Convertion Error"))
@@ -1221,8 +1233,8 @@ impl Add for CelValue {
                 CelValue::Bytes(val1) => {
                     if let CelValue::Bytes(val2) = rhs {
                         let mut res = val1;
-                        res.extend_from_slice(&val2);
-                        return CelValue::from_byte_slice(res.as_ref());
+                        res.extend(val2.into_vec());
+                        return CelValue::Bytes(res);
                     }
                 }
                 CelValue::List(val1) => {
@@ -1525,14 +1537,37 @@ impl fmt::Display for CelValue {
     }
 }
 
+impl From<CelByteCode> for CelValue {
+    fn from(value: CelByteCode) -> Self {
+        CelValue::ByteCode(value)
+    }
+}
+
+impl From<CelBytes> for CelValue {
+    fn from(value: CelBytes) -> Self {
+        CelValue::Bytes(value)
+    }
+}
+
 impl From<CelError> for CelValue {
     fn from(value: CelError) -> Self {
         CelValue::Err(value)
     }
 }
 
-impl From<CelResult<CelValue>> for CelValue {
-    fn from(value: CelResult<CelValue>) -> Self {
+impl<T: Into<CelValue>> From<Vec<T>> for CelValue {
+    fn from(value: Vec<T>) -> Self {
+        CelValue::List(
+            value
+                .into_iter()
+                .map(|i| i.into())
+                .collect::<Vec<CelValue>>(),
+        )
+    }
+}
+
+impl<T: Into<CelValue>> From<CelResult<T>> for CelValue {
+    fn from(value: CelResult<T>) -> Self {
         match value {
             Ok(val) => val.into(),
             Err(e) => e.into(),

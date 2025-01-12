@@ -1,5 +1,5 @@
 use crate::py_cel_value::{PyCelValue, PyCelValueRef};
-use pyo3::{types::PyTuple, Py, PyAny, PyObject, Python, ToPyObject};
+use pyo3::{types::PyTuple, Bound, IntoPyObject, Py, PyAny, PyErr, Python};
 use rscel::{CelError, CelValue};
 
 pub struct CelPyCallable {
@@ -17,21 +17,23 @@ impl FnOnce<(CelValue, Vec<CelValue>)> for CelPyCallable {
 
     extern "rust-call" fn call_once(self, args: (CelValue, Vec<CelValue>)) -> Self::Output {
         Python::with_gil(|py| {
-            match self.func.call_bound(
+            match self.func.call(
                 py,
-                PyTuple::new_bound(
+                PyTuple::new(
                     py,
                     &[args.0]
                         .iter()
                         .filter(|x| !x.is_null())
-                        .map(|x| PyCelValueRef::new(x).to_object(py))
+                        .map(|x| PyCelValueRef::new(x).into_pyobject(py))
                         .chain(
                             args.1
                                 .into_iter()
-                                .map(|x| PyCelValueRef::new(&x).to_object(py)),
+                                .map(|x| PyCelValueRef::new(&x).into_pyobject(py)),
                         )
-                        .collect::<Vec<PyObject>>(),
-                ),
+                        .collect::<Result<Vec<Bound<'_, PyAny>>, PyErr>>()
+                        .expect("argument collection failed"),
+                )
+                .expect("pytuple construction failed"),
                 None,
             ) {
                 Ok(val) => val.extract::<PyCelValue>(py).unwrap().into_inner(),
@@ -44,21 +46,27 @@ impl FnOnce<(CelValue, Vec<CelValue>)> for CelPyCallable {
 impl FnMut<(CelValue, Vec<CelValue>)> for CelPyCallable {
     extern "rust-call" fn call_mut(&mut self, args: (CelValue, Vec<CelValue>)) -> Self::Output {
         Python::with_gil(|py| {
-            match self.func.call_bound(
+            match self.func.call(
                 py,
-                PyTuple::new_bound(
+                PyTuple::new(
                     py,
                     &[args.0]
                         .iter()
                         .filter(|x| !x.is_null())
-                        .map(|x| PyCelValueRef::new(x).to_object(py))
+                        .map(|x| {
+                            PyCelValueRef::new(x)
+                                .into_pyobject(py)
+                                .map(|o| o.into_any())
+                        })
                         .chain(
                             args.1
                                 .into_iter()
-                                .map(|x| PyCelValueRef::new(&x).to_object(py)),
+                                .map(|x| PyCelValueRef::new(&x).into_pyobject(py)),
                         )
-                        .collect::<Vec<PyObject>>(),
-                ),
+                        .collect::<Result<Vec<Bound<'_, PyAny>>, PyErr>>()
+                        .expect("argument collection failed"),
+                )
+                .expect("pytuple construction failed"),
                 None,
             ) {
                 Ok(val) => val.extract::<PyCelValue>(py).unwrap().into_inner(),
@@ -71,21 +79,27 @@ impl FnMut<(CelValue, Vec<CelValue>)> for CelPyCallable {
 impl Fn<(CelValue, Vec<CelValue>)> for CelPyCallable {
     extern "rust-call" fn call(&self, args: (CelValue, Vec<CelValue>)) -> Self::Output {
         Python::with_gil(|py| {
-            match self.func.call_bound(
+            match self.func.call(
                 py,
-                PyTuple::new_bound(
+                PyTuple::new(
                     py,
                     &[args.0]
                         .iter()
                         .filter(|x| !x.is_null())
-                        .map(|x| PyCelValueRef::new(x).to_object(py))
+                        .map(|x| {
+                            PyCelValueRef::new(x)
+                                .into_pyobject(py)
+                                .map(|o| o.into_any())
+                        })
                         .chain(
                             args.1
                                 .into_iter()
-                                .map(|x| PyCelValueRef::new(&x).to_object(py)),
+                                .map(|x| PyCelValueRef::new(&x).into_pyobject(py)),
                         )
-                        .collect::<Vec<PyObject>>(),
-                ),
+                        .collect::<Result<Vec<Bound<'_, PyAny>>, PyErr>>()
+                        .expect("argument collection failed"),
+                )
+                .expect("pytuple construction failed"),
                 None,
             ) {
                 Ok(val) => val.extract::<PyCelValue>(py).unwrap().into_inner(),

@@ -1,10 +1,11 @@
 use crate::{
-    interp::JmpWhen, program::ProgramDetails, ByteCode, CelError, CelValue, CelValueDyn, Program,
+    interp::JmpWhen, program::ProgramDetails, types::CelByteCode, ByteCode, CelError, CelValue,
+    CelValueDyn, Program,
 };
 
 #[derive(Debug, Clone)]
 pub enum NodeValue {
-    Bytecode(Vec<ByteCode>),
+    Bytecode(CelByteCode),
     ConstExpr(CelValue),
 }
 
@@ -20,6 +21,7 @@ macro_rules! compile {
         {
             use crate::compiler::compiled_prog::NodeValue;
             use crate::program::ProgramDetails;
+            use crate::types::CelByteCode;
 
             let mut new_details = ProgramDetails::new();
 
@@ -38,13 +40,13 @@ macro_rules! compile {
                     }
                 }
                 ($($child,)+) => {
-                let mut new_bytecode = Vec::new();
+                let mut new_bytecode = CelByteCode::new();
 
                 $(
-                    new_bytecode.append(&mut $child.into_bytecode());
+                    new_bytecode.extend($child.into_bytecode().into_iter());
                 )+
 
-                new_bytecode.extend_from_slice(&$bytecode);
+                new_bytecode.extend($bytecode);
 
                 CompiledProg {
                     inner: NodeValue::Bytecode(new_bytecode),
@@ -61,7 +63,7 @@ macro_rules! compile {
 impl CompiledProg {
     pub fn empty() -> CompiledProg {
         CompiledProg {
-            inner: NodeValue::Bytecode(Vec::new()),
+            inner: NodeValue::Bytecode(CelByteCode::new()),
             details: ProgramDetails::new(),
         }
     }
@@ -73,9 +75,16 @@ impl CompiledProg {
         }
     }
 
-    pub fn with_bytecode(bytecode: Vec<ByteCode>) -> CompiledProg {
+    pub fn with_bytecode(bytecode: CelByteCode) -> CompiledProg {
         CompiledProg {
             inner: NodeValue::Bytecode(bytecode),
+            details: ProgramDetails::new(),
+        }
+    }
+
+    pub fn with_code_points(bytecode: Vec<ByteCode>) -> CompiledProg {
+        CompiledProg {
+            inner: NodeValue::Bytecode(bytecode.into()),
             details: ProgramDetails::new(),
         }
     }
@@ -111,7 +120,7 @@ impl CompiledProg {
             NodeValue::Bytecode(
                 children
                     .into_iter()
-                    .map(|c| c.inner.into_bytecode())
+                    .map(|c| c.inner.into_bytecode().into_iter())
                     .flatten()
                     .chain(bytecode.into_iter())
                     .collect(),
@@ -280,7 +289,7 @@ impl CompiledProg {
         }
     }
 
-    pub fn into_bytecode(self) -> Vec<ByteCode> {
+    pub fn into_bytecode(self) -> CelByteCode {
         self.inner.into_bytecode()
     }
 
@@ -301,10 +310,10 @@ impl NodeValue {
         matches!(*self, NodeValue::ConstExpr(_))
     }
 
-    pub fn into_bytecode(self) -> Vec<ByteCode> {
+    pub fn into_bytecode(self) -> CelByteCode {
         match self {
             NodeValue::Bytecode(b) => b,
-            NodeValue::ConstExpr(c) => [ByteCode::Push(c)].to_vec(),
+            NodeValue::ConstExpr(c) => CelByteCode::from_code_point(ByteCode::Push(c)),
         }
     }
 }

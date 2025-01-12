@@ -98,7 +98,7 @@ impl<'l> CelCompiler<'l> {
                 self.tokenizer.next()?;
                 let (rhs_node, rhs_ast) = self.parse_conditional_and()?;
 
-                let jmp_node = CompiledProg::with_bytecode(vec![ByteCode::JmpCond {
+                let jmp_node = CompiledProg::with_code_points(vec![ByteCode::JmpCond {
                     when: JmpWhen::True,
                     dist: rhs_node.bytecode_len() as u32 + 1,
                     leave_val: true,
@@ -136,7 +136,7 @@ impl<'l> CelCompiler<'l> {
                 self.tokenizer.next()?;
                 let (rhs_node, rhs_ast) = self.parse_relation()?;
 
-                let jmp_node = CompiledProg::with_bytecode(vec![ByteCode::JmpCond {
+                let jmp_node = CompiledProg::with_code_points(vec![ByteCode::JmpCond {
                     when: JmpWhen::False,
                     dist: rhs_node.bytecode_len() as u32 + 1,
                     leave_val: true,
@@ -651,15 +651,17 @@ impl<'l> CelCompiler<'l> {
                         // Arguments are evaluated backwards so they get popped off the stack in order
                         for (a, ast) in args.into_iter().rev() {
                             args_ast.push(ast);
-                            args_node = args_node.append_result(CompiledProg::with_bytecode(vec![
-                                ByteCode::Push(a.into_bytecode().into()),
-                            ]))
+                            args_node =
+                                args_node.append_result(CompiledProg::with_code_points(vec![
+                                    ByteCode::Push(a.into_bytecode().into()),
+                                ]))
                         }
 
-                        member_prime_node =
-                            member_prime_node.consume_child(args_node).consume_child(
-                                CompiledProg::with_bytecode(vec![ByteCode::Call(args_len as u32)]),
-                            );
+                        member_prime_node = member_prime_node
+                            .consume_child(args_node)
+                            .consume_child(CompiledProg::with_code_points(vec![ByteCode::Call(
+                                args_len as u32,
+                            )]));
 
                         member_prime_node = self.check_for_const(member_prime_node);
 
@@ -744,7 +746,7 @@ impl<'l> CelCompiler<'l> {
                 token: Token::Ident(val),
                 loc,
             }) => Ok((
-                CompiledProg::with_bytecode(vec![ByteCode::Push(CelValue::from_ident(&val))])
+                CompiledProg::with_code_points(vec![ByteCode::Push(CelValue::from_ident(&val))])
                     .add_ident(&val),
                 AstNode::new(Primary::Ident(Ident(val.clone())), loc),
             )),
@@ -933,7 +935,7 @@ impl<'l> CelCompiler<'l> {
             }) => Ok((
                 CompiledProg::with_const(val.clone().into()),
                 AstNode::new(
-                    Primary::Literal(LiteralsAndKeywords::ByteStringLit(val.clone())),
+                    Primary::Literal(LiteralsAndKeywords::ByteStringLit(val.into())),
                     loc,
                 ),
             )),
@@ -965,7 +967,7 @@ impl<'l> CelCompiler<'l> {
                 bytecode.push(ByteCode::FmtString(segments.len() as u32));
 
                 Ok((
-                    CompiledProg::with_bytecode(bytecode),
+                    CompiledProg::with_code_points(bytecode),
                     AstNode::new(
                         Primary::Literal(LiteralsAndKeywords::FStringList(segments.clone())),
                         loc,

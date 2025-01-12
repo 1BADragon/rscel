@@ -2,7 +2,7 @@ use crate::{py_cel_program::PyCelProgram, py_cel_value::PyCelValue};
 
 use super::py_bind_context::PyBindContext;
 use pyo3::{
-    exceptions::PyValueError, pyclass, pymethods, PyObject, PyRefMut, PyResult, ToPyObject,
+    exceptions::PyValueError, pyclass, pymethods, IntoPyObjectExt, PyObject, PyRefMut, PyResult,
 };
 use rscel::{BindContext, CelContext};
 
@@ -55,7 +55,9 @@ impl PyCelContext {
         }
 
         match slf.ctx.exec(name, &bindctx) {
-            Ok(val) => Ok(PyCelValue::new(val).to_object(slf.py())),
+            Ok(val) => Ok(PyCelValue::new(val)
+                .into_pyobject_or_pyerr(slf.py())?
+                .unbind()),
             Err(err) => Err(PyValueError::new_err(err.to_string())),
         }
     }

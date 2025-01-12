@@ -2,7 +2,7 @@ mod program_details;
 
 use crate::{
     compiler::{ast_node::AstNode, grammar::Expr},
-    interp::ByteCode,
+    types::CelByteCode,
     CelCompiler, CelResult, StringTokenizer,
 };
 pub use program_details::ProgramDetails;
@@ -11,11 +11,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Program {
     details: ProgramDetails,
-    bytecode: Vec<ByteCode>,
+    bytecode: CelByteCode,
 }
 
 impl Program {
-    pub fn new(details: ProgramDetails, bytecode: Vec<ByteCode>) -> Program {
+    pub fn new(details: ProgramDetails, bytecode: CelByteCode) -> Program {
         Program { details, bytecode }
     }
 
@@ -43,7 +43,7 @@ impl Program {
         &mut self.details
     }
 
-    pub fn bytecode<'a>(&'a self) -> &'a [ByteCode] {
+    pub fn bytecode<'a>(&'a self) -> &'a CelByteCode {
         &self.bytecode
     }
 

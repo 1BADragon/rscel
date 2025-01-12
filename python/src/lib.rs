@@ -8,6 +8,7 @@ use pyo3::{
     exceptions::PyException,
     prelude::*,
     types::{PyDict, PyString},
+    IntoPyObjectExt,
 };
 
 mod cel_py_object;
@@ -63,7 +64,7 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &Bound<PyDict>) -> PyResult<
     let res = ctx.exec("entry", &exec_ctx);
 
     match res {
-        Ok(res) => Ok(PyCelValue::new(res).to_object(py)),
+        Ok(res) => Ok(PyCelValue::new(res).into_pyobject_or_pyerr(py)?.unbind()),
         Err(err) => Err(PyException::new_err(err.to_string())),
     }
 }

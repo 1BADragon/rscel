@@ -1,14 +1,10 @@
 [workspace]
-members = [
-  "rscel",
-  "python",
-  "wasm"
-]
+members = ["rscel", "python", "wasm", "rscel-macro"]
 default-members = ["rscel"]
-resolver="2"
+resolver = "2"
 
 [workspace.package]
-version = "1.0.3"
+version = "1.0.4"
 edition = "2021"
 description = "Cel interpreter in rust"
 license = "MIT"
@@ -24,4 +20,3 @@ lto = true
 [workspace.dependencies]
 chrono = { version = "0.4.38", features = ["serde"] }
 serde_json = { version = "1.0.121", features = ["raw_value"] }
-

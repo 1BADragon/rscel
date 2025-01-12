@@ -4,10 +4,7 @@ use std::collections::HashMap;
 use protobuf::MessageDyn;
 use serde_json::Value;
 
-use crate::{
-    interp::{ByteCode, Interpreter},
-    CelError, CelResult, CelValue,
-};
+use crate::{interp::Interpreter, types::CelByteCode, CelError, CelResult, CelValue};
 
 use super::default_macros::{load_compile_macros, load_default_macros};
 use super::{default_funcs::load_default_funcs, type_funcs::load_default_types};
@@ -27,9 +24,9 @@ use super::{default_funcs::load_default_funcs, type_funcs::load_default_types};
 ///
 /// fn keys_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
 ///     if args.len() == 0 {
-///         return Err(CelError::misc("keys() expects 0 arguments"));    
+///         return Err(CelError::misc("keys() expects 0 arguments"));
 ///     }
-///     
+///
 ///     if let CelValue::Map(map) = this {
 ///         Ok(CelValue::from_list(map.keys().map(|x| x.as_str().into()).collect()))
 ///     } else {
@@ -47,7 +44,8 @@ pub type RsCelFunction = dyn Fn(CelValue, Vec<CelValue>) -> CelValue;
 /// argument is the resolved value the macro is being run on (i.e `my_list.map()`) however
 /// all arguents passed to the macro are left unresolved bytecode. An additional argument,
 /// the Interpreter context, is provided to the macro for bytecode resolution.
-pub type RsCelMacro = dyn for<'a, 'b> Fn(&'a Interpreter<'a>, CelValue, &[&[ByteCode]]) -> CelValue;
+pub type RsCelMacro =
+    dyn for<'a, 'b> Fn(&'a Interpreter<'a>, CelValue, &[&CelByteCode]) -> CelValue;
 
 /// Bindings context for a cel evaluation.
 ///
