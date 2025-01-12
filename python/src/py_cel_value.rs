@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use pyo3::{types::PyBytes, PyObject, Python, ToPyObject};
+use pyo3::{types::PyBytes, IntoPyObject, Python};
+use pyo3::{Bound, IntoPyObjectExt, PyAny, PyErr};
 use rscel::CelValue;
 
 use crate::cel_py_object::CelPyObject;
@@ -48,9 +49,13 @@ impl PyCelValue {
     }
 }
 
-impl ToPyObject for PyCelValue {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        PyCelValueRef(&self.0).to_object(py)
+impl<'py> IntoPyObject<'py> for PyCelValue {
+    type Error = PyErr;
+    type Target = PyAny;
+    type Output = Bound<'py, PyAny>;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        PyCelValueRef::new(&self.0).into_pyobject(py)
     }
 }
 
@@ -66,40 +71,52 @@ impl fmt::Debug for PyCelValue {
     }
 }
 
-impl<'a> ToPyObject for PyCelValueRef<'a> {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
+impl<'py, 'a> IntoPyObject<'py> for PyCelValueRef<'a> {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         use crate::CelValue::*;
 
         match self.0 {
-            Int(i) => i.to_object(py),
-            UInt(i) => i.to_object(py),
-            Float(f) => f.to_object(py),
-            Bool(b) => b.to_object(py),
-            String(s) => s.to_object(py),
-            Bytes(s) => PyBytes::new_bound(py, s.as_slice()).into(),
+            Int(i) => i.into_pyobject_or_pyerr(py).map(|o| o.into_any()),
+            UInt(i) => i.into_pyobject_or_pyerr(py).map(|o| o.into_any()),
+            Float(f) => f.into_pyobject_or_pyerr(py).map(|o| o.into_any()),
+            Bool(b) => b
+                .into_pyobject_or_pyerr(py)
+                .map(|o| o.to_owned().into_any()),
+            String(s) => s.into_pyobject_or_pyerr(py).map(|o| o.into_any()),
+            Bytes(s) => Ok(PyBytes::new(py, s.as_slice()).into_any()),
             List(l) => l
                 .into_iter()
-                .map(|x| PyCelValueRef(x).to_object(py))
-                .collect::<Vec<_>>()
-                .to_object(py),
+                .map(|x| {
+                    PyCelValueRef(x)
+                        .into_pyobject_or_pyerr(py)
+                        .map(|o| o.into_any())
+                })
+                .collect::<Result<Vec<_>, PyErr>>()?
+                .into_pyobject_or_pyerr(py)
+                .map(|o| o.into_any()),
             Map(m) => m
                 .into_iter()
-                .map(|(k, v)| (k, PyCelValueRef(v).to_object(py)))
-                .collect::<HashMap<_, _>>()
-                .to_object(py),
-            TimeStamp(ts) => ts.to_object(py),
-            Duration(d) => d.to_object(py),
-            Null => py.None(),
+                .map(|(k, v)| PyCelValueRef(v).into_pyobject_or_pyerr(py).map(|o| (k, o)))
+                .collect::<Result<HashMap<_, _>, PyErr>>()?
+                .into_pyobject_or_pyerr(py)
+                .map(|o| o.into_any()),
+            TimeStamp(ts) => ts.into_pyobject_or_pyerr(py).map(|o| o.into_any()),
+            Duration(d) => d.into_pyobject_or_pyerr(py).map(|o| o.into_any()),
+            Null => Ok(py.None().bind(py).to_owned()),
             Dyn(d) => {
                 match d.any_ref().downcast_ref::<CelPyObject>() {
-                    Some(obj) => obj.as_inner().clone(),
+                    Some(obj) => Ok(obj.as_inner().clone().bind(py).to_owned()),
                     // This *should* never happen. If this downcase were to fail that would
                     // mean that the data in this dyn isn't a CelPyObject which should be impossible
                     // for these bidnings
-                    None => py.None(),
+                    None => Ok(py.None().bind(py).to_owned()),
                 }
             }
-            _ => py.None(),
+            _ => Ok(py.None().bind(py).to_owned()),
         }
     }
 }
