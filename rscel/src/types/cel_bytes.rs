@@ -28,6 +28,10 @@ impl CelBytes {
     {
         self.inner.extend(bytes.into_iter());
     }
+
+    pub fn as_slice(&self) -> &[u8] {
+        self.inner.as_ref()
+    }
 }
 
 impl From<Vec<u8>> for CelBytes {

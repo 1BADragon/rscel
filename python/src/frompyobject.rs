@@ -5,10 +5,10 @@ use pyo3::{
     conversion::FromPyObject,
     exceptions::PyValueError,
     types::{
-        timezone_utc_bound, PyBool, PyBytes, PyDateTime, PyDelta, PyDict, PyFloat, PyInt, PyList,
-        PyString, PyTuple,
+        timezone_utc, PyAnyMethods, PyBool, PyBytes, PyDateTime, PyDelta, PyDict, PyDictMethods,
+        PyFloat, PyInt, PyList, PyString, PyStringMethods, PyTuple, PyTypeMethods,
     },
-    PyAny, PyErr, PyResult, PyTypeCheck, Python,
+    Bound, PyAny, PyErr, PyResult, PyTypeCheck,
 };
 
 use rscel::CelValue;
@@ -37,12 +37,12 @@ trait WrappedExtract<'a> {
 
 macro_rules! wrapped_extract {
     ($type_name:ident) => {
-        impl<'a> WrappedExtract<'a> for $type_name {
+        impl<'a> WrappedExtract<'a> for &Bound<'_, $type_name> {
             fn wrapped_extract<D>(&'a self, path: &[&str]) -> Result<D, WrappedError>
             where
                 D: FromPyObject<'a>,
             {
-                match self.extract::<D>() {
+                match D::extract_bound(self) {
                     Ok(val) => Ok(val),
                     Err(err) => Err(WrappedError::new(err, path)),
                 }
@@ -58,12 +58,12 @@ wrapped_extract!(PyString);
 wrapped_extract!(PyBytes);
 wrapped_extract!(PyDateTime);
 wrapped_extract!(PyDelta);
-impl<'a> WrappedExtract<'a> for &PyAny {
+impl<'a> WrappedExtract<'a> for Bound<'_, PyAny> {
     fn wrapped_extract<D>(&'a self, path: &[&str]) -> Result<D, WrappedError>
     where
         D: FromPyObject<'a>,
     {
-        match self.extract() {
+        match D::extract_bound(self) {
             Ok(val) => Ok(val),
             Err(err) => Err(WrappedError::new(err, path)),
         }
@@ -71,16 +71,13 @@ impl<'a> WrappedExtract<'a> for &PyAny {
 }
 
 trait WrappedDowncast {
-    fn wrapped_downcast<D>(&self, path: &[&str]) -> Result<&D, WrappedError>
+    fn wrapped_downcast<D>(&self, path: &[&str]) -> Result<&Bound<'_, D>, WrappedError>
     where
-        D: PyTypeCheck<AsRefTarget = D>;
+        D: PyTypeCheck;
 }
 
-impl WrappedDowncast for &PyAny {
-    fn wrapped_downcast<D: PyTypeCheck<AsRefTarget = D>>(
-        &self,
-        path: &[&str],
-    ) -> Result<&D, WrappedError>
+impl WrappedDowncast for &Bound<'_, PyAny> {
+    fn wrapped_downcast<D>(&self, path: &[&str]) -> Result<&Bound<'_, D>, WrappedError>
     where
         D: PyTypeCheck,
     {
@@ -95,11 +92,11 @@ impl WrappedDowncast for &PyAny {
 }
 
 fn extract_celval_recurse<'source>(
-    ob: &PyAny,
+    ob: &Bound<'source, PyAny>,
     current_path: &'source [&'source str],
 ) -> Result<PyCelValue, WrappedError> {
     match ob.get_type().name() {
-        Ok(type_name) => match type_name.as_ref() {
+        Ok(type_name) => match type_name.to_str().expect("to get python type as str") {
             "int" => Ok(PyCelValue::new(
                 ob.wrapped_downcast::<PyInt>(current_path)?
                     .wrapped_extract::<i64>(current_path)?
@@ -132,9 +129,11 @@ fn extract_celval_recurse<'source>(
 
                 for (i, val) in ob
                     .wrapped_downcast::<PyList>(current_path)?
-                    .iter()
+                    .try_iter()
+                    .expect("list to iterate")
                     .enumerate()
                 {
+                    let val = val.expect("val to exist");
                     next_path.push(format!("{}", i));
                     vec.push(
                         val.wrapped_extract::<PyCelValue>(
@@ -153,7 +152,8 @@ fn extract_celval_recurse<'source>(
                 let mut map: HashMap<String, CelValue> = HashMap::new();
 
                 let mapobj = ob.wrapped_downcast::<PyDict>(current_path)?;
-                for keyobj in mapobj.keys().iter() {
+                for keyobj in mapobj.keys().try_iter().expect("keys to iterate") {
+                    let keyobj = keyobj.expect("keyobj to exist");
                     let key = match keyobj.downcast::<PyString>() {
                         Ok(val) => val.to_string(),
                         Err(_) => {
@@ -186,33 +186,39 @@ fn extract_celval_recurse<'source>(
 
                 Ok(PyCelValue::new(map.into()))
             }
-            "datetime.datetime" => {
-                let py_utc_dt = match Python::with_gil(|py| {
-                    let utc = timezone_utc_bound(py);
-                    let py_astimezone = ob.getattr("astimezone")?;
+            "datetime.datetime" | "datetime" => {
+                let py = ob.py();
 
-                    let args = PyTuple::new_bound(py, [utc]);
+                let utc = timezone_utc(py);
+                let py_astimezone = match ob.getattr("astimezone") {
+                    Ok(v) => v,
+                    Err(e) => return Err(WrappedError::new(e, current_path)),
+                };
 
-                    py_astimezone.call1(args)
-                }) {
+                let args = match PyTuple::new(py, [utc]) {
+                    Ok(v) => v,
+                    Err(e) => return Err(WrappedError::new(e, current_path)),
+                };
+
+                let py_utc_dt = match py_astimezone.call1(args) {
                     Ok(val) => val,
                     Err(err) => return Err(WrappedError::new(err, current_path)),
                 };
 
-                let dt = py_utc_dt
+                let dt = (&py_utc_dt)
                     .wrapped_downcast::<PyDateTime>(current_path)?
                     .wrapped_extract::<DateTime<Utc>>(current_path)?;
 
-                Ok(PyCelValue::new(dt.with_timezone(&Utc).into()))
+                Ok(PyCelValue::new(dt.into()))
             }
-            "datetime.timedelta" => Ok(PyCelValue::new(
+            "datetime.timedelta" | "timedelta" => Ok(PyCelValue::new(
                 ob.wrapped_downcast::<PyDelta>(current_path)?
                     .wrapped_extract::<Duration>(current_path)?
                     .into(),
             )),
             "NoneType" => Ok(PyCelValue::new(CelValue::from_null())),
             _ => Ok(PyCelValue::new(CelValue::Dyn(Arc::<CelPyObject>::new(
-                CelPyObject::new(ob.into()),
+                CelPyObject::new(ob.clone().unbind()),
             )))),
         },
         Err(_) => Err(WrappedError::new(
@@ -223,7 +229,7 @@ fn extract_celval_recurse<'source>(
 }
 
 impl<'source> FromPyObject<'source> for PyCelValue {
-    fn extract(ob: &PyAny) -> PyResult<Self> {
+    fn extract_bound(ob: &pyo3::Bound<'source, PyAny>) -> PyResult<Self> {
         match extract_celval_recurse(ob, &[]) {
             Ok(val) => Ok(val),
             Err(WrappedError { err, path }) => Err(PyValueError::new_err(format!(
