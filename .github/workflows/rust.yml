@@ -59,5 +59,8 @@ jobs:
       - name: Copy Readme
         run: cp README.md rscel/README.md
 
-      - name: publish
+      - name: publish rscel-macro
+        run: cargo publish -p rscel-macro --token ${{ secrets.CRATES_IO_API_KEY }}
+
+      - name: publish rscel
         run: cargo publish -p rscel --token ${{ secrets.CRATES_IO_API_KEY }}
