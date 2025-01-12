@@ -3,7 +3,6 @@ use syn::{parse_macro_input, ItemMod};
 use types::DispatchMod;
 
 mod types;
-mod util;
 
 #[proc_macro_attribute]
 pub fn dispatch(_attr: TokenStream, item: TokenStream) -> TokenStream {

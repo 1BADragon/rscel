@@ -9,7 +9,7 @@ fn main() {
     }
 
     let p = Program::from_source(&args[1]).expect("Failed to compile program");
-    for bc in p.bytecode() {
+    for bc in p.bytecode().iter() {
         println!("{:?}", bc);
     }
 }

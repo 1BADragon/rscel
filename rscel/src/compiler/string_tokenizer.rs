@@ -246,7 +246,7 @@ impl<'l> StringTokenizer<'l> {
             }
         }
 
-        Ok(Some(Token::ByteStringLit(working)))
+        Ok(Some(Token::ByteStringLit(working.into())))
     }
 
     fn parse_string_literal(

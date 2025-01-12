@@ -187,12 +187,17 @@ fn string_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
 
     let arg_type = args[0].as_type();
 
-    match &args[0] {
+    let arg = match TryInto::<[CelValue; 1]>::try_into(args) {
+        Ok([i]) => i,
+        _ => return CelValue::from_err(CelError::argument("string expects 1 argument")),
+    };
+
+    match arg {
         Int(i) => i.to_string().into(),
         UInt(i) => i.to_string().into(),
         Float(f) => f.to_string().into(),
         String(s) => s.clone().into(),
-        Bytes(b) => match std::string::String::from_utf8(b.clone()) {
+        Bytes(b) => match std::string::String::from_utf8(b.into()) {
             Ok(s) => s.into(),
             Result::Err(_) => CelValue::from_err(CelError::value("Bad bytes in utf8 convertion")),
         },

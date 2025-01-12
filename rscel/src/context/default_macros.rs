@@ -1,6 +1,6 @@
 use crate::{
-    interp::Interpreter, utils::eval_ident, BindContext, ByteCode, CelContext, CelError, CelValue,
-    CelValueDyn,
+    interp::Interpreter, types::CelByteCode, utils::eval_ident, BindContext, CelContext, CelError,
+    CelValue, CelValueDyn,
 };
 
 use super::bind_context::RsCelMacro;
@@ -37,7 +37,7 @@ pub fn load_compile_macros(exec_ctx: &mut BindContext) {
     }
 }
 
-fn has_impl(ctx: &Interpreter, _this: CelValue, exprlist: &[&[ByteCode]]) -> CelValue {
+fn has_impl(ctx: &Interpreter, _this: CelValue, exprlist: &[&CelByteCode]) -> CelValue {
     if exprlist.len() != 1 {
         return CelValue::from_err(CelError::argument("has() macro expects exactly 1 argument"));
     }
@@ -53,7 +53,7 @@ fn has_impl(ctx: &Interpreter, _this: CelValue, exprlist: &[&[ByteCode]]) -> Cel
     }
 }
 
-fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
+fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCode]) -> CelValue {
     if bytecode.len() != 2 {
         return CelValue::from_err(CelError::argument(
             "all() macro expects exactly 2 arguments",
@@ -90,7 +90,7 @@ fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelV
     }
 }
 
-fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
+fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCode]) -> CelValue {
     if bytecode.len() != 2 {
         return CelValue::from_err(CelError::argument(
             "exists() macro expects exactly 2 arguments",
@@ -125,7 +125,7 @@ fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
     }
 }
 
-fn exists_one_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
+fn exists_one_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCode]) -> CelValue {
     if bytecode.len() != 2 {
         return CelValue::from_err(CelError::argument(
             "exists_one() macro expects exactly 2 arguments",
@@ -166,7 +166,7 @@ fn exists_one_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) 
     }
 }
 
-fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
+fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCode]) -> CelValue {
     if bytecode.len() != 2 {
         return CelValue::from_err(CelError::argument(
             "filter() macro expects exactly 2 arguments",
@@ -224,7 +224,7 @@ fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
     }
 }
 
-fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
+fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCode]) -> CelValue {
     if !(bytecode.len() == 2 || bytecode.len() == 3) {
         return CelValue::from_err(CelError::argument(
             "map() macro expects exactly 2 or 3 arguments",
@@ -320,7 +320,7 @@ fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelV
 }
 
 // reduce [].reduce(curr, next, expression, starting)
-fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
+fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCode]) -> CelValue {
     if bytecode.len() != 4 {
         return CelValue::from_err(CelError::argument("reduce() macro expects 4 arguments"));
     }
@@ -359,7 +359,7 @@ fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&[ByteCode]]) -> C
     }
 }
 
-fn coalesce_impl(ctx: &Interpreter, _this: CelValue, bytecode: &[&[ByteCode]]) -> CelValue {
+fn coalesce_impl(ctx: &Interpreter, _this: CelValue, bytecode: &[&CelByteCode]) -> CelValue {
     for arg in bytecode.iter() {
         let res = ctx.run_raw(arg, true);
         match res {

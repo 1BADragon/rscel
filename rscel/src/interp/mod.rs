@@ -1,5 +1,5 @@
 mod types;
-use crate::CelValueDyn;
+use crate::{types::CelByteCode, CelValueDyn};
 use std::{collections::HashMap, fmt};
 pub use types::{ByteCode, JmpWhen};
 
@@ -145,7 +145,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn run_raw(&self, prog: &[ByteCode], resolve: bool) -> CelResult<CelValue> {
+    pub fn run_raw(&self, prog: &CelByteCode, resolve: bool) -> CelResult<CelValue> {
         let mut pc: usize = 0;
         let mut stack = InterpStack::new(self);
 
@@ -512,7 +512,7 @@ impl<'a> Interpreter<'a> {
         let mut v = Vec::new();
         for arg in args.iter() {
             if let CelValue::ByteCode(bc) = arg {
-                v.push(bc.as_slice());
+                v.push(bc);
             } else {
                 return Err(CelError::internal("macro args must be bytecode"));
             }
@@ -562,7 +562,7 @@ impl<'a> Interpreter<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::CelValue;
+    use crate::{types::CelByteCode, CelValue};
 
     use super::{types::ByteCode, Interpreter};
     use test_case::test_case;
@@ -579,7 +579,8 @@ mod test {
     #[test_case(ByteCode::Ge, true.into())]
     #[test_case(ByteCode::Gt, true.into())]
     fn test_interp_ops(op: ByteCode, expected: CelValue) {
-        let mut prog = vec![ByteCode::Push(4.into()), ByteCode::Push(3.into())];
+        let mut prog =
+            CelByteCode::from_vec(vec![ByteCode::Push(4.into()), ByteCode::Push(3.into())]);
         prog.push(op);
         let interp = Interpreter::empty();
 

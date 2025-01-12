@@ -36,9 +36,8 @@ impl DispatchArgType {
                                 Some(GenericArgument::Type(t)) => match t {
                                     Type::Path(path) => match path.path.segments.last() {
                                         Some(t) => match t.ident.to_string().as_str() {
-                                            "u8" => DispatchArgType::Bytes,
                                             "CelValue" => DispatchArgType::Vec,
-                                            _ => panic!("Vec arg must be either CelValue or u8"),
+                                            _ => panic!("Vec arg must be either CelValue"),
                                         },
                                         _ => panic!("Empty Vec args"),
                                     },
@@ -52,6 +51,7 @@ impl DispatchArgType {
                         "DateTime" => DispatchArgType::Timestamp,
                         "Duration" => DispatchArgType::Duration,
                         "CelResult" => DispatchArgType::CelResult,
+                        "CelBytes" => DispatchArgType::Bytes,
                         other => panic!("Unknown type: {}", other),
                     },
                     None => panic!("No type info"),

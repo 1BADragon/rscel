@@ -11,10 +11,10 @@ crate-type = ["cdylib"]
 
 [dependencies]
 rscel = { path = "../rscel" }
-pyo3 = { version = "0.21.2", features = ["extension-module", "chrono"] }
+pyo3 = { version = "0.21", features = ["extension-module", "chrono"] }
 chrono = { workspace = true }
-serde_json = { workspace = true } 
+serde_json = { workspace = true }
 bincode = "1.3.3"
 
 [build-dependencies]
-pyo3-build-config = "0.21.2"
+pyo3-build-config = "0.21"
