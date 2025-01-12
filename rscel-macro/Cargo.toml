@@ -1,9 +1,9 @@
 [package]
 name = "rscel-macro"
-version = {workspace = true}
-edition = {workspace = true}
-description = {workspace = true}
-license = {workspace = true}
+version = { workspace = true }
+edition = { workspace = true }
+description = { workspace = true }
+license = { workspace = true }
 
 [lib]
 proc-macro = true
@@ -11,6 +11,4 @@ proc-macro = true
 [dependencies]
 proc-macro2 = "1.0.92"
 quote = "1.0.37"
-syn = "2.0.91"
-
-
+syn = { version = "2.0.91", features = ["full"] }
