@@ -31,6 +31,8 @@ pub enum Token {
     NotEqual,                        // !=
     In,                              // 'in'
     Null,                            // 'null'
+    Match,                           // 'match'
+    Case,                            // 'case'
     BoolLit(bool),                   // true | false
     IntLit(u64),                     // [-+]?[0-9]+
     UIntLit(u64),                    // [0-9]+u

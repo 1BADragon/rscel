@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::{
     ast_node::AstNode,
-    compiled_prog::CompiledProg,
+    compiled_prog::{CompiledProg, NodeValue},
     grammar::*,
     source_range::SourceRange,
     syntax_error::SyntaxError,
@@ -11,7 +11,9 @@ use super::{
 };
 use crate::{
     interp::{Interpreter, JmpWhen},
-    BindContext, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, StringTokenizer,
+    types::CelByteCode,
+    BindContext, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, ProgramDetails,
+    StringTokenizer,
 };
 
 use crate::compile;
@@ -50,44 +52,150 @@ impl<'l> CelCompiler<'l> {
     }
 
     fn parse_expression(&mut self) -> CelResult<(CompiledProg, AstNode<Expr>)> {
-        let (lhs_node, lhs_ast) = self.parse_conditional_or()?;
+        if let Some(Token::Match) = self.tokenizer.peek()?.as_token() {
+            self.tokenizer.next()?;
+            self.parse_match_expression()
+        } else {
+            let (lhs_node, lhs_ast) = self.parse_conditional_or()?;
 
-        match self.tokenizer.peek()?.as_token() {
-            Some(Token::Question) => {
-                self.tokenizer.next()?;
-                let (true_clause_node, true_clause_ast) = self.parse_conditional_or()?;
-
-                let next = self.tokenizer.next()?;
-                if next.as_token() != Some(&Token::Colon) {
-                    return Err(SyntaxError::from_location(self.tokenizer.location())
-                        .with_message(format!("Unexpected token {:?}, expected COLON", next))
-                        .into());
+            match self.tokenizer.peek()?.as_token() {
+                Some(Token::Question) => {
+                    self.tokenizer.next()?;
+                    self.parse_turnary_expression(lhs_node, lhs_ast)
                 }
-
-                let (false_clause_node, false_clause_ast) = self.parse_expression()?;
-
-                let range = lhs_ast.range().surrounding(false_clause_ast.range());
-
-                Ok((
-                    lhs_node.into_turnary(true_clause_node, false_clause_node),
-                    AstNode::new(
-                        Expr::Ternary {
-                            condition: Box::new(lhs_ast),
-                            true_clause: Box::new(true_clause_ast),
-                            false_clause: Box::new(false_clause_ast),
-                        },
-                        range,
-                    ),
-                ))
-            }
-            _ => {
-                let range = lhs_ast.range();
-                Ok((
-                    CompiledProg::from_node(lhs_node),
-                    AstNode::new(Expr::Unary(Box::new(lhs_ast)), range),
-                ))
+                _ => {
+                    let range = lhs_ast.range();
+                    Ok((
+                        CompiledProg::from_node(lhs_node),
+                        AstNode::new(Expr::Unary(Box::new(lhs_ast)), range),
+                    ))
+                }
             }
         }
+    }
+
+    fn parse_turnary_expression(
+        &mut self,
+        or_prog: CompiledProg,
+        or_ast: AstNode<ConditionalOr>,
+    ) -> CelResult<(CompiledProg, AstNode<Expr>)> {
+        let (true_clause_node, true_clause_ast) = self.parse_conditional_or()?;
+
+        let next = self.tokenizer.next()?;
+        if next.as_token() != Some(&Token::Colon) {
+            return Err(SyntaxError::from_location(self.tokenizer.location())
+                .with_message(format!("Unexpected token {:?}, expected COLON", next))
+                .into());
+        }
+
+        let (false_clause_node, false_clause_ast) = self.parse_expression()?;
+
+        let range = or_ast.range().surrounding(false_clause_ast.range());
+
+        Ok((
+            or_prog.into_turnary(true_clause_node, false_clause_node),
+            AstNode::new(
+                Expr::Ternary {
+                    condition: Box::new(or_ast),
+                    true_clause: Box::new(true_clause_ast),
+                    false_clause: Box::new(false_clause_ast),
+                },
+                range,
+            ),
+        ))
+    }
+
+    fn parse_match_expression(&mut self) -> CelResult<(CompiledProg, AstNode<Expr>)> {
+        let (condition_node, condition_ast) = self.parse_expression()?;
+
+        let mut range = condition_ast.range();
+
+        let (node_bytecode, mut node_details) = condition_node.into_parts();
+
+        let mut node_bytecode = node_bytecode.into_bytecode();
+
+        let next = self.tokenizer.next()?;
+        if next.as_token() != Some(&Token::LBrace) {
+            return Err(SyntaxError::from_location(self.tokenizer.location())
+                .with_message(format!("Unexpected token {:?}, expected LBRACE", next))
+                .into());
+        }
+
+        let mut expressions: Vec<AstNode<MatchCase>> = Vec::new();
+
+        let mut all_parts = Vec::new();
+
+        loop {
+            let lbrace = self.tokenizer.peek()?;
+            if lbrace.as_token() != Some(&Token::LBrace) {
+                range = range.surrounding(lbrace.unwrap().loc);
+                break;
+            }
+
+            let case_token = self.tokenizer.next()?;
+            if case_token.as_token() != Some(&Token::Case) {
+                return Err(SyntaxError::from_location(self.tokenizer.location())
+                    .with_message(format!("Unexpected token {:?}, expected CASE", next))
+                    .into());
+            }
+            let (pattern_prog, pattern_ast) = self.parse_match_pattern()?;
+            let (pattern_bytecode, pattern_details) = pattern_prog.into_parts();
+            let pattern_bytecode: Vec<_> = [ByteCode::Dup]
+                .into_iter()
+                .chain(pattern_bytecode.into_bytecode().into_iter())
+                .collect();
+
+            node_details.union_from(pattern_details);
+
+            let pattern_range = pattern_ast.range();
+
+            let colon_token = self.tokenizer.next()?;
+            if colon_token.as_token() != Some(&Token::Colon) {
+                return Err(SyntaxError::from_location(self.tokenizer.location())
+                    .with_message(format!("Unexpected token {:?}, expected COLON", next))
+                    .into());
+            }
+
+            let (expr_prog, expr_ast) = self.parse_expression()?;
+            let (expr_bytecode, expr_details) = expr_prog.into_parts();
+            let expr_bytecode: Vec<_> = [ByteCode::Pop]
+                .into_iter()
+                .chain(expr_bytecode.into_bytecode().into_iter())
+                .collect();
+
+            node_details.union_from(expr_details);
+
+            let case_range = pattern_range.surrounding(expr_ast.range());
+
+            all_parts.push((pattern_bytecode, expr_bytecode));
+            expressions.push(AstNode::new(
+                MatchCase {
+                    pattern: pattern_ast,
+                    expr: Box::new(expr_ast),
+                },
+                case_range,
+            ));
+        }
+
+        let mut pattern_segment = CelByteCode::new();
+        let mut expr_segment = CelByteCode::new();
+
+        for (pattern_bytecode, expr_bytecode) in all_parts.into_iter().rev() {}
+
+        Ok((
+            CompiledProg::new(NodeValue::Bytecode(node_bytecode), node_details),
+            AstNode::new(
+                Expr::Match {
+                    condition: Box::new(condition_ast),
+                    cases: expressions,
+                },
+                range,
+            ),
+        ))
+    }
+
+    fn parse_match_pattern(&mut self) -> CelResult<(CompiledProg, AstNode<MatchPattern>)> {
+        todo!()
     }
 
     fn parse_conditional_or(&mut self) -> CelResult<(CompiledProg, AstNode<ConditionalOr>)> {

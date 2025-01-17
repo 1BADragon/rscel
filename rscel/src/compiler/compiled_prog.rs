@@ -61,6 +61,10 @@ macro_rules! compile {
 }
 
 impl CompiledProg {
+    pub fn new(inner: NodeValue, details: ProgramDetails) -> Self {
+        Self { inner, details }
+    }
+
     pub fn empty() -> CompiledProg {
         CompiledProg {
             inner: NodeValue::Bytecode(CelByteCode::new()),
@@ -73,6 +77,10 @@ impl CompiledProg {
             inner: other.inner,
             details: other.details,
         }
+    }
+
+    pub fn details(&self) -> &ProgramDetails {
+        &self.details
     }
 
     pub fn with_bytecode(bytecode: CelByteCode) -> CompiledProg {
@@ -291,6 +299,10 @@ impl CompiledProg {
 
     pub fn into_bytecode(self) -> CelByteCode {
         self.inner.into_bytecode()
+    }
+
+    pub fn into_parts(self) -> (NodeValue, ProgramDetails) {
+        (self.inner, self.details)
     }
 
     pub fn is_const(&self) -> bool {

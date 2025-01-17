@@ -160,6 +160,15 @@ impl<'a> Interpreter<'a> {
             pc += 1;
             match &prog[oldpc] {
                 ByteCode::Push(val) => stack.push(val.clone().into()),
+                ByteCode::Dup => {
+                    let v = stack.pop_val()?;
+
+                    stack.push_val(v.clone());
+                    stack.push_val(v);
+                }
+                ByteCode::Pop => {
+                    stack.pop_val()?;
+                }
                 ByteCode::Or => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
