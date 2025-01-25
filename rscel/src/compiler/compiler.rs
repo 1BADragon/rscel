@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::{
     ast_node::AstNode,
-    compiled_prog::CompiledProg,
+    compiled_prog::{resolve_bytecode, CompiledProg, PreResolvedByteCode},
     grammar::*,
     source_range::SourceRange,
     syntax_error::SyntaxError,
@@ -19,6 +19,8 @@ use crate::compile;
 pub struct CelCompiler<'l> {
     tokenizer: &'l mut dyn Tokenizer,
     bindings: BindContext<'l>,
+
+    next_label: u32,
 }
 
 impl<'l> CelCompiler<'l> {
@@ -26,6 +28,7 @@ impl<'l> CelCompiler<'l> {
         CelCompiler {
             tokenizer,
             bindings: BindContext::for_compile(),
+            next_label: 0,
         }
     }
 
@@ -47,6 +50,12 @@ impl<'l> CelCompiler<'l> {
         prog.details_mut().add_ast(ast);
 
         Ok(prog)
+    }
+
+    fn get_label(&mut self) -> u32 {
+        let n = self.next_label;
+        self.next_label += 1;
+        n
     }
 
     fn parse_expression(&mut self) -> CelResult<(CompiledProg, AstNode<Expr>)> {
@@ -98,11 +107,14 @@ impl<'l> CelCompiler<'l> {
                 self.tokenizer.next()?;
                 let (rhs_node, rhs_ast) = self.parse_conditional_and()?;
 
-                let jmp_node = CompiledProg::with_code_points(vec![ByteCode::JmpCond {
+                let label = self.get_label();
+
+                let jmp_node = CompiledProg::with_code_points(vec![PreResolvedByteCode::JmpCond {
                     when: JmpWhen::True,
-                    dist: rhs_node.bytecode_len() as u32 + 1,
+                    label,
                     leave_val: true,
-                }]);
+                }
+                .into()]);
 
                 let range = current_ast.range().surrounding(rhs_ast.range());
 
@@ -114,7 +126,7 @@ impl<'l> CelCompiler<'l> {
                     range,
                 );
                 current_node = compile!(
-                    [ByteCode::Or],
+                    [ByteCode::Or.into(), PreResolvedByteCode::Label(label)],
                     current_node.or(&rhs_node),
                     current_node,
                     jmp_node,
@@ -136,9 +148,11 @@ impl<'l> CelCompiler<'l> {
                 self.tokenizer.next()?;
                 let (rhs_node, rhs_ast) = self.parse_relation()?;
 
-                let jmp_node = CompiledProg::with_code_points(vec![ByteCode::JmpCond {
+                let label = self.get_label();
+
+                let jmp_node = CompiledProg::with_code_points(vec![PreResolvedByteCode::JmpCond {
                     when: JmpWhen::False,
-                    dist: rhs_node.bytecode_len() as u32 + 1,
+                    label: label,
                     leave_val: true,
                 }]);
 
@@ -152,7 +166,7 @@ impl<'l> CelCompiler<'l> {
                     range,
                 );
                 current_node = compile!(
-                    [ByteCode::And],
+                    [ByteCode::And.into(), PreResolvedByteCode::Label(label)],
                     current_node.and(rhs_node),
                     current_node,
                     jmp_node,
@@ -186,7 +200,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Lt],
+                        [ByteCode::Lt.into()],
                         current_node.lt(rhs_node),
                         current_node,
                         rhs_node
@@ -207,7 +221,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Le],
+                        [ByteCode::Le.into()],
                         current_node.le(rhs_node),
                         current_node,
                         rhs_node
@@ -228,7 +242,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Eq],
+                        [ByteCode::Eq.into()],
                         CelValueDyn::eq(&current_node, &rhs_node),
                         current_node,
                         rhs_node
@@ -249,7 +263,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Ne],
+                        [ByteCode::Ne.into()],
                         current_node.neq(rhs_node),
                         current_node,
                         rhs_node
@@ -270,7 +284,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Ge],
+                        [ByteCode::Ge.into()],
                         current_node.ge(rhs_node),
                         current_node,
                         rhs_node
@@ -291,7 +305,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Gt],
+                        [ByteCode::Gt.into()],
                         current_node.gt(rhs_node),
                         current_node,
                         rhs_node
@@ -311,7 +325,7 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
                     current_node = compile!(
-                        [ByteCode::In],
+                        [ByteCode::In.into()],
                         current_node.in_(rhs_node),
                         current_node,
                         rhs_node
@@ -345,7 +359,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Add],
+                        [ByteCode::Add.into()],
                         current_node + rhs_node,
                         current_node,
                         rhs_node
@@ -367,7 +381,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Sub],
+                        [ByteCode::Sub.into()],
                         current_node - rhs_node,
                         current_node,
                         rhs_node
@@ -400,7 +414,7 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
                     current_node = compile!(
-                        [ByteCode::Mul],
+                        [ByteCode::Mul.into()],
                         current_node * rhs_node,
                         current_node,
                         rhs_node
@@ -422,7 +436,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Div],
+                        [ByteCode::Div.into()],
                         current_node / rhs_node,
                         current_node,
                         rhs_node
@@ -444,7 +458,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Mod],
+                        [ByteCode::Mod.into()],
                         current_node % rhs_node,
                         current_node,
                         rhs_node
@@ -506,7 +520,7 @@ impl<'l> CelCompiler<'l> {
                 self.tokenizer.next()?;
 
                 let (not_list, ast) = self.parse_not_list()?;
-                let node = compile!([ByteCode::Not], not_list, not_list);
+                let node = compile!([ByteCode::Not.into()], not_list, not_list);
 
                 let range = ast.range().surrounding(loc);
 
@@ -539,7 +553,7 @@ impl<'l> CelCompiler<'l> {
                 self.tokenizer.next()?;
 
                 let (neg_list, ast) = self.parse_neg_list()?;
-                let node = compile!([ByteCode::Neg], neg_list, neg_list);
+                let node = compile!([ByteCode::Neg.into()], neg_list, neg_list);
 
                 let range = ast.range().surrounding(loc);
 
@@ -653,7 +667,10 @@ impl<'l> CelCompiler<'l> {
                             args_ast.push(ast);
                             args_node =
                                 args_node.append_result(CompiledProg::with_code_points(vec![
-                                    ByteCode::Push(a.into_bytecode().into()),
+                                    ByteCode::Push(
+                                        resolve_bytecode(a.into_unresolved_bytecode()).into(),
+                                    )
+                                    .into(),
                                 ]))
                         }
 
@@ -661,7 +678,8 @@ impl<'l> CelCompiler<'l> {
                             .consume_child(args_node)
                             .consume_child(CompiledProg::with_code_points(vec![ByteCode::Call(
                                 args_len as u32,
-                            )]));
+                            )
+                            .into()]));
 
                         member_prime_node = self.check_for_const(member_prime_node);
 
@@ -697,7 +715,7 @@ impl<'l> CelCompiler<'l> {
                             loc: rbracket_loc,
                         }) => {
                             member_prime_node = compile!(
-                                [ByteCode::Index],
+                                [ByteCode::Index.into()],
                                 member_prime_node.index(index_node),
                                 member_prime_node,
                                 index_node
@@ -746,8 +764,10 @@ impl<'l> CelCompiler<'l> {
                 token: Token::Ident(val),
                 loc,
             }) => Ok((
-                CompiledProg::with_code_points(vec![ByteCode::Push(CelValue::from_ident(&val))])
-                    .add_ident(&val),
+                CompiledProg::with_code_points(vec![
+                    ByteCode::Push(CelValue::from_ident(&val)).into()
+                ])
+                .add_ident(&val),
                 AstNode::new(Primary::Ident(Ident(val.clone())), loc),
             )),
             Some(TokenWithLoc {
@@ -943,13 +963,13 @@ impl<'l> CelCompiler<'l> {
                 token: Token::FStringLit(segments),
                 loc,
             }) => {
-                let mut bytecode = Vec::new();
+                let mut bytecode = Vec::<PreResolvedByteCode>::new();
 
                 for segment in segments.iter() {
-                    bytecode.push(ByteCode::Push(CelValue::Ident("string".to_string())));
+                    bytecode.push(ByteCode::Push(CelValue::Ident("string".to_string())).into());
                     match segment {
                         FStringSegment::Lit(c) => {
-                            bytecode.push(ByteCode::Push(CelValue::String(c.clone())))
+                            bytecode.push(ByteCode::Push(CelValue::String(c.clone())).into())
                         }
                         FStringSegment::Expr(e) => {
                             let mut tok = StringTokenizer::with_input(&e);
@@ -957,14 +977,19 @@ impl<'l> CelCompiler<'l> {
 
                             let (e, _) = comp.parse_expression()?;
 
-                            bytecode.push(ByteCode::Push(CelValue::ByteCode(e.into_bytecode())));
+                            bytecode.push(
+                                ByteCode::Push(CelValue::ByteCode(resolve_bytecode(
+                                    e.into_unresolved_bytecode(),
+                                )))
+                                .into(),
+                            );
                         }
                     }
-                    bytecode.push(ByteCode::Call(1));
+                    bytecode.push(ByteCode::Call(1).into());
                 }
 
                 // Reverse it so its evaluated in order on the stack
-                bytecode.push(ByteCode::FmtString(segments.len() as u32));
+                bytecode.push(ByteCode::FmtString(segments.len() as u32).into());
 
                 Ok((
                     CompiledProg::with_code_points(bytecode),
@@ -1066,7 +1091,7 @@ impl<'l> CelCompiler<'l> {
     fn check_for_const(&self, member_prime_node: CompiledProg) -> CompiledProg {
         let mut i = Interpreter::empty();
         i.add_bindings(&self.bindings);
-        let bc = member_prime_node.into_bytecode();
+        let bc = resolve_bytecode(member_prime_node.into_unresolved_bytecode());
         let r = i.run_raw(&bc, true);
 
         match r {
