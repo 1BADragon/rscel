@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::{
     ast_node::AstNode,
-    compiled_prog::{resolve_bytecode, CompiledProg, PreResolvedByteCode},
+    compiled_prog::{CompiledProg, PreResolvedCodePoint},
     grammar::*,
     source_range::SourceRange,
     syntax_error::SyntaxError,
@@ -102,19 +102,20 @@ impl<'l> CelCompiler<'l> {
     fn parse_conditional_or(&mut self) -> CelResult<(CompiledProg, AstNode<ConditionalOr>)> {
         let (mut current_node, mut current_ast) = into_unary(self.parse_conditional_and()?);
 
+        let label = self.get_label();
+
         loop {
             if let Some(Token::OrOr) = self.tokenizer.peek()?.as_token() {
                 self.tokenizer.next()?;
                 let (rhs_node, rhs_ast) = self.parse_conditional_and()?;
 
-                let label = self.get_label();
-
-                let jmp_node = CompiledProg::with_code_points(vec![PreResolvedByteCode::JmpCond {
-                    when: JmpWhen::True,
-                    label,
-                    leave_val: true,
-                }
-                .into()]);
+                let jmp_node =
+                    CompiledProg::with_code_points(vec![PreResolvedCodePoint::JmpCond {
+                        when: JmpWhen::True,
+                        label,
+                        leave_val: true,
+                    }
+                    .into()]);
 
                 let range = current_ast.range().surrounding(rhs_ast.range());
 
@@ -126,7 +127,7 @@ impl<'l> CelCompiler<'l> {
                     range,
                 );
                 current_node = compile!(
-                    [ByteCode::Or.into(), PreResolvedByteCode::Label(label)],
+                    [ByteCode::Or.into()],
                     current_node.or(&rhs_node),
                     current_node,
                     jmp_node,
@@ -137,24 +138,27 @@ impl<'l> CelCompiler<'l> {
             }
         }
 
+        current_node.append_if_bytecode([PreResolvedCodePoint::Label(label)]);
+
         Ok((current_node, current_ast))
     }
 
     fn parse_conditional_and(&mut self) -> CelResult<(CompiledProg, AstNode<ConditionalAnd>)> {
         let (mut current_node, mut current_ast) = into_unary(self.parse_relation()?);
 
+        let label = self.get_label();
+
         loop {
             if let Some(Token::AndAnd) = self.tokenizer.peek()?.as_token() {
                 self.tokenizer.next()?;
                 let (rhs_node, rhs_ast) = self.parse_relation()?;
 
-                let label = self.get_label();
-
-                let jmp_node = CompiledProg::with_code_points(vec![PreResolvedByteCode::JmpCond {
-                    when: JmpWhen::False,
-                    label: label,
-                    leave_val: true,
-                }]);
+                let jmp_node =
+                    CompiledProg::with_code_points(vec![PreResolvedCodePoint::JmpCond {
+                        when: JmpWhen::False,
+                        label: label,
+                        leave_val: true,
+                    }]);
 
                 let range = current_ast.range().surrounding(rhs_ast.range());
 
@@ -166,7 +170,7 @@ impl<'l> CelCompiler<'l> {
                     range,
                 );
                 current_node = compile!(
-                    [ByteCode::And.into(), PreResolvedByteCode::Label(label)],
+                    [ByteCode::And.into()],
                     current_node.and(rhs_node),
                     current_node,
                     jmp_node,
@@ -176,6 +180,8 @@ impl<'l> CelCompiler<'l> {
                 break;
             }
         }
+        current_node.append_if_bytecode([PreResolvedCodePoint::Label(label)]);
+
         Ok((current_node, current_ast))
     }
 
@@ -667,10 +673,8 @@ impl<'l> CelCompiler<'l> {
                             args_ast.push(ast);
                             args_node =
                                 args_node.append_result(CompiledProg::with_code_points(vec![
-                                    ByteCode::Push(
-                                        resolve_bytecode(a.into_unresolved_bytecode()).into(),
-                                    )
-                                    .into(),
+                                    ByteCode::Push(a.into_unresolved_bytecode().resolve().into())
+                                        .into(),
                                 ]))
                         }
 
@@ -963,7 +967,7 @@ impl<'l> CelCompiler<'l> {
                 token: Token::FStringLit(segments),
                 loc,
             }) => {
-                let mut bytecode = Vec::<PreResolvedByteCode>::new();
+                let mut bytecode = Vec::<PreResolvedCodePoint>::new();
 
                 for segment in segments.iter() {
                     bytecode.push(ByteCode::Push(CelValue::Ident("string".to_string())).into());
@@ -978,9 +982,9 @@ impl<'l> CelCompiler<'l> {
                             let (e, _) = comp.parse_expression()?;
 
                             bytecode.push(
-                                ByteCode::Push(CelValue::ByteCode(resolve_bytecode(
-                                    e.into_unresolved_bytecode(),
-                                )))
+                                ByteCode::Push(CelValue::ByteCode(
+                                    e.into_unresolved_bytecode().resolve(),
+                                ))
                                 .into(),
                             );
                         }
@@ -1091,7 +1095,7 @@ impl<'l> CelCompiler<'l> {
     fn check_for_const(&self, member_prime_node: CompiledProg) -> CompiledProg {
         let mut i = Interpreter::empty();
         i.add_bindings(&self.bindings);
-        let bc = resolve_bytecode(member_prime_node.into_unresolved_bytecode());
+        let bc = member_prime_node.into_unresolved_bytecode().resolve();
         let r = i.run_raw(&bc, true);
 
         match r {

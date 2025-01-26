@@ -1,39 +1,14 @@
-use std::collections::HashMap;
+mod preresolved;
 
 use crate::{
     interp::JmpWhen, program::ProgramDetails, types::CelByteCode, ByteCode, CelError, CelValue,
     CelValueDyn, Program,
 };
-
-#[derive(Debug, Clone)]
-pub enum PreResolvedByteCode {
-    Bytecode(ByteCode),
-    Jmp {
-        label: u32,
-    },
-    JmpCond {
-        when: JmpWhen,
-        label: u32,
-        leave_val: bool,
-    },
-    Label(u32),
-}
-
-impl From<ByteCode> for PreResolvedByteCode {
-    fn from(value: ByteCode) -> Self {
-        PreResolvedByteCode::Bytecode(value)
-    }
-}
-
-impl From<CelByteCode> for Vec<PreResolvedByteCode> {
-    fn from(value: CelByteCode) -> Self {
-        value.into_iter().map(|b| b.into()).collect()
-    }
-}
+pub use preresolved::{PreResolvedByteCode, PreResolvedCodePoint};
 
 #[derive(Debug, Clone)]
 pub enum NodeValue {
-    Bytecode(Vec<PreResolvedByteCode>),
+    Bytecode(PreResolvedByteCode),
     ConstExpr(CelValue),
 }
 
@@ -67,7 +42,7 @@ macro_rules! compile {
                     }
                 }
                 ($($child,)+) => {
-                let mut new_bytecode = Vec::<PreResolvedByteCode>::new();
+                let mut new_bytecode = PreResolvedByteCode::new();
 
                 $(
                     new_bytecode.extend($child.into_bytecode().into_iter());
@@ -90,7 +65,7 @@ macro_rules! compile {
 impl CompiledProg {
     pub fn empty() -> CompiledProg {
         CompiledProg {
-            inner: NodeValue::Bytecode(Vec::new()),
+            inner: NodeValue::Bytecode(PreResolvedByteCode::new()),
             details: ProgramDetails::new(),
         }
     }
@@ -109,10 +84,19 @@ impl CompiledProg {
         }
     }
 
-    pub fn with_code_points(bytecode: Vec<PreResolvedByteCode>) -> CompiledProg {
+    pub fn with_code_points(bytecode: Vec<PreResolvedCodePoint>) -> CompiledProg {
         CompiledProg {
-            inner: NodeValue::Bytecode(bytecode.into_iter().map(|b| b.into()).collect()),
+            inner: NodeValue::Bytecode(bytecode.into_iter().collect()),
             details: ProgramDetails::new(),
+        }
+    }
+
+    pub fn append_if_bytecode(&mut self, b: impl IntoIterator<Item = PreResolvedCodePoint>) {
+        match &mut self.inner {
+            NodeValue::Bytecode(bytecode) => {
+                bytecode.extend(b);
+            }
+            NodeValue::ConstExpr(_) => { /* do nothing */ }
         }
     }
 
@@ -176,10 +160,13 @@ impl CompiledProg {
                 },
                 None => CompiledProg {
                     inner: NodeValue::Bytecode(
-                        [ByteCode::Push(c1).into(), ByteCode::Push(c2).into()]
-                            .into_iter()
-                            .chain(bytecode.into_iter().map(|b| b.into()))
-                            .collect(),
+                        [
+                            PreResolvedCodePoint::Bytecode(ByteCode::Push(c1)),
+                            PreResolvedCodePoint::Bytecode(ByteCode::Push(c2)),
+                        ]
+                        .into_iter()
+                        .chain(bytecode.into_iter().map(|b| b.into()))
+                        .collect(),
                     ),
                     details: new_details,
                 },
@@ -201,7 +188,7 @@ impl CompiledProg {
         let mut details = self.details;
         details.add_source(source);
 
-        Program::new(details, resolve_bytecode(self.inner.into_bytecode()))
+        Program::new(details, self.inner.into_bytecode().resolve())
     }
 
     pub fn add_ident(mut self, ident: &str) -> CompiledProg {
@@ -291,17 +278,17 @@ impl CompiledProg {
                         .into_bytecode()
                         .into_iter()
                         .chain(
-                            [ByteCode::JmpCond {
+                            [PreResolvedCodePoint::Bytecode(ByteCode::JmpCond {
                                 when: JmpWhen::False,
-                                dist: (true_clause_bytecode.len() as u32) + 1, // +1 to jmp over the next jump
+                                dist: i32::try_from(true_clause_bytecode.len() + 1)
+                                    .expect("Jump distance too far"),
                                 leave_val: false,
-                            }
-                            .into()]
+                            })]
                             .into_iter(),
                         )
                         .chain(true_clause_bytecode.into_iter())
                         .chain(
-                            [ByteCode::Jmp(false_clause_bytecode.len() as u32).into()].into_iter(),
+                            [ByteCode::Jmp(false_clause_bytecode.len() as i32).into()].into_iter(),
                         )
                         .chain(false_clause_bytecode.into_iter())
                         .collect(),
@@ -319,7 +306,7 @@ impl CompiledProg {
         }
     }
 
-    pub fn into_unresolved_bytecode(self) -> Vec<PreResolvedByteCode> {
+    pub fn into_unresolved_bytecode(self) -> PreResolvedByteCode {
         self.inner.into_bytecode()
     }
 
@@ -340,66 +327,10 @@ impl NodeValue {
         matches!(*self, NodeValue::ConstExpr(_))
     }
 
-    pub fn into_bytecode(self) -> Vec<PreResolvedByteCode> {
+    pub fn into_bytecode(self) -> PreResolvedByteCode {
         match self {
             NodeValue::Bytecode(b) => b,
-            NodeValue::ConstExpr(c) => vec![ByteCode::Push(c).into()],
+            NodeValue::ConstExpr(c) => [ByteCode::Push(c)].into_iter().collect(),
         }
     }
-}
-
-pub fn resolve_bytecode(code: Vec<PreResolvedByteCode>) -> CelByteCode {
-    let mut curr_loc: usize = 0;
-    let mut locations = HashMap::<u32, usize>::new();
-    let mut ret = CelByteCode::new();
-
-    // determine label locations
-    for c in code.iter() {
-        match c {
-            PreResolvedByteCode::Label(i) => {
-                if locations.contains_key(i) {
-                    panic!("Duplicate label found!");
-                }
-                locations.insert(*i, curr_loc);
-            }
-            _ => {
-                curr_loc += 1;
-            }
-        }
-    }
-
-    curr_loc = 0;
-
-    // resolve the label locations
-    for c in code.into_iter() {
-        match c {
-            PreResolvedByteCode::Bytecode(byte_code) => {
-                curr_loc += 1;
-                ret.push(byte_code);
-            }
-            PreResolvedByteCode::Jmp { label } => {
-                curr_loc += 1;
-                let jmp_loc = locations[&label];
-                let offset = jmp_loc - curr_loc;
-                ret.push(ByteCode::Jmp(offset as u32));
-            }
-            PreResolvedByteCode::JmpCond {
-                when,
-                label,
-                leave_val,
-            } => {
-                curr_loc += 1;
-                let jmp_loc = locations[&label];
-                let offset = jmp_loc - curr_loc;
-                ret.push(ByteCode::JmpCond {
-                    when,
-                    dist: offset as u32,
-                    leave_val,
-                });
-            }
-            PreResolvedByteCode::Label(_) => {}
-        }
-    }
-
-    ret
 }
