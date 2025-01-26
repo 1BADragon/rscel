@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::{
     ast_node::AstNode,
-    compiled_prog::{CompiledProg, PreResolvedCodePoint},
+    compiled_prog::{CompiledProg, NodeValue, PreResolvedCodePoint},
     grammar::*,
     source_range::SourceRange,
     syntax_error::SyntaxError,
@@ -64,7 +64,10 @@ impl<'l> CelCompiler<'l> {
         match self.tokenizer.peek()?.as_token() {
             Some(Token::Question) => {
                 self.tokenizer.next()?;
+                let (expr_node, mut details) = lhs_node.into_parts();
+
                 let (true_clause_node, true_clause_ast) = self.parse_conditional_or()?;
+                let (true_clause_node, true_clause_details) = true_clause_node.into_parts();
 
                 let next = self.tokenizer.next()?;
                 if next.as_token() != Some(&Token::Colon) {
@@ -74,11 +77,96 @@ impl<'l> CelCompiler<'l> {
                 }
 
                 let (false_clause_node, false_clause_ast) = self.parse_expression()?;
+                let (false_clause_node, false_clause_details) = false_clause_node.into_parts();
 
                 let range = lhs_ast.range().surrounding(false_clause_ast.range());
 
+                details.union_from(true_clause_details);
+                details.union_from(false_clause_details);
+
+                let turnary_node = if let NodeValue::ConstExpr(i) = expr_node {
+                    if i.is_err() {
+                        CompiledProg {
+                            inner: NodeValue::ConstExpr(i),
+                            details,
+                        }
+                    } else {
+                        if cfg!(feature = "type_prop") {
+                            if i.is_truthy() {
+                                CompiledProg {
+                                    inner: true_clause_node,
+                                    details,
+                                }
+                            } else {
+                                CompiledProg {
+                                    inner: false_clause_node,
+                                    details,
+                                }
+                            }
+                        } else {
+                            if let CelValue::Bool(b) = i {
+                                if b {
+                                    CompiledProg {
+                                        inner: true_clause_node,
+                                        details,
+                                    }
+                                } else {
+                                    CompiledProg {
+                                        inner: false_clause_node,
+                                        details,
+                                    }
+                                }
+                            } else {
+                                CompiledProg {
+                                    inner: NodeValue::ConstExpr(CelValue::from_err(
+                                        CelError::Value(format!(
+                                            "{} cannot be converted to bool",
+                                            i.as_type()
+                                        )),
+                                    )),
+                                    details,
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    let true_clause_bytecode = true_clause_node.into_bytecode();
+                    let false_clause_bytecode = false_clause_node.into_bytecode();
+
+                    let after_true_clause = self.get_label();
+                    let end_label = self.get_label();
+
+                    CompiledProg {
+                        inner: NodeValue::Bytecode(
+                            expr_node
+                                .into_bytecode()
+                                .into_iter()
+                                .chain(
+                                    [PreResolvedCodePoint::JmpCond {
+                                        when: JmpWhen::False,
+                                        label: after_true_clause,
+                                        leave_val: false,
+                                    }]
+                                    .into_iter(),
+                                )
+                                .chain(true_clause_bytecode.into_iter())
+                                .chain(
+                                    [
+                                        PreResolvedCodePoint::Jmp { label: end_label },
+                                        PreResolvedCodePoint::Label(after_true_clause),
+                                    ]
+                                    .into_iter(),
+                                )
+                                .chain(false_clause_bytecode.into_iter())
+                                .chain([PreResolvedCodePoint::Label(end_label)].into_iter())
+                                .collect(),
+                        ),
+                        details,
+                    }
+                };
+
                 Ok((
-                    lhs_node.into_turnary(true_clause_node, false_clause_node),
+                    turnary_node,
                     AstNode::new(
                         Expr::Ternary {
                             condition: Box::new(lhs_ast),

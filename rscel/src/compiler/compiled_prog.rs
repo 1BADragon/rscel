@@ -1,9 +1,6 @@
 mod preresolved;
 
-use crate::{
-    interp::JmpWhen, program::ProgramDetails, types::CelByteCode, ByteCode, CelError, CelValue,
-    CelValueDyn, Program,
-};
+use crate::{program::ProgramDetails, types::CelByteCode, ByteCode, CelValue, Program};
 pub use preresolved::{PreResolvedByteCode, PreResolvedCodePoint};
 
 #[derive(Debug, Clone)]
@@ -89,6 +86,14 @@ impl CompiledProg {
             inner: NodeValue::Bytecode(bytecode.into_iter().collect()),
             details: ProgramDetails::new(),
         }
+    }
+
+    pub fn details(&self) -> &ProgramDetails {
+        &self.details
+    }
+
+    pub fn into_parts(self) -> (NodeValue, ProgramDetails) {
+        (self.inner, self.details)
     }
 
     pub fn append_if_bytecode(&mut self, b: impl IntoIterator<Item = PreResolvedCodePoint>) {
@@ -217,85 +222,6 @@ impl CompiledProg {
     pub fn consume_child(self, child: CompiledProg) -> CompiledProg {
         let r = self.append_result(child);
         r
-    }
-
-    pub fn into_turnary(
-        mut self,
-        true_clause: CompiledProg,
-        false_clause: CompiledProg,
-    ) -> CompiledProg {
-        self.details.union_from(true_clause.details);
-        self.details.union_from(false_clause.details);
-
-        if let NodeValue::ConstExpr(i) = self.inner {
-            if i.is_err() {
-                CompiledProg {
-                    inner: NodeValue::ConstExpr(i),
-                    details: self.details,
-                }
-            } else {
-                if cfg!(feature = "type_prop") {
-                    if i.is_truthy() {
-                        CompiledProg {
-                            inner: true_clause.inner,
-                            details: self.details,
-                        }
-                    } else {
-                        CompiledProg {
-                            inner: false_clause.inner,
-                            details: self.details,
-                        }
-                    }
-                } else {
-                    if let CelValue::Bool(b) = i {
-                        if b {
-                            CompiledProg {
-                                inner: true_clause.inner,
-                                details: self.details,
-                            }
-                        } else {
-                            CompiledProg {
-                                inner: false_clause.inner,
-                                details: self.details,
-                            }
-                        }
-                    } else {
-                        CompiledProg {
-                            inner: NodeValue::ConstExpr(CelValue::from_err(CelError::Value(
-                                format!("{} cannot be converted to bool", i.as_type()),
-                            ))),
-                            details: self.details,
-                        }
-                    }
-                }
-            }
-        } else {
-            let true_clause_bytecode = true_clause.inner.into_bytecode();
-            let false_clause_bytecode = false_clause.inner.into_bytecode();
-            CompiledProg {
-                inner: NodeValue::Bytecode(
-                    self.inner
-                        .into_bytecode()
-                        .into_iter()
-                        .chain(
-                            [PreResolvedCodePoint::Bytecode(ByteCode::JmpCond {
-                                when: JmpWhen::False,
-                                dist: i32::try_from(true_clause_bytecode.len() + 1)
-                                    .expect("Jump distance too far"),
-                                leave_val: false,
-                            })]
-                            .into_iter(),
-                        )
-                        .chain(true_clause_bytecode.into_iter())
-                        .chain(
-                            [ByteCode::Jmp(false_clause_bytecode.len() as i32).into()].into_iter(),
-                        )
-                        .chain(false_clause_bytecode.into_iter())
-                        .collect(),
-                ),
-                details: self.details,
-            }
-        }
     }
 
     #[inline]
