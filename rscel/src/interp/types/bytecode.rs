@@ -10,6 +10,15 @@ pub enum JmpWhen {
     False,
 }
 
+impl JmpWhen {
+    pub fn as_bool(&self) -> bool {
+        match self {
+            JmpWhen::True => true,
+            JmpWhen::False => false,
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum ByteCode {
     Push(CelValue),

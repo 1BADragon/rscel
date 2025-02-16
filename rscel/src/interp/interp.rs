@@ -158,7 +158,18 @@ impl<'a> Interpreter<'a> {
                 ByteCode::Test => {
                     let v = stack.pop_val()?;
 
-                    stack.push_val(v.is_truthy().into());
+                    if v.is_err() {
+                        stack.push_val(v);
+                    } else if cfg!(feature = "type_prop") {
+                        stack.push_val(v.is_truthy().into());
+                    } else if let CelValue::Bool(b) = v {
+                        stack.push_val(b.into())
+                    } else {
+                        return Err(CelError::invalid_op(&format!(
+                            "TEST invalid on type {:?}",
+                            v.as_type()
+                        )));
+                    }
                 }
                 ByteCode::Dup => {
                     let v = stack.pop_val()?;
@@ -263,42 +274,24 @@ impl<'a> Interpreter<'a> {
                 ByteCode::Jmp(dist) => pc = pc + *dist as usize,
                 ByteCode::JmpCond { when, dist } => {
                     let v1 = stack.pop_val()?;
-                    match when {
-                        JmpWhen::True => {
-                            if cfg!(feature = "type_prop") {
-                                if v1.is_truthy() {
-                                    pc += *dist as usize
-                                }
-                            } else if let CelValue::Err(ref _e) = v1 {
-                                // do nothing
-                            } else if let CelValue::Bool(v) = v1 {
-                                if v {
-                                    pc += *dist as usize
-                                }
-                            } else {
-                                return Err(CelError::invalid_op(&format!(
-                                    "JMP TRUE invalid on type {:?}",
-                                    v1.as_type()
-                                )));
+                    match v1 {
+                        CelValue::Bool(b) => {
+                            if b == when.as_bool() {
+                                pc += *dist as usize
                             }
                         }
-                        JmpWhen::False => {
-                            if cfg!(feature = "type_prop") {
-                                if !v1.is_truthy() {
-                                    pc += *dist as usize
-                                }
-                            } else if let CelValue::Bool(v) = v1 {
-                                if !v {
-                                    pc += *dist as usize
-                                }
-                            } else {
-                                return Err(CelError::invalid_op(&format!(
-                                    "JMP FALSE invalid on type {:?}",
-                                    v1.as_type()
-                                )));
+                        CelValue::Err(_) => {
+                            if *when == JmpWhen::False {
+                                pc += *dist as usize
                             }
                         }
-                    };
+                        v => {
+                            return Err(CelError::invalid_op(&format!(
+                                "JMP TRUE invalid on type {:?}",
+                                v.as_type()
+                            )))
+                        }
+                    }
                 }
                 ByteCode::MkList(size) => {
                     let mut v = Vec::new();
