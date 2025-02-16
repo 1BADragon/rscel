@@ -5,14 +5,8 @@ use crate::{interp::JmpWhen, types::CelByteCode, ByteCode};
 #[derive(Debug, Clone)]
 pub enum PreResolvedCodePoint {
     Bytecode(ByteCode),
-    Jmp {
-        label: u32,
-    },
-    JmpCond {
-        when: JmpWhen,
-        label: u32,
-        leave_val: bool,
-    },
+    Jmp { label: u32 },
+    JmpCond { when: JmpWhen, label: u32 },
     Label(u32),
 }
 
@@ -98,18 +92,13 @@ impl PreResolvedByteCode {
                         i32::try_from(offset).expect("Attempt to jump farther than possible"),
                     ));
                 }
-                PreResolvedCodePoint::JmpCond {
-                    when,
-                    label,
-                    leave_val,
-                } => {
+                PreResolvedCodePoint::JmpCond { when, label } => {
                     curr_loc += 1;
                     let jmp_loc = locations[&label];
                     let offset = (jmp_loc as isize) - (curr_loc as isize);
                     ret.push(ByteCode::JmpCond {
                         when,
                         dist: offset as i32,
-                        leave_val,
                     });
                 }
                 PreResolvedCodePoint::Label(_) => {}

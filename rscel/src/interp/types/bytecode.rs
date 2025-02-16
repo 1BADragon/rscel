@@ -13,6 +13,8 @@ pub enum JmpWhen {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum ByteCode {
     Push(CelValue),
+    Test,
+    Dup,
     Or,
     And,
     Not,
@@ -30,11 +32,7 @@ pub enum ByteCode {
     Gt,
     In,
     Jmp(i32),
-    JmpCond {
-        when: JmpWhen,
-        dist: i32,
-        leave_val: bool,
-    },
+    JmpCond { when: JmpWhen, dist: i32 },
     MkList(u32),
     MkDict(u32),
     Index,
@@ -49,6 +47,8 @@ impl fmt::Debug for ByteCode {
 
         match self {
             Push(val) => write!(f, "PUSH {:?}", val),
+            Test => write!(f, "TEST"),
+            Dup => write!(f, "DUP"),
             Or => write!(f, "OR"),
             And => write!(f, "AND"),
             Not => write!(f, "NOT"),
@@ -66,11 +66,7 @@ impl fmt::Debug for ByteCode {
             Gt => write!(f, "GT"),
             In => write!(f, "IN"),
             Jmp(dist) => write!(f, "JMP {}", dist),
-            JmpCond {
-                when,
-                dist,
-                leave_val: _,
-            } => write!(f, "JMP {:?} {}", when, dist),
+            JmpCond { when, dist } => write!(f, "JMP {:?} {}", when, dist),
             MkList(size) => write!(f, "MKLIST {}", size),
             MkDict(size) => write!(f, "MKDICT {}", size),
             Index => write!(f, "INDEX"),

@@ -145,7 +145,6 @@ impl<'l> CelCompiler<'l> {
                                     [PreResolvedCodePoint::JmpCond {
                                         when: JmpWhen::False,
                                         label: after_true_clause,
-                                        leave_val: false,
                                     }]
                                     .into_iter(),
                                 )
@@ -197,13 +196,14 @@ impl<'l> CelCompiler<'l> {
                 self.tokenizer.next()?;
                 let (rhs_node, rhs_ast) = self.parse_conditional_and()?;
 
-                let jmp_node =
-                    CompiledProg::with_code_points(vec![PreResolvedCodePoint::JmpCond {
+                let jmp_node = CompiledProg::with_code_points(vec![
+                    PreResolvedCodePoint::Bytecode(ByteCode::Test),
+                    PreResolvedCodePoint::Bytecode(ByteCode::Dup),
+                    PreResolvedCodePoint::JmpCond {
                         when: JmpWhen::True,
                         label,
-                        leave_val: true,
-                    }
-                    .into()]);
+                    },
+                ]);
 
                 let range = current_ast.range().surrounding(rhs_ast.range());
 
@@ -241,12 +241,14 @@ impl<'l> CelCompiler<'l> {
                 self.tokenizer.next()?;
                 let (rhs_node, rhs_ast) = self.parse_relation()?;
 
-                let jmp_node =
-                    CompiledProg::with_code_points(vec![PreResolvedCodePoint::JmpCond {
+                let jmp_node = CompiledProg::with_code_points(vec![
+                    PreResolvedCodePoint::Bytecode(ByteCode::Test),
+                    PreResolvedCodePoint::Bytecode(ByteCode::Dup),
+                    PreResolvedCodePoint::JmpCond {
                         when: JmpWhen::False,
                         label: label,
-                        leave_val: true,
-                    }]);
+                    },
+                ]);
 
                 let range = current_ast.range().surrounding(rhs_ast.range());
 

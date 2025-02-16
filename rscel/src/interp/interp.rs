@@ -154,7 +154,18 @@ impl<'a> Interpreter<'a> {
             let oldpc = pc;
             pc += 1;
             match &prog[oldpc] {
-                ByteCode::Push(val) => stack.push(val.clone().into()),
+                ByteCode::Push(val) => stack.push_val(val.clone()),
+                ByteCode::Test => {
+                    let v = stack.pop_val()?;
+
+                    stack.push_val(v.is_truthy().into());
+                }
+                ByteCode::Dup => {
+                    let v = stack.pop_val()?;
+
+                    stack.push_val(v.clone());
+                    stack.push_val(v);
+                }
                 ByteCode::Or => {
                     let v2 = stack.pop_val()?;
                     let v1 = stack.pop_val()?;
@@ -250,17 +261,12 @@ impl<'a> Interpreter<'a> {
                     stack.push_val(lhs.in_(rhs));
                 }
                 ByteCode::Jmp(dist) => pc = pc + *dist as usize,
-                ByteCode::JmpCond {
-                    when,
-                    dist,
-                    leave_val,
-                } => {
-                    let mut v1 = stack.pop_val()?;
+                ByteCode::JmpCond { when, dist } => {
+                    let v1 = stack.pop_val()?;
                     match when {
                         JmpWhen::True => {
                             if cfg!(feature = "type_prop") {
                                 if v1.is_truthy() {
-                                    v1 = CelValue::true_();
                                     pc += *dist as usize
                                 }
                             } else if let CelValue::Err(ref _e) = v1 {
@@ -279,7 +285,6 @@ impl<'a> Interpreter<'a> {
                         JmpWhen::False => {
                             if cfg!(feature = "type_prop") {
                                 if !v1.is_truthy() {
-                                    v1 = CelValue::false_();
                                     pc += *dist as usize
                                 }
                             } else if let CelValue::Bool(v) = v1 {
@@ -294,9 +299,6 @@ impl<'a> Interpreter<'a> {
                             }
                         }
                     };
-                    if *leave_val {
-                        stack.push_val(v1);
-                    }
                 }
                 ByteCode::MkList(size) => {
                     let mut v = Vec::new();
