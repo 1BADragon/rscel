@@ -126,6 +126,7 @@ impl<'l> StringTokenizer<'l> {
                         self.parse_keywords_or_ident("b", &[])
                     }
                 }
+                'c' => self.parse_keywords_or_ident("c", &[("case", Token::Case)]),
                 'f' => {
                     if let Some('\'') = self.scanner.peek() {
                         self.scanner.next();
@@ -138,6 +139,7 @@ impl<'l> StringTokenizer<'l> {
                     }
                 }
                 'i' => self.parse_keywords_or_ident("i", &[("in", Token::In)]),
+                'm' => self.parse_keywords_or_ident("m", &[("match", Token::Match)]),
                 'n' => self.parse_keywords_or_ident("n", &[("null", Token::Null)]),
                 'r' => {
                     if let Some('\'') = self.scanner.peek() {
