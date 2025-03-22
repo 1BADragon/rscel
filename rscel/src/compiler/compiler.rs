@@ -110,9 +110,8 @@ impl<'l> CelCompiler<'l> {
 
         let mut range = condition_ast.range();
 
-        let (node_bytecode, mut node_details) = condition_node.into_parts();
-
-        let mut node_bytecode = node_bytecode.into_bytecode();
+        let (mut node_value, mut node_details) = condition_node.into_parts();
+        let mut node_bytecode = node_value.into_bytecode();
 
         let next = self.tokenizer.next()?;
         if next.as_token() != Some(&Token::LBrace) {
@@ -125,19 +124,31 @@ impl<'l> CelCompiler<'l> {
 
         let mut all_parts = Vec::new();
 
+        let mut comma_seen = true;
+
         loop {
-            let lbrace = self.tokenizer.peek()?;
-            if lbrace.as_token() != Some(&Token::LBrace) {
-                range = range.surrounding(lbrace.unwrap().loc);
+            // the rbrace at the end of the match
+            let rbrace = self.tokenizer.peek()?;
+            if rbrace.as_token() == Some(&Token::RBrace) {
+                range = range.surrounding(rbrace.unwrap().loc);
                 break;
             }
 
+            if !comma_seen {
+                return Err(SyntaxError::from_location(self.tokenizer.location())
+                    .with_message(format!("Expected COMMA"))
+                    .into());
+            }
+            comma_seen = false;
+
+            // case
             let case_token = self.tokenizer.next()?;
             if case_token.as_token() != Some(&Token::Case) {
                 return Err(SyntaxError::from_location(self.tokenizer.location())
                     .with_message(format!("Unexpected token {:?}, expected CASE", next))
                     .into());
             }
+            //pattern
             let (pattern_prog, pattern_ast) = self.parse_match_pattern()?;
             let (pattern_bytecode, pattern_details) = pattern_prog.into_parts();
             let pattern_bytecode: Vec<_> = [ByteCode::Dup]
@@ -149,6 +160,7 @@ impl<'l> CelCompiler<'l> {
 
             let pattern_range = pattern_ast.range();
 
+            // colon after pattern
             let colon_token = self.tokenizer.next()?;
             if colon_token.as_token() != Some(&Token::Colon) {
                 return Err(SyntaxError::from_location(self.tokenizer.location())
@@ -156,6 +168,7 @@ impl<'l> CelCompiler<'l> {
                     .into());
             }
 
+            // eval expression
             let (expr_prog, expr_ast) = self.parse_expression()?;
             let (expr_bytecode, expr_details) = expr_prog.into_parts();
             let expr_bytecode: Vec<_> = [ByteCode::Pop]
@@ -175,12 +188,23 @@ impl<'l> CelCompiler<'l> {
                 },
                 case_range,
             ));
+            //
+            // comma after pattern
+            let comma_token = self.tokenizer.peek()?;
+            if comma_token.as_token() == Some(&Token::Comma) {
+                comma_seen = true;
+                self.tokenizer.next()?;
+            }
         }
 
-        let mut pattern_segment = CelByteCode::new();
-        let mut expr_segment = CelByteCode::new();
+        let after_match_l = self
 
-        for (pattern_bytecode, expr_bytecode) in all_parts.into_iter().rev() {}
+        for (pattern_bytecode, expr_bytecode) in all_parts.into_iter().rev() {
+            
+            node_bytecode.push(ByteCode::Dup);
+
+
+        }
 
         Ok((
             CompiledProg::new(NodeValue::Bytecode(node_bytecode), node_details),
@@ -195,7 +219,34 @@ impl<'l> CelCompiler<'l> {
     }
 
     fn parse_match_pattern(&mut self) -> CelResult<(CompiledProg, AstNode<MatchPattern>)> {
-        todo!()
+        let start = self.tokenizer.location();
+
+        if let Some(t) = self.tokenizer.next()? {
+            match t.token {
+                Token::UnderScore => {
+                    let range = SourceRange::new(start, self.tokenizer.location());
+                    return Ok((
+                        CompiledProg::with_bytecode(CelByteCode::from_vec(vec![
+                            ByteCode::Pop,                     // pop off the pattern value
+                            ByteCode::Push(CelValue::true_()), // push true
+                        ])),
+                        AstNode::new(
+                            MatchPattern::Any(AstNode::new(MatchAnyPattern {}, range)),
+                            range,
+                        ),
+                    ));
+                }
+                other => {
+                    return Err(SyntaxError::from_location(self.tokenizer.location())
+                        .with_message(format!("Expected PATTERN got {:?}", other))
+                        .into())
+                }
+            }
+        } else {
+            return Err(SyntaxError::from_location(self.tokenizer.location())
+                .with_message(format!("Expected PATTERN got NOTHING"))
+                .into());
+        }
     }
 
     fn parse_conditional_or(&mut self) -> CelResult<(CompiledProg, AstNode<ConditionalOr>)> {
