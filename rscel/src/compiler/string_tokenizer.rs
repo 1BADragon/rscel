@@ -564,7 +564,7 @@ impl<'l> StringTokenizer<'l> {
 
 impl Tokenizer for StringTokenizer<'_> {
     fn peek(&mut self) -> Result<Option<&TokenWithLoc>, SyntaxError> {
-        if let None = self.current {
+        if self.current.is_none() {
             match self.collect_next_token() {
                 Ok(token) => self.current = token,
                 Err(err) => return Err(err),
@@ -574,7 +574,7 @@ impl Tokenizer for StringTokenizer<'_> {
     }
 
     fn next(&mut self) -> Result<Option<TokenWithLoc>, SyntaxError> {
-        if let None = self.current {
+        if self.current.is_none() {
             self.collect_next_token()
         } else {
             let tmp = std::mem::replace(&mut self.current, None);

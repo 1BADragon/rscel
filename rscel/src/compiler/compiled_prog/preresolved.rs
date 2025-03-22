@@ -36,6 +36,11 @@ impl PreResolvedByteCode {
         }
     }
 
+    pub fn push(&mut self, val: impl Into<PreResolvedCodePoint>) {
+        let v = val.into();
+        self.inner.push(v);
+    }
+
     pub fn extend(&mut self, byte_codes: impl IntoIterator<Item = PreResolvedCodePoint>) {
         for b in byte_codes.into_iter() {
             match &b {

@@ -11,7 +11,9 @@ use super::{
 };
 use crate::{
     interp::{Interpreter, JmpWhen},
-    BindContext, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, StringTokenizer,
+    types::CelByteCode,
+    BindContext, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, ProgramDetails,
+    StringTokenizer,
 };
 
 use crate::compile;
@@ -59,130 +61,281 @@ impl<'l> CelCompiler<'l> {
     }
 
     fn parse_expression(&mut self) -> CelResult<(CompiledProg, AstNode<Expr>)> {
-        let (lhs_node, lhs_ast) = self.parse_conditional_or()?;
+        if let Some(Token::Match) = self.tokenizer.peek()?.as_token() {
+            self.tokenizer.next()?;
+            self.parse_match_expression()
+        } else {
+            let (lhs_node, lhs_ast) = self.parse_conditional_or()?;
 
-        match self.tokenizer.peek()?.as_token() {
-            Some(Token::Question) => {
-                self.tokenizer.next()?;
-                let (expr_node, mut details) = lhs_node.into_parts();
-
-                let (true_clause_node, true_clause_ast) = self.parse_conditional_or()?;
-                let (true_clause_node, true_clause_details) = true_clause_node.into_parts();
-
-                let next = self.tokenizer.next()?;
-                if next.as_token() != Some(&Token::Colon) {
-                    return Err(SyntaxError::from_location(self.tokenizer.location())
-                        .with_message(format!("Unexpected token {:?}, expected COLON", next))
-                        .into());
+            match self.tokenizer.peek()?.as_token() {
+                Some(Token::Question) => {
+                    self.tokenizer.next()?;
+                    self.parse_turnary_expression(lhs_node, lhs_ast)
                 }
+                _ => {
+                    let range = lhs_ast.range();
+                    Ok((
+                        CompiledProg::from_node(lhs_node),
+                        AstNode::new(Expr::Unary(Box::new(lhs_ast)), range),
+                    ))
+                }
+            }
+        }
+    }
 
-                let (false_clause_node, false_clause_ast) = self.parse_expression()?;
-                let (false_clause_node, false_clause_details) = false_clause_node.into_parts();
+    fn parse_turnary_expression(
+        &mut self,
+        or_prog: CompiledProg,
+        or_ast: AstNode<ConditionalOr>,
+    ) -> CelResult<(CompiledProg, AstNode<Expr>)> {
+        let (expr_node, mut details) = or_prog.into_parts();
 
-                let range = lhs_ast.range().surrounding(false_clause_ast.range());
+        let (true_clause_node, true_clause_ast) = self.parse_conditional_or()?;
+        let (true_clause_node, true_clause_details) = true_clause_node.into_parts();
 
-                details.union_from(true_clause_details);
-                details.union_from(false_clause_details);
+        let next = self.tokenizer.next()?;
+        if next.as_token() != Some(&Token::Colon) {
+            return Err(SyntaxError::from_location(self.tokenizer.location())
+                .with_message(format!("Unexpected token {:?}, expected COLON", next))
+                .into());
+        }
 
-                let turnary_node = if let NodeValue::ConstExpr(i) = expr_node {
-                    if i.is_err() {
+        let (false_clause_node, false_clause_ast) = self.parse_expression()?;
+        let (false_clause_node, false_clause_details) = false_clause_node.into_parts();
+
+        let range = or_ast.range().surrounding(false_clause_ast.range());
+
+        details.union_from(true_clause_details);
+        details.union_from(false_clause_details);
+
+        let turnary_node = if let NodeValue::ConstExpr(i) = expr_node {
+            if i.is_err() {
+                CompiledProg {
+                    inner: NodeValue::ConstExpr(i),
+                    details,
+                }
+            } else {
+                if cfg!(feature = "type_prop") {
+                    if i.is_truthy() {
                         CompiledProg {
-                            inner: NodeValue::ConstExpr(i),
+                            inner: true_clause_node,
                             details,
                         }
                     } else {
-                        if cfg!(feature = "type_prop") {
-                            if i.is_truthy() {
-                                CompiledProg {
-                                    inner: true_clause_node,
-                                    details,
-                                }
-                            } else {
-                                CompiledProg {
-                                    inner: false_clause_node,
-                                    details,
-                                }
-                            }
-                        } else {
-                            if let CelValue::Bool(b) = i {
-                                if b {
-                                    CompiledProg {
-                                        inner: true_clause_node,
-                                        details,
-                                    }
-                                } else {
-                                    CompiledProg {
-                                        inner: false_clause_node,
-                                        details,
-                                    }
-                                }
-                            } else {
-                                CompiledProg {
-                                    inner: NodeValue::ConstExpr(CelValue::from_err(
-                                        CelError::Value(format!(
-                                            "{} cannot be converted to bool",
-                                            i.as_type()
-                                        )),
-                                    )),
-                                    details,
-                                }
-                            }
+                        CompiledProg {
+                            inner: false_clause_node,
+                            details,
                         }
                     }
                 } else {
-                    let true_clause_bytecode = true_clause_node.into_bytecode();
-                    let false_clause_bytecode = false_clause_node.into_bytecode();
-
-                    let after_true_clause = self.get_label();
-                    let end_label = self.get_label();
-
-                    CompiledProg {
-                        inner: NodeValue::Bytecode(
-                            expr_node
-                                .into_bytecode()
-                                .into_iter()
-                                .chain(
-                                    [PreResolvedCodePoint::JmpCond {
-                                        when: JmpWhen::False,
-                                        label: after_true_clause,
-                                    }]
-                                    .into_iter(),
-                                )
-                                .chain(true_clause_bytecode.into_iter())
-                                .chain(
-                                    [
-                                        PreResolvedCodePoint::Jmp { label: end_label },
-                                        PreResolvedCodePoint::Label(after_true_clause),
-                                    ]
-                                    .into_iter(),
-                                )
-                                .chain(false_clause_bytecode.into_iter())
-                                .chain([PreResolvedCodePoint::Label(end_label)].into_iter())
-                                .collect(),
-                        ),
-                        details,
+                    if let CelValue::Bool(b) = i {
+                        if b {
+                            CompiledProg {
+                                inner: true_clause_node,
+                                details,
+                            }
+                        } else {
+                            CompiledProg {
+                                inner: false_clause_node,
+                                details,
+                            }
+                        }
+                    } else {
+                        CompiledProg {
+                            inner: NodeValue::ConstExpr(CelValue::from_err(CelError::Value(
+                                format!("{} cannot be converted to bool", i.as_type()),
+                            ))),
+                            details,
+                        }
                     }
-                };
+                }
+            }
+        } else {
+            let true_clause_bytecode = true_clause_node.into_bytecode();
+            let false_clause_bytecode = false_clause_node.into_bytecode();
 
-                Ok((
-                    turnary_node,
-                    AstNode::new(
-                        Expr::Ternary {
-                            condition: Box::new(lhs_ast),
-                            true_clause: Box::new(true_clause_ast),
-                            false_clause: Box::new(false_clause_ast),
-                        },
-                        range,
-                    ),
-                ))
+            let after_true_clause = self.get_label();
+            let end_label = self.get_label();
+
+            CompiledProg {
+                inner: NodeValue::Bytecode(
+                    expr_node
+                        .into_bytecode()
+                        .into_iter()
+                        .chain(
+                            [PreResolvedCodePoint::JmpCond {
+                                when: JmpWhen::False,
+                                label: after_true_clause,
+                            }]
+                            .into_iter(),
+                        )
+                        .chain(true_clause_bytecode.into_iter())
+                        .chain(
+                            [
+                                PreResolvedCodePoint::Jmp { label: end_label },
+                                PreResolvedCodePoint::Label(after_true_clause),
+                            ]
+                            .into_iter(),
+                        )
+                        .chain(false_clause_bytecode.into_iter())
+                        .chain([PreResolvedCodePoint::Label(end_label)].into_iter())
+                        .collect(),
+                ),
+                details,
             }
-            _ => {
-                let range = lhs_ast.range();
-                Ok((
-                    CompiledProg::from_node(lhs_node),
-                    AstNode::new(Expr::Unary(Box::new(lhs_ast)), range),
-                ))
+        };
+
+        Ok((
+            turnary_node,
+            AstNode::new(
+                Expr::Ternary {
+                    condition: Box::new(or_ast),
+                    true_clause: Box::new(true_clause_ast),
+                    false_clause: Box::new(false_clause_ast),
+                },
+                range,
+            ),
+        ))
+    }
+
+    fn parse_match_expression(&mut self) -> CelResult<(CompiledProg, AstNode<Expr>)> {
+        let (condition_node, condition_ast) = self.parse_expression()?;
+
+        let mut range = condition_ast.range();
+
+        let (mut node_value, mut node_details) = condition_node.into_parts();
+        let mut node_bytecode = node_value.into_bytecode();
+
+        let next = self.tokenizer.next()?;
+        if next.as_token() != Some(&Token::LBrace) {
+            return Err(SyntaxError::from_location(self.tokenizer.location())
+                .with_message(format!("Unexpected token {:?}, expected LBRACE", next))
+                .into());
+        }
+
+        let mut expressions: Vec<AstNode<MatchCase>> = Vec::new();
+
+        let mut all_parts = Vec::new();
+
+        let mut comma_seen = true;
+
+        loop {
+            // the rbrace at the end of the match
+            let rbrace = self.tokenizer.peek()?;
+            if rbrace.as_token() == Some(&Token::RBrace) {
+                range = range.surrounding(rbrace.unwrap().loc);
+                break;
             }
+
+            if !comma_seen {
+                return Err(SyntaxError::from_location(self.tokenizer.location())
+                    .with_message(format!("Expected COMMA"))
+                    .into());
+            }
+            comma_seen = false;
+
+            // case
+            let case_token = self.tokenizer.next()?;
+            if case_token.as_token() != Some(&Token::Case) {
+                return Err(SyntaxError::from_location(self.tokenizer.location())
+                    .with_message(format!("Unexpected token {:?}, expected CASE", next))
+                    .into());
+            }
+            //pattern
+            let (pattern_prog, pattern_ast) = self.parse_match_pattern()?;
+            let (pattern_bytecode, pattern_details) = pattern_prog.into_parts();
+            let pattern_bytecode: Vec<_> = [ByteCode::Dup.into()]
+                .into_iter()
+                .chain(pattern_bytecode.into_bytecode().into_iter())
+                .collect();
+
+            node_details.union_from(pattern_details);
+
+            let pattern_range = pattern_ast.range();
+
+            // colon after pattern
+            let colon_token = self.tokenizer.next()?;
+            if colon_token.as_token() != Some(&Token::Colon) {
+                return Err(SyntaxError::from_location(self.tokenizer.location())
+                    .with_message(format!("Unexpected token {:?}, expected COLON", next))
+                    .into());
+            }
+
+            // eval expression
+            let (expr_prog, expr_ast) = self.parse_expression()?;
+            let (expr_bytecode, expr_details) = expr_prog.into_parts();
+            let expr_bytecode: Vec<_> = [ByteCode::Pop.into()]
+                .into_iter()
+                .chain(expr_bytecode.into_bytecode().into_iter())
+                .collect();
+
+            node_details.union_from(expr_details);
+
+            let case_range = pattern_range.surrounding(expr_ast.range());
+
+            all_parts.push((pattern_bytecode, expr_bytecode));
+            expressions.push(AstNode::new(
+                MatchCase {
+                    pattern: pattern_ast,
+                    expr: Box::new(expr_ast),
+                },
+                case_range,
+            ));
+            //
+            // comma after pattern
+            let comma_token = self.tokenizer.peek()?;
+            if comma_token.as_token() == Some(&Token::Comma) {
+                comma_seen = true;
+                self.tokenizer.next()?;
+            }
+        }
+
+        let after_match_l = self.get_label();
+
+        for (pattern_bytecode, expr_bytecode) in all_parts.into_iter().rev() {
+            node_bytecode.push(ByteCode::Dup);
+        }
+
+        Ok((
+            CompiledProg::new(NodeValue::Bytecode(node_bytecode), node_details),
+            AstNode::new(
+                Expr::Match {
+                    condition: Box::new(condition_ast),
+                    cases: expressions,
+                },
+                range,
+            ),
+        ))
+    }
+
+    fn parse_match_pattern(&mut self) -> CelResult<(CompiledProg, AstNode<MatchPattern>)> {
+        let start = self.tokenizer.location();
+
+        if let Some(t) = self.tokenizer.next()? {
+            match t.token {
+                Token::UnderScore => {
+                    let range = SourceRange::new(start, self.tokenizer.location());
+                    return Ok((
+                        CompiledProg::with_bytecode(CelByteCode::from_vec(vec![
+                            ByteCode::Pop,                     // pop off the pattern value
+                            ByteCode::Push(CelValue::true_()), // push true
+                        ])),
+                        AstNode::new(
+                            MatchPattern::Any(AstNode::new(MatchAnyPattern {}, range)),
+                            range,
+                        ),
+                    ));
+                }
+                other => {
+                    return Err(SyntaxError::from_location(self.tokenizer.location())
+                        .with_message(format!("Expected PATTERN got {:?}", other))
+                        .into())
+                }
+            }
+        } else {
+            return Err(SyntaxError::from_location(self.tokenizer.location())
+                .with_message(format!("Expected PATTERN got NOTHING"))
+                .into());
         }
     }
 

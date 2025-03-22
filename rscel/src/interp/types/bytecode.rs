@@ -22,6 +22,7 @@ impl JmpWhen {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum ByteCode {
     Push(CelValue),
+    Pop,
     Test,
     Dup,
     Or,
@@ -56,6 +57,7 @@ impl fmt::Debug for ByteCode {
 
         match self {
             Push(val) => write!(f, "PUSH {:?}", val),
+            Pop => write!(f, "POP"),
             Test => write!(f, "TEST"),
             Dup => write!(f, "DUP"),
             Or => write!(f, "OR"),

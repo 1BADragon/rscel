@@ -24,8 +24,42 @@ pub enum Expr {
         true_clause: Box<AstNode<ConditionalOr>>,
         false_clause: Box<AstNode<Self>>,
     },
+    Match {
+        condition: Box<AstNode<Expr>>,
+        cases: Vec<AstNode<MatchCase>>,
+    },
     Unary(Box<AstNode<ConditionalOr>>),
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MatchCase {
+    pub pattern: AstNode<MatchPattern>,
+    pub expr: Box<AstNode<Expr>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum MatchPattern {
+    Type(AstNode<MatchTypePattern>),
+    Any(AstNode<MatchAnyPattern>),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum MatchTypePattern {
+    Int,
+    Uint,
+    Float,
+    String,
+    Bool,
+    Bytes,
+    List,
+    Object,
+    Null,
+    Timestamp,
+    Duration,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MatchAnyPattern;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConditionalOr {
