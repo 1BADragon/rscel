@@ -190,6 +190,9 @@ fn test_contains() {
 #[test_case("match 2.0 { case float: true, case _: flase}", true; "match float")]
 #[test_case("match 'foo' { case string: true, case _: false}", true; "match string")]
 #[test_case("match false { case bool: true, case _: false}", true; "match bool")]
+#[test_case("match 3 { case 3: true, case _: flase}", true; "match int literal")]
+#[test_case("match 3.0 { case 3.0: true, case _: flase}", true; "match float literal")]
+#[test_case("match '3' { case '3': true, case _: flase}", true; "match string literal")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

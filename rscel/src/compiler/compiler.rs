@@ -11,7 +11,6 @@ use super::{
 };
 use crate::{
     interp::{Interpreter, JmpWhen},
-    types::CelByteCode,
     BindContext, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, StringTokenizer,
 };
 
@@ -326,58 +325,65 @@ impl<'l> CelCompiler<'l> {
     fn parse_match_pattern(&mut self) -> CelResult<(CompiledProg, AstNode<MatchPattern>)> {
         let start = self.tokenizer.location();
 
-        if let Some(t) = self.tokenizer.next()? {
-            match t.token {
-                Token::Ident(i) => {
+        if let Some(t) = self.tokenizer.peek()? {
+            if let Token::Ident(i) = t.token() {
+                let i = i.clone();
+                if i == "_" {
+                    self.tokenizer.next()?;
                     let range = SourceRange::new(start, self.tokenizer.location());
-                    let (bytecode_vec, pattern_type) = match i.as_str() {
-                        "int" | "uint" | "float" | "double" | "string" | "bool" | "bytes"
-                        | "list" | "object" | "null" | "timestamp" | "duration" => (
-                            vec![
+
+                    return Ok((
+                        CompiledProg::with_bytecode(
+                            [
+                                ByteCode::Pop,                     // pop off the pattern value
+                                ByteCode::Push(CelValue::true_()), // push true
+                            ]
+                            .into_iter()
+                            .collect(),
+                        ),
+                        AstNode::new(
+                            MatchPattern::Any(AstNode::new(MatchAnyPattern {}, range)),
+                            range,
+                        ),
+                    ));
+                } else if self.bindings.get_type(&i).is_some() {
+                    self.tokenizer.next()?;
+                    return Ok((
+                        CompiledProg::with_bytecode(
+                            [
                                 ByteCode::Push(CelValue::Ident("type".to_owned())),
                                 ByteCode::Call(1),
                                 ByteCode::Push(CelValue::Ident(i.clone())),
                                 ByteCode::Eq,
-                            ],
+                            ]
+                            .into_iter()
+                            .collect(),
+                        ),
+                        AstNode::new(
                             MatchPattern::Type(AstNode::new(
                                 MatchTypePattern::from_type_str(&i),
-                                range,
+                                SourceRange::new(start, self.tokenizer.location()),
                             )),
+                            SourceRange::new(start, self.tokenizer.location()),
                         ),
-                        "_" => {
-                            (
-                                vec![
-                                    ByteCode::Pop,                     // pop off the pattern value
-                                    ByteCode::Push(CelValue::true_()), // push true
-                                ],
-                                MatchPattern::Any(AstNode::new(MatchAnyPattern {}, range)),
-                            )
-                        }
-                        _ => {
-                            return Err(SyntaxError::from_location(self.tokenizer.location())
-                                .with_message(
-                                    "_ is the only identifier allowed in case expressions"
-                                        .to_owned(),
-                                )
-                                .into());
-                        }
-                    };
-                    Ok((
-                        CompiledProg::with_bytecode(CelByteCode::from_vec(bytecode_vec)),
-                        AstNode::new(pattern_type, range),
-                    ))
-                }
-                other => {
-                    return Err(SyntaxError::from_location(self.tokenizer.location())
-                        .with_message(format!("Expected PATTERN got {:?}", other))
-                        .into())
+                    ));
                 }
             }
-        } else {
-            return Err(SyntaxError::from_location(self.tokenizer.location())
-                .with_message(format!("Expected PATTERN got NOTHING"))
-                .into());
         }
+
+        let (or_prod, or_ast) = self.parse_conditional_or()?;
+        let or_details = or_prod.details().clone();
+        let mut or_bc = or_prod.into_unresolved_bytecode();
+
+        or_bc.push(ByteCode::Eq);
+
+        Ok((
+            CompiledProg::new(NodeValue::Bytecode(or_bc), or_details),
+            AstNode::new(
+                MatchPattern::Or(or_ast),
+                SourceRange::new(start, self.tokenizer.location()),
+            ),
+        ))
     }
 
     fn parse_conditional_or(&mut self) -> CelResult<(CompiledProg, AstNode<ConditionalOr>)> {

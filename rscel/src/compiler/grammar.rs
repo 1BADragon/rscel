@@ -39,6 +39,7 @@ pub struct MatchCase {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MatchPattern {
+    Or(AstNode<ConditionalOr>),
     Type(AstNode<MatchTypePattern>),
     Any(AstNode<MatchAnyPattern>),
 }

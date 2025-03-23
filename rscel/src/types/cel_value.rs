@@ -23,6 +23,11 @@ use crate::{interp::ByteCode, CelError, CelResult, CelValueDyn};
 
 use super::{cel_byte_code::CelByteCode, CelBytes};
 
+pub type CelTimeStamp = DateTime<Utc>;
+pub type CelValueVec = Vec<CelValue>;
+pub type CelValueMap = HashMap<String, CelValue>;
+pub type CelValueBytes = Vec<u8>;
+
 /// The basic value of the CEL interpreter.
 ///
 /// Houses all possible types and implements most of the valid operations within the
@@ -40,13 +45,13 @@ pub enum CelValue {
     Bool(bool),
     String(String),
     Bytes(CelBytes),
-    List(Vec<CelValue>),
-    Map(HashMap<String, CelValue>),
+    List(CelValueVec),
+    Map(CelValueMap),
     Null,
     Ident(String),
     Type(String),
     #[serde(with = "ts_milliseconds")]
-    TimeStamp(DateTime<Utc>),
+    TimeStamp(CelTimeStamp),
     #[serde(
         serialize_with = "DurationMilliSeconds::<i64>::serialize_as",
         deserialize_with = "DurationMilliSeconds::<i64>::deserialize_as"
