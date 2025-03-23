@@ -58,6 +58,25 @@ pub enum MatchTypePattern {
     Duration,
 }
 
+impl MatchTypePattern {
+    pub fn from_type_str(s: &str) -> Self {
+        match s {
+            "int" => MatchTypePattern::Int,
+            "uint" => MatchTypePattern::Uint,
+            "float" | "double" => MatchTypePattern::Float,
+            "string" => MatchTypePattern::String,
+            "bool" => MatchTypePattern::Bool,
+            "bytes" => MatchTypePattern::Bytes,
+            "list" => MatchTypePattern::List,
+            "object" => MatchTypePattern::Object,
+            "null" => MatchTypePattern::Null,
+            "timestamp" => MatchTypePattern::Timestamp,
+            "duration" => MatchTypePattern::Duration,
+            _ => panic!("Unknown type"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MatchAnyPattern;
 

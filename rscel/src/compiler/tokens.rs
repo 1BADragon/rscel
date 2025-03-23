@@ -23,7 +23,6 @@ pub enum Token {
     RParen,                          // )
     LessThan,                        // <
     GreaterThan,                     // >
-    UnderScore,                      // _
     OrOr,                            // ||
     AndAnd,                          // &&
     LessEqual,                       // <=

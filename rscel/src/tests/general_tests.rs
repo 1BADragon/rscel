@@ -185,7 +185,11 @@ fn test_contains() {
 #[test_case("duration('1s234ms').getMilliseconds()", 234; "duration.getMilliseconds")]
 #[test_case("duration('1h30m').getMinutes()", 90; "duration.getMinutes")]
 #[test_case("duration('1m30s').getSeconds()", 90; "duration.getSeconds")]
-#[test_case("match 3 { case int: true, _: false}", true; "match int" )]
+#[test_case("match 'foo' {case int: false, case _: true}", true; "match else")]
+#[test_case("match 3 { case int: true, case _: false}", true; "match int" )]
+#[test_case("match 2.0 { case float: true, case _: flase}", true; "match float")]
+#[test_case("match 'foo' { case string: true, case _: false}", true; "match string")]
+#[test_case("match false { case bool: true, case _: false}", true; "match bool")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

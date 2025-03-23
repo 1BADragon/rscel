@@ -78,10 +78,6 @@ impl CompiledProg {
         }
     }
 
-    pub fn details(&self) -> &ProgramDetails {
-        &self.details
-    }
-
     pub fn with_bytecode(bytecode: CelByteCode) -> CompiledProg {
         CompiledProg {
             inner: NodeValue::Bytecode(bytecode.into()),
@@ -242,10 +238,6 @@ impl CompiledProg {
 
     pub fn into_unresolved_bytecode(self) -> PreResolvedByteCode {
         self.inner.into_bytecode()
-    }
-
-    pub fn into_parts(self) -> (NodeValue, ProgramDetails) {
-        (self.inner, self.details)
     }
 
     pub fn is_const(&self) -> bool {
