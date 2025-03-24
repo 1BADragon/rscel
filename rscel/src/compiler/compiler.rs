@@ -312,7 +312,11 @@ impl<'l> CelCompiler<'l> {
             node_bytecode.push(PreResolvedCodePoint::Label(after_case_l));
         }
 
-        node_bytecode.push(PreResolvedCodePoint::Label(after_match_s_l));
+        node_bytecode.extend([
+            ByteCode::Pop.into(),
+            ByteCode::Push(CelValue::from_null()).into(),
+            PreResolvedCodePoint::Label(after_match_s_l),
+        ]);
 
         Ok((
             CompiledProg::new(NodeValue::Bytecode(node_bytecode), node_details),
