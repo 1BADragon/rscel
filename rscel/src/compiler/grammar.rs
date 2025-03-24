@@ -39,9 +39,22 @@ pub struct MatchCase {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MatchPattern {
-    Or(AstNode<ConditionalOr>),
+    Cmp {
+        op: AstNode<MatchCmpOp>,
+        or: AstNode<ConditionalOr>,
+    },
     Type(AstNode<MatchTypePattern>),
     Any(AstNode<MatchAnyPattern>),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum MatchCmpOp {
+    Eq,
+    Neq,
+    Gt,
+    Ge,
+    Lt,
+    Le,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

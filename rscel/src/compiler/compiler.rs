@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+mod pattern_utils;
+
+use pattern_utils::PrefixPattern;
+
 use super::{
     ast_node::AstNode,
     compiled_prog::{CompiledProg, NodeValue, PreResolvedCodePoint},
@@ -324,6 +328,7 @@ impl<'l> CelCompiler<'l> {
 
     fn parse_match_pattern(&mut self) -> CelResult<(CompiledProg, AstNode<MatchPattern>)> {
         let start = self.tokenizer.location();
+        let mut prefix_pattern = PrefixPattern::Eq;
 
         if let Some(t) = self.tokenizer.peek()? {
             if let Token::Ident(i) = t.token() {
@@ -369,18 +374,28 @@ impl<'l> CelCompiler<'l> {
                     ));
                 }
             }
+
+            if let Some(token_prefix_pattern) = PrefixPattern::from_token(t.token()) {
+                self.tokenizer.next()?;
+                prefix_pattern = token_prefix_pattern;
+            }
         }
+
+        let op_range = SourceRange::new(start, self.tokenizer.location());
 
         let (or_prod, or_ast) = self.parse_conditional_or()?;
         let or_details = or_prod.details().clone();
         let mut or_bc = or_prod.into_unresolved_bytecode();
 
-        or_bc.push(ByteCode::Eq);
+        or_bc.push(prefix_pattern.as_bytecode());
 
         Ok((
             CompiledProg::new(NodeValue::Bytecode(or_bc), or_details),
             AstNode::new(
-                MatchPattern::Or(or_ast),
+                MatchPattern::Cmp {
+                    op: AstNode::new(prefix_pattern.as_ast(), op_range),
+                    or: or_ast,
+                },
                 SourceRange::new(start, self.tokenizer.location()),
             ),
         ))

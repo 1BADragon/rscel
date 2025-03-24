@@ -193,6 +193,12 @@ fn test_contains() {
 #[test_case("match 3 { case 3: true, case _: flase}", true; "match int literal")]
 #[test_case("match 3.0 { case 3.0: true, case _: flase}", true; "match float literal")]
 #[test_case("match '3' { case '3': true, case _: flase}", true; "match string literal")]
+#[test_case("match 3 { case >2: true, case _: false}", true; "match greater than")]
+#[test_case("match 3 { case >=2: true, case _: false}", true; "match greater equal")]
+#[test_case("match 3 { case >=3: true, case _: false}", true; "match greater equal equal")]
+#[test_case("match 3 { case <2: false, case _: true}", true; "match less than")]
+#[test_case("match 3 { case <=2: false, case _: true}", true; "match less equal")]
+#[test_case("match 3 { case <=3: true, case _: false}", true; "match less equal equal")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
