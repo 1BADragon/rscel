@@ -23,6 +23,10 @@ use crate::{interp::ByteCode, CelError, CelResult, CelValueDyn};
 
 use super::{cel_byte_code::CelByteCode, CelBytes};
 
+pub type CelTimeStamp = DateTime<Utc>;
+pub type CelValueVec = Vec<CelValue>;
+pub type CelValueMap = HashMap<String, CelValue>;
+
 /// The basic value of the CEL interpreter.
 ///
 /// Houses all possible types and implements most of the valid operations within the
@@ -40,13 +44,13 @@ pub enum CelValue {
     Bool(bool),
     String(String),
     Bytes(CelBytes),
-    List(Vec<CelValue>),
-    Map(HashMap<String, CelValue>),
+    List(CelValueVec),
+    Map(CelValueMap),
     Null,
     Ident(String),
     Type(String),
     #[serde(with = "ts_milliseconds")]
-    TimeStamp(DateTime<Utc>),
+    TimeStamp(CelTimeStamp),
     #[serde(
         serialize_with = "DurationMilliSeconds::<i64>::serialize_as",
         deserialize_with = "DurationMilliSeconds::<i64>::deserialize_as"
@@ -547,26 +551,53 @@ impl CelValue {
     pub fn index(self, ival: CelValue) -> CelValue {
         self.error_prop_or(ival, |obj, index| match obj {
             CelValue::List(list) => {
-                let index = if let CelValue::UInt(ref index) = index {
-                    *index as usize
+                if let CelValue::UInt(index) = index {
+                    if index as usize >= list.len() {
+                        return CelValue::from_err(CelError::value("List access out of bounds"));
+                    }
+
+                    return list[index as usize].clone();
                 } else if let CelValue::Int(index) = index {
                     if index < 0 {
-                        return CelValue::from_err(CelError::value(
-                            "Negative index is not allowed",
-                        ));
+                        if cfg!(feature = "neg_index") {
+                            let adjusted_index: isize = match TryInto::<isize>::try_into(list.len())
+                            {
+                                Ok(v) => v,
+                                Err(_) => {
+                                    return CelValue::from_err(CelError::value(
+                                        "List access out of bounds",
+                                    ))
+                                }
+                            } + (index as isize);
+
+                            if adjusted_index < 0
+                                || TryInto::<usize>::try_into(adjusted_index).unwrap() >= list.len()
+                            {
+                                return CelValue::from_err(CelError::value(
+                                    "List access out of bounds 3",
+                                ));
+                            }
+
+                            list[adjusted_index as usize].clone()
+                        } else {
+                            return CelValue::from_err(CelError::value(
+                                "Negative index is not allowed",
+                            ));
+                        }
+                    } else {
+                        if index as usize >= list.len() {
+                            return CelValue::from_err(CelError::value(
+                                "List access out of bounds",
+                            ));
+                        }
+
+                        list[index as usize].clone()
                     }
-                    index as usize
                 } else {
                     return CelValue::from_err(CelError::value(
                         "List index can only be int or uint",
                     ));
-                };
-
-                if index >= list.len() {
-                    return CelValue::from_err(CelError::value("List access out of bounds"));
                 }
-
-                return list[index].clone();
             }
             CelValue::Map(map) => {
                 if let CelValue::String(index) = index {

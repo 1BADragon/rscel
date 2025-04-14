@@ -1,11 +1,11 @@
-use crate::{
-    interp::JmpWhen, program::ProgramDetails, types::CelByteCode, ByteCode, CelError, CelValue,
-    CelValueDyn, Program,
-};
+mod preresolved;
+
+use crate::{program::ProgramDetails, types::CelByteCode, ByteCode, CelValue, Program};
+pub use preresolved::{PreResolvedByteCode, PreResolvedCodePoint};
 
 #[derive(Debug, Clone)]
 pub enum NodeValue {
-    Bytecode(CelByteCode),
+    Bytecode(PreResolvedByteCode),
     ConstExpr(CelValue),
 }
 
@@ -19,9 +19,8 @@ pub struct CompiledProg {
 macro_rules! compile {
     ($bytecode:expr, $const_expr:expr, $( $child : ident),+) => {
         {
-            use crate::compiler::compiled_prog::NodeValue;
+            use crate::compiler::compiled_prog::{NodeValue, PreResolvedByteCode};
             use crate::program::ProgramDetails;
-            use crate::types::CelByteCode;
 
             let mut new_details = ProgramDetails::new();
 
@@ -40,7 +39,7 @@ macro_rules! compile {
                     }
                 }
                 ($($child,)+) => {
-                let mut new_bytecode = CelByteCode::new();
+                let mut new_bytecode = PreResolvedByteCode::new();
 
                 $(
                     new_bytecode.extend($child.into_bytecode().into_iter());
@@ -61,9 +60,13 @@ macro_rules! compile {
 }
 
 impl CompiledProg {
+    pub fn new(inner: NodeValue, details: ProgramDetails) -> Self {
+        Self { inner, details }
+    }
+
     pub fn empty() -> CompiledProg {
         CompiledProg {
-            inner: NodeValue::Bytecode(CelByteCode::new()),
+            inner: NodeValue::Bytecode(PreResolvedByteCode::new()),
             details: ProgramDetails::new(),
         }
     }
@@ -77,15 +80,32 @@ impl CompiledProg {
 
     pub fn with_bytecode(bytecode: CelByteCode) -> CompiledProg {
         CompiledProg {
-            inner: NodeValue::Bytecode(bytecode),
+            inner: NodeValue::Bytecode(bytecode.into()),
             details: ProgramDetails::new(),
         }
     }
 
-    pub fn with_code_points(bytecode: Vec<ByteCode>) -> CompiledProg {
+    pub fn with_code_points(bytecode: Vec<PreResolvedCodePoint>) -> CompiledProg {
         CompiledProg {
-            inner: NodeValue::Bytecode(bytecode.into()),
+            inner: NodeValue::Bytecode(bytecode.into_iter().collect()),
             details: ProgramDetails::new(),
+        }
+    }
+
+    pub fn details(&self) -> &ProgramDetails {
+        &self.details
+    }
+
+    pub fn into_parts(self) -> (NodeValue, ProgramDetails) {
+        (self.inner, self.details)
+    }
+
+    pub fn append_if_bytecode(&mut self, b: impl IntoIterator<Item = PreResolvedCodePoint>) {
+        match &mut self.inner {
+            NodeValue::Bytecode(bytecode) => {
+                bytecode.extend(b);
+            }
+            NodeValue::ConstExpr(_) => { /* do nothing */ }
         }
     }
 
@@ -122,7 +142,7 @@ impl CompiledProg {
                     .into_iter()
                     .map(|c| c.inner.into_bytecode().into_iter())
                     .flatten()
-                    .chain(bytecode.into_iter())
+                    .chain(bytecode.into_iter().map(|b| b.into()))
                     .collect(),
             )
         };
@@ -149,10 +169,13 @@ impl CompiledProg {
                 },
                 None => CompiledProg {
                     inner: NodeValue::Bytecode(
-                        [ByteCode::Push(c1), ByteCode::Push(c2)]
-                            .into_iter()
-                            .chain(bytecode.into_iter())
-                            .collect(),
+                        [
+                            PreResolvedCodePoint::Bytecode(ByteCode::Push(c1)),
+                            PreResolvedCodePoint::Bytecode(ByteCode::Push(c2)),
+                        ]
+                        .into_iter()
+                        .chain(bytecode.into_iter().map(|b| b.into()))
+                        .collect(),
                     ),
                     details: new_details,
                 },
@@ -162,7 +185,7 @@ impl CompiledProg {
                     c1.into_bytecode()
                         .into_iter()
                         .chain(c2.into_bytecode().into_iter())
-                        .chain(bytecode.into_iter())
+                        .chain(bytecode.into_iter().map(|b| b.into()))
                         .collect(),
                 ),
                 details: new_details,
@@ -174,7 +197,7 @@ impl CompiledProg {
         let mut details = self.details;
         details.add_source(source);
 
-        Program::new(details, self.inner.into_bytecode())
+        Program::new(details, self.inner.into_bytecode().resolve())
     }
 
     pub fn add_ident(mut self, ident: &str) -> CompiledProg {
@@ -205,82 +228,6 @@ impl CompiledProg {
         r
     }
 
-    pub fn into_turnary(
-        mut self,
-        true_clause: CompiledProg,
-        false_clause: CompiledProg,
-    ) -> CompiledProg {
-        self.details.union_from(true_clause.details);
-        self.details.union_from(false_clause.details);
-
-        if let NodeValue::ConstExpr(i) = self.inner {
-            if i.is_err() {
-                CompiledProg {
-                    inner: NodeValue::ConstExpr(i),
-                    details: self.details,
-                }
-            } else {
-                if cfg!(feature = "type_prop") {
-                    if i.is_truthy() {
-                        CompiledProg {
-                            inner: true_clause.inner,
-                            details: self.details,
-                        }
-                    } else {
-                        CompiledProg {
-                            inner: false_clause.inner,
-                            details: self.details,
-                        }
-                    }
-                } else {
-                    if let CelValue::Bool(b) = i {
-                        if b {
-                            CompiledProg {
-                                inner: true_clause.inner,
-                                details: self.details,
-                            }
-                        } else {
-                            CompiledProg {
-                                inner: false_clause.inner,
-                                details: self.details,
-                            }
-                        }
-                    } else {
-                        CompiledProg {
-                            inner: NodeValue::ConstExpr(CelValue::from_err(CelError::Value(
-                                format!("{} cannot be converted to bool", i.as_type()),
-                            ))),
-                            details: self.details,
-                        }
-                    }
-                }
-            }
-        } else {
-            let true_clause_bytecode = true_clause.inner.into_bytecode();
-            let false_clause_bytecode = false_clause.inner.into_bytecode();
-            CompiledProg {
-                inner: NodeValue::Bytecode(
-                    self.inner
-                        .into_bytecode()
-                        .into_iter()
-                        .chain(
-                            [ByteCode::JmpCond {
-                                when: JmpWhen::False,
-                                dist: (true_clause_bytecode.len() as u32) + 1, // +1 to jmp over the next jump
-                                leave_val: false,
-                            }]
-                            .into_iter(),
-                        )
-                        .chain(true_clause_bytecode.into_iter())
-                        .chain([ByteCode::Jmp(false_clause_bytecode.len() as u32)].into_iter())
-                        .chain(false_clause_bytecode.into_iter())
-                        .collect(),
-                ),
-                details: self.details,
-            }
-        }
-    }
-
     #[inline]
     pub fn bytecode_len(&self) -> usize {
         match self.inner {
@@ -289,7 +236,7 @@ impl CompiledProg {
         }
     }
 
-    pub fn into_bytecode(self) -> CelByteCode {
+    pub fn into_unresolved_bytecode(self) -> PreResolvedByteCode {
         self.inner.into_bytecode()
     }
 
@@ -310,10 +257,10 @@ impl NodeValue {
         matches!(*self, NodeValue::ConstExpr(_))
     }
 
-    pub fn into_bytecode(self) -> CelByteCode {
+    pub fn into_bytecode(self) -> PreResolvedByteCode {
         match self {
             NodeValue::Bytecode(b) => b,
-            NodeValue::ConstExpr(c) => CelByteCode::from_code_point(ByteCode::Push(c)),
+            NodeValue::ConstExpr(c) => [ByteCode::Push(c)].into_iter().collect(),
         }
     }
 }

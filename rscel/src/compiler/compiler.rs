@@ -1,8 +1,12 @@
 use std::collections::HashMap;
 
+mod pattern_utils;
+
+use pattern_utils::PrefixPattern;
+
 use super::{
     ast_node::AstNode,
-    compiled_prog::CompiledProg,
+    compiled_prog::{CompiledProg, NodeValue, PreResolvedCodePoint},
     grammar::*,
     source_range::SourceRange,
     syntax_error::SyntaxError,
@@ -19,6 +23,8 @@ use crate::compile;
 pub struct CelCompiler<'l> {
     tokenizer: &'l mut dyn Tokenizer,
     bindings: BindContext<'l>,
+
+    next_label: u32,
 }
 
 impl<'l> CelCompiler<'l> {
@@ -26,6 +32,7 @@ impl<'l> CelCompiler<'l> {
         CelCompiler {
             tokenizer,
             bindings: BindContext::for_compile(),
+            next_label: 0,
         }
     }
 
@@ -49,60 +56,373 @@ impl<'l> CelCompiler<'l> {
         Ok(prog)
     }
 
+    fn new_label(&mut self) -> u32 {
+        let n = self.next_label;
+        self.next_label += 1;
+        n
+    }
+
     fn parse_expression(&mut self) -> CelResult<(CompiledProg, AstNode<Expr>)> {
-        let (lhs_node, lhs_ast) = self.parse_conditional_or()?;
+        if let Some(Token::Match) = self.tokenizer.peek()?.as_token() {
+            self.tokenizer.next()?;
+            self.parse_match_expression()
+        } else {
+            let (lhs_node, lhs_ast) = self.parse_conditional_or()?;
 
-        match self.tokenizer.peek()?.as_token() {
-            Some(Token::Question) => {
-                self.tokenizer.next()?;
-                let (true_clause_node, true_clause_ast) = self.parse_conditional_or()?;
-
-                let next = self.tokenizer.next()?;
-                if next.as_token() != Some(&Token::Colon) {
-                    return Err(SyntaxError::from_location(self.tokenizer.location())
-                        .with_message(format!("Unexpected token {:?}, expected COLON", next))
-                        .into());
+            match self.tokenizer.peek()?.as_token() {
+                Some(Token::Question) => {
+                    self.tokenizer.next()?;
+                    self.parse_turnary_expression(lhs_node, lhs_ast)
                 }
-
-                let (false_clause_node, false_clause_ast) = self.parse_expression()?;
-
-                let range = lhs_ast.range().surrounding(false_clause_ast.range());
-
-                Ok((
-                    lhs_node.into_turnary(true_clause_node, false_clause_node),
-                    AstNode::new(
-                        Expr::Ternary {
-                            condition: Box::new(lhs_ast),
-                            true_clause: Box::new(true_clause_ast),
-                            false_clause: Box::new(false_clause_ast),
-                        },
-                        range,
-                    ),
-                ))
-            }
-            _ => {
-                let range = lhs_ast.range();
-                Ok((
-                    CompiledProg::from_node(lhs_node),
-                    AstNode::new(Expr::Unary(Box::new(lhs_ast)), range),
-                ))
+                _ => {
+                    let range = lhs_ast.range();
+                    Ok((
+                        CompiledProg::from_node(lhs_node),
+                        AstNode::new(Expr::Unary(Box::new(lhs_ast)), range),
+                    ))
+                }
             }
         }
     }
 
+    fn parse_turnary_expression(
+        &mut self,
+        or_prog: CompiledProg,
+        or_ast: AstNode<ConditionalOr>,
+    ) -> CelResult<(CompiledProg, AstNode<Expr>)> {
+        let (expr_node, mut details) = or_prog.into_parts();
+
+        let (true_clause_node, true_clause_ast) = self.parse_conditional_or()?;
+        let (true_clause_node, true_clause_details) = true_clause_node.into_parts();
+
+        let next = self.tokenizer.next()?;
+        if next.as_token() != Some(&Token::Colon) {
+            return Err(SyntaxError::from_location(self.tokenizer.location())
+                .with_message(format!("Unexpected token {:?}, expected COLON", next))
+                .into());
+        }
+
+        let (false_clause_node, false_clause_ast) = self.parse_expression()?;
+        let (false_clause_node, false_clause_details) = false_clause_node.into_parts();
+
+        let range = or_ast.range().surrounding(false_clause_ast.range());
+
+        details.union_from(true_clause_details);
+        details.union_from(false_clause_details);
+
+        let turnary_node = if let NodeValue::ConstExpr(i) = expr_node {
+            if i.is_err() {
+                CompiledProg {
+                    inner: NodeValue::ConstExpr(i),
+                    details,
+                }
+            } else {
+                if cfg!(feature = "type_prop") {
+                    if i.is_truthy() {
+                        CompiledProg {
+                            inner: true_clause_node,
+                            details,
+                        }
+                    } else {
+                        CompiledProg {
+                            inner: false_clause_node,
+                            details,
+                        }
+                    }
+                } else {
+                    if let CelValue::Bool(b) = i {
+                        if b {
+                            CompiledProg {
+                                inner: true_clause_node,
+                                details,
+                            }
+                        } else {
+                            CompiledProg {
+                                inner: false_clause_node,
+                                details,
+                            }
+                        }
+                    } else {
+                        CompiledProg {
+                            inner: NodeValue::ConstExpr(CelValue::from_err(CelError::Value(
+                                format!("{} cannot be converted to bool", i.as_type()),
+                            ))),
+                            details,
+                        }
+                    }
+                }
+            }
+        } else {
+            let true_clause_bytecode = true_clause_node.into_bytecode();
+            let false_clause_bytecode = false_clause_node.into_bytecode();
+
+            let after_true_clause = self.new_label();
+            let end_label = self.new_label();
+
+            CompiledProg {
+                inner: NodeValue::Bytecode(
+                    expr_node
+                        .into_bytecode()
+                        .into_iter()
+                        .chain(
+                            [PreResolvedCodePoint::JmpCond {
+                                when: JmpWhen::False,
+                                label: after_true_clause,
+                            }]
+                            .into_iter(),
+                        )
+                        .chain(true_clause_bytecode.into_iter())
+                        .chain(
+                            [
+                                PreResolvedCodePoint::Jmp { label: end_label },
+                                PreResolvedCodePoint::Label(after_true_clause),
+                            ]
+                            .into_iter(),
+                        )
+                        .chain(false_clause_bytecode.into_iter())
+                        .chain([PreResolvedCodePoint::Label(end_label)].into_iter())
+                        .collect(),
+                ),
+                details,
+            }
+        };
+
+        Ok((
+            turnary_node,
+            AstNode::new(
+                Expr::Ternary {
+                    condition: Box::new(or_ast),
+                    true_clause: Box::new(true_clause_ast),
+                    false_clause: Box::new(false_clause_ast),
+                },
+                range,
+            ),
+        ))
+    }
+
+    fn parse_match_expression(&mut self) -> CelResult<(CompiledProg, AstNode<Expr>)> {
+        let (condition_node, condition_ast) = self.parse_expression()?;
+
+        let mut range = condition_ast.range();
+
+        let (node_value, mut node_details) = condition_node.into_parts();
+        let mut node_bytecode = node_value.into_bytecode();
+
+        let next = self.tokenizer.next()?;
+        if next.as_token() != Some(&Token::LBrace) {
+            return Err(SyntaxError::from_location(self.tokenizer.location())
+                .with_message(format!("Unexpected token {:?}, expected LBRACE", next))
+                .into());
+        }
+
+        let mut expressions: Vec<AstNode<MatchCase>> = Vec::new();
+
+        let mut all_parts = Vec::new();
+
+        let mut comma_seen = true;
+
+        loop {
+            // the rbrace at the end of the match
+            let rbrace = self.tokenizer.peek()?;
+            if rbrace.as_token() == Some(&Token::RBrace) {
+                range = range.surrounding(rbrace.unwrap().loc);
+                break;
+            }
+
+            if !comma_seen {
+                return Err(SyntaxError::from_location(self.tokenizer.location())
+                    .with_message(format!("Expected COMMA"))
+                    .into());
+            }
+            comma_seen = false;
+
+            // case
+            let case_token = self.tokenizer.next()?;
+            if case_token.as_token() != Some(&Token::Case) {
+                return Err(SyntaxError::from_location(self.tokenizer.location())
+                    .with_message(format!("Unexpected token {:?}, expected CASE", next))
+                    .into());
+            }
+            //pattern
+            let (pattern_prog, pattern_ast) = self.parse_match_pattern()?;
+            let (pattern_bytecode, pattern_details) = pattern_prog.into_parts();
+            let pattern_bytecode = pattern_bytecode.into_bytecode();
+
+            node_details.union_from(pattern_details);
+
+            let pattern_range = pattern_ast.range();
+
+            // colon after pattern
+            let colon_token = self.tokenizer.next()?;
+            if colon_token.as_token() != Some(&Token::Colon) {
+                return Err(SyntaxError::from_location(self.tokenizer.location())
+                    .with_message(format!("Unexpected token {:?}, expected COLON", next))
+                    .into());
+            }
+
+            // eval expression
+            let (expr_prog, expr_ast) = self.parse_expression()?;
+            let (expr_bytecode, expr_details) = expr_prog.into_parts();
+            let expr_bytecode: Vec<_> = [ByteCode::Pop.into()]
+                .into_iter()
+                .chain(expr_bytecode.into_bytecode().into_iter())
+                .collect();
+
+            node_details.union_from(expr_details);
+
+            let case_range = pattern_range.surrounding(expr_ast.range());
+
+            all_parts.push((pattern_bytecode, expr_bytecode));
+            expressions.push(AstNode::new(
+                MatchCase {
+                    pattern: pattern_ast,
+                    expr: Box::new(expr_ast),
+                },
+                case_range,
+            ));
+            //
+            // comma after pattern
+            let comma_token = self.tokenizer.peek()?;
+            if comma_token.as_token() == Some(&Token::Comma) {
+                comma_seen = true;
+                self.tokenizer.next()?;
+            }
+        }
+
+        // consume the RBRACE
+        self.tokenizer.next()?;
+
+        // After match expression label
+        let after_match_s_l = self.new_label();
+
+        for (pattern_bytecode, expr_bytecode) in all_parts.into_iter() {
+            let after_case_l = self.new_label();
+
+            node_bytecode.push(ByteCode::Dup);
+            node_bytecode.extend(pattern_bytecode.into_iter());
+            node_bytecode.push(PreResolvedCodePoint::JmpCond {
+                when: JmpWhen::False,
+                label: after_case_l,
+            });
+
+            node_bytecode.extend(expr_bytecode);
+            node_bytecode.push(PreResolvedCodePoint::Jmp {
+                label: after_match_s_l,
+            });
+            node_bytecode.push(PreResolvedCodePoint::Label(after_case_l));
+        }
+
+        node_bytecode.extend([
+            ByteCode::Pop.into(),
+            ByteCode::Push(CelValue::from_null()).into(),
+            PreResolvedCodePoint::Label(after_match_s_l),
+        ]);
+
+        Ok((
+            CompiledProg::new(NodeValue::Bytecode(node_bytecode), node_details),
+            AstNode::new(
+                Expr::Match {
+                    condition: Box::new(condition_ast),
+                    cases: expressions,
+                },
+                range,
+            ),
+        ))
+    }
+
+    fn parse_match_pattern(&mut self) -> CelResult<(CompiledProg, AstNode<MatchPattern>)> {
+        let start = self.tokenizer.location();
+        let mut prefix_pattern = PrefixPattern::Eq;
+
+        if let Some(t) = self.tokenizer.peek()? {
+            if let Token::Ident(i) = t.token() {
+                let i = i.clone();
+                if i == "_" {
+                    self.tokenizer.next()?;
+                    let range = SourceRange::new(start, self.tokenizer.location());
+
+                    return Ok((
+                        CompiledProg::with_bytecode(
+                            [
+                                ByteCode::Pop,                     // pop off the pattern value
+                                ByteCode::Push(CelValue::true_()), // push true
+                            ]
+                            .into_iter()
+                            .collect(),
+                        ),
+                        AstNode::new(
+                            MatchPattern::Any(AstNode::new(MatchAnyPattern {}, range)),
+                            range,
+                        ),
+                    ));
+                } else if self.bindings.get_type(&i).is_some() {
+                    self.tokenizer.next()?;
+                    return Ok((
+                        CompiledProg::with_bytecode(
+                            [
+                                ByteCode::Push(CelValue::Ident("type".to_owned())),
+                                ByteCode::Call(1),
+                                ByteCode::Push(CelValue::Ident(i.clone())),
+                                ByteCode::Eq,
+                            ]
+                            .into_iter()
+                            .collect(),
+                        ),
+                        AstNode::new(
+                            MatchPattern::Type(AstNode::new(
+                                MatchTypePattern::from_type_str(&i),
+                                SourceRange::new(start, self.tokenizer.location()),
+                            )),
+                            SourceRange::new(start, self.tokenizer.location()),
+                        ),
+                    ));
+                }
+            }
+
+            if let Some(token_prefix_pattern) = PrefixPattern::from_token(t.token()) {
+                self.tokenizer.next()?;
+                prefix_pattern = token_prefix_pattern;
+            }
+        }
+
+        let op_range = SourceRange::new(start, self.tokenizer.location());
+
+        let (or_prod, or_ast) = self.parse_conditional_or()?;
+        let or_details = or_prod.details().clone();
+        let mut or_bc = or_prod.into_unresolved_bytecode();
+
+        or_bc.push(prefix_pattern.as_bytecode());
+
+        Ok((
+            CompiledProg::new(NodeValue::Bytecode(or_bc), or_details),
+            AstNode::new(
+                MatchPattern::Cmp {
+                    op: AstNode::new(prefix_pattern.as_ast(), op_range),
+                    or: or_ast,
+                },
+                SourceRange::new(start, self.tokenizer.location()),
+            ),
+        ))
+    }
+
     fn parse_conditional_or(&mut self) -> CelResult<(CompiledProg, AstNode<ConditionalOr>)> {
         let (mut current_node, mut current_ast) = into_unary(self.parse_conditional_and()?);
+
+        let label = self.new_label();
 
         loop {
             if let Some(Token::OrOr) = self.tokenizer.peek()?.as_token() {
                 self.tokenizer.next()?;
                 let (rhs_node, rhs_ast) = self.parse_conditional_and()?;
 
-                let jmp_node = CompiledProg::with_code_points(vec![ByteCode::JmpCond {
-                    when: JmpWhen::True,
-                    dist: rhs_node.bytecode_len() as u32 + 1,
-                    leave_val: true,
-                }]);
+                let jmp_node = CompiledProg::with_code_points(vec![
+                    PreResolvedCodePoint::Bytecode(ByteCode::Test),
+                    PreResolvedCodePoint::Bytecode(ByteCode::Dup),
+                    PreResolvedCodePoint::JmpCond {
+                        when: JmpWhen::True,
+                        label,
+                    },
+                ]);
 
                 let range = current_ast.range().surrounding(rhs_ast.range());
 
@@ -114,7 +434,7 @@ impl<'l> CelCompiler<'l> {
                     range,
                 );
                 current_node = compile!(
-                    [ByteCode::Or],
+                    [ByteCode::Or.into()],
                     current_node.or(&rhs_node),
                     current_node,
                     jmp_node,
@@ -125,22 +445,29 @@ impl<'l> CelCompiler<'l> {
             }
         }
 
+        current_node.append_if_bytecode([PreResolvedCodePoint::Label(label)]);
+
         Ok((current_node, current_ast))
     }
 
     fn parse_conditional_and(&mut self) -> CelResult<(CompiledProg, AstNode<ConditionalAnd>)> {
         let (mut current_node, mut current_ast) = into_unary(self.parse_relation()?);
 
+        let label = self.new_label();
+
         loop {
             if let Some(Token::AndAnd) = self.tokenizer.peek()?.as_token() {
                 self.tokenizer.next()?;
                 let (rhs_node, rhs_ast) = self.parse_relation()?;
 
-                let jmp_node = CompiledProg::with_code_points(vec![ByteCode::JmpCond {
-                    when: JmpWhen::False,
-                    dist: rhs_node.bytecode_len() as u32 + 1,
-                    leave_val: true,
-                }]);
+                let jmp_node = CompiledProg::with_code_points(vec![
+                    PreResolvedCodePoint::Bytecode(ByteCode::Test),
+                    PreResolvedCodePoint::Bytecode(ByteCode::Dup),
+                    PreResolvedCodePoint::JmpCond {
+                        when: JmpWhen::False,
+                        label: label,
+                    },
+                ]);
 
                 let range = current_ast.range().surrounding(rhs_ast.range());
 
@@ -152,7 +479,7 @@ impl<'l> CelCompiler<'l> {
                     range,
                 );
                 current_node = compile!(
-                    [ByteCode::And],
+                    [ByteCode::And.into()],
                     current_node.and(rhs_node),
                     current_node,
                     jmp_node,
@@ -162,6 +489,8 @@ impl<'l> CelCompiler<'l> {
                 break;
             }
         }
+        current_node.append_if_bytecode([PreResolvedCodePoint::Label(label)]);
+
         Ok((current_node, current_ast))
     }
 
@@ -186,7 +515,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Lt],
+                        [ByteCode::Lt.into()],
                         current_node.lt(rhs_node),
                         current_node,
                         rhs_node
@@ -207,7 +536,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Le],
+                        [ByteCode::Le.into()],
                         current_node.le(rhs_node),
                         current_node,
                         rhs_node
@@ -228,7 +557,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Eq],
+                        [ByteCode::Eq.into()],
                         CelValueDyn::eq(&current_node, &rhs_node),
                         current_node,
                         rhs_node
@@ -249,7 +578,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Ne],
+                        [ByteCode::Ne.into()],
                         current_node.neq(rhs_node),
                         current_node,
                         rhs_node
@@ -270,7 +599,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Ge],
+                        [ByteCode::Ge.into()],
                         current_node.ge(rhs_node),
                         current_node,
                         rhs_node
@@ -291,7 +620,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Gt],
+                        [ByteCode::Gt.into()],
                         current_node.gt(rhs_node),
                         current_node,
                         rhs_node
@@ -311,7 +640,7 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
                     current_node = compile!(
-                        [ByteCode::In],
+                        [ByteCode::In.into()],
                         current_node.in_(rhs_node),
                         current_node,
                         rhs_node
@@ -345,7 +674,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Add],
+                        [ByteCode::Add.into()],
                         current_node + rhs_node,
                         current_node,
                         rhs_node
@@ -367,7 +696,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Sub],
+                        [ByteCode::Sub.into()],
                         current_node - rhs_node,
                         current_node,
                         rhs_node
@@ -400,7 +729,7 @@ impl<'l> CelCompiler<'l> {
                         range,
                     );
                     current_node = compile!(
-                        [ByteCode::Mul],
+                        [ByteCode::Mul.into()],
                         current_node * rhs_node,
                         current_node,
                         rhs_node
@@ -422,7 +751,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Div],
+                        [ByteCode::Div.into()],
                         current_node / rhs_node,
                         current_node,
                         rhs_node
@@ -444,7 +773,7 @@ impl<'l> CelCompiler<'l> {
                     );
 
                     current_node = compile!(
-                        [ByteCode::Mod],
+                        [ByteCode::Mod.into()],
                         current_node % rhs_node,
                         current_node,
                         rhs_node
@@ -506,7 +835,7 @@ impl<'l> CelCompiler<'l> {
                 self.tokenizer.next()?;
 
                 let (not_list, ast) = self.parse_not_list()?;
-                let node = compile!([ByteCode::Not], not_list, not_list);
+                let node = compile!([ByteCode::Not.into()], not_list, not_list);
 
                 let range = ast.range().surrounding(loc);
 
@@ -539,7 +868,7 @@ impl<'l> CelCompiler<'l> {
                 self.tokenizer.next()?;
 
                 let (neg_list, ast) = self.parse_neg_list()?;
-                let node = compile!([ByteCode::Neg], neg_list, neg_list);
+                let node = compile!([ByteCode::Neg.into()], neg_list, neg_list);
 
                 let range = ast.range().surrounding(loc);
 
@@ -653,15 +982,17 @@ impl<'l> CelCompiler<'l> {
                             args_ast.push(ast);
                             args_node =
                                 args_node.append_result(CompiledProg::with_code_points(vec![
-                                    ByteCode::Push(a.into_bytecode().into()),
+                                    ByteCode::Push(a.into_unresolved_bytecode().resolve().into())
+                                        .into(),
                                 ]))
                         }
 
-                        member_prime_node = member_prime_node
-                            .consume_child(args_node)
+                        member_prime_node = args_node
+                            .consume_child(member_prime_node)
                             .consume_child(CompiledProg::with_code_points(vec![ByteCode::Call(
                                 args_len as u32,
-                            )]));
+                            )
+                            .into()]));
 
                         member_prime_node = self.check_for_const(member_prime_node);
 
@@ -697,7 +1028,7 @@ impl<'l> CelCompiler<'l> {
                             loc: rbracket_loc,
                         }) => {
                             member_prime_node = compile!(
-                                [ByteCode::Index],
+                                [ByteCode::Index.into()],
                                 member_prime_node.index(index_node),
                                 member_prime_node,
                                 index_node
@@ -746,8 +1077,10 @@ impl<'l> CelCompiler<'l> {
                 token: Token::Ident(val),
                 loc,
             }) => Ok((
-                CompiledProg::with_code_points(vec![ByteCode::Push(CelValue::from_ident(&val))])
-                    .add_ident(&val),
+                CompiledProg::with_code_points(vec![
+                    ByteCode::Push(CelValue::from_ident(&val)).into()
+                ])
+                .add_ident(&val),
                 AstNode::new(Primary::Ident(Ident(val.clone())), loc),
             )),
             Some(TokenWithLoc {
@@ -943,13 +1276,12 @@ impl<'l> CelCompiler<'l> {
                 token: Token::FStringLit(segments),
                 loc,
             }) => {
-                let mut bytecode = Vec::new();
+                let mut bytecode = Vec::<PreResolvedCodePoint>::new();
 
                 for segment in segments.iter() {
-                    bytecode.push(ByteCode::Push(CelValue::Ident("string".to_string())));
                     match segment {
                         FStringSegment::Lit(c) => {
-                            bytecode.push(ByteCode::Push(CelValue::String(c.clone())))
+                            bytecode.push(ByteCode::Push(CelValue::String(c.clone())).into())
                         }
                         FStringSegment::Expr(e) => {
                             let mut tok = StringTokenizer::with_input(&e);
@@ -957,14 +1289,20 @@ impl<'l> CelCompiler<'l> {
 
                             let (e, _) = comp.parse_expression()?;
 
-                            bytecode.push(ByteCode::Push(CelValue::ByteCode(e.into_bytecode())));
+                            bytecode.push(
+                                ByteCode::Push(CelValue::ByteCode(
+                                    e.into_unresolved_bytecode().resolve(),
+                                ))
+                                .into(),
+                            );
                         }
                     }
-                    bytecode.push(ByteCode::Call(1));
+                    bytecode.push(ByteCode::Push(CelValue::Ident("string".to_string())).into());
+                    bytecode.push(ByteCode::Call(1).into());
                 }
 
                 // Reverse it so its evaluated in order on the stack
-                bytecode.push(ByteCode::FmtString(segments.len() as u32));
+                bytecode.push(ByteCode::FmtString(segments.len() as u32).into());
 
                 Ok((
                     CompiledProg::with_code_points(bytecode),
@@ -1066,7 +1404,7 @@ impl<'l> CelCompiler<'l> {
     fn check_for_const(&self, member_prime_node: CompiledProg) -> CompiledProg {
         let mut i = Interpreter::empty();
         i.add_bindings(&self.bindings);
-        let bc = member_prime_node.into_bytecode();
+        let bc = member_prime_node.into_unresolved_bytecode().resolve();
         let r = i.run_raw(&bc, true);
 
         match r {

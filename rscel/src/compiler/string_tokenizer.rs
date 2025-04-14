@@ -126,6 +126,7 @@ impl<'l> StringTokenizer<'l> {
                         self.parse_keywords_or_ident("b", &[])
                     }
                 }
+                'c' => self.parse_keywords_or_ident("c", &[("case", Token::Case)]),
                 'f' => {
                     if let Some('\'') = self.scanner.peek() {
                         self.scanner.next();
@@ -138,6 +139,7 @@ impl<'l> StringTokenizer<'l> {
                     }
                 }
                 'i' => self.parse_keywords_or_ident("i", &[("in", Token::In)]),
+                'm' => self.parse_keywords_or_ident("m", &[("match", Token::Match)]),
                 'n' => self.parse_keywords_or_ident("n", &[("null", Token::Null)]),
                 'r' => {
                     if let Some('\'') = self.scanner.peek() {
@@ -562,7 +564,7 @@ impl<'l> StringTokenizer<'l> {
 
 impl Tokenizer for StringTokenizer<'_> {
     fn peek(&mut self) -> Result<Option<&TokenWithLoc>, SyntaxError> {
-        if let None = self.current {
+        if self.current.is_none() {
             match self.collect_next_token() {
                 Ok(token) => self.current = token,
                 Err(err) => return Err(err),
@@ -572,7 +574,7 @@ impl Tokenizer for StringTokenizer<'_> {
     }
 
     fn next(&mut self) -> Result<Option<TokenWithLoc>, SyntaxError> {
-        if let None = self.current {
+        if self.current.is_none() {
             self.collect_next_token()
         } else {
             let tmp = std::mem::replace(&mut self.current, None);

@@ -24,7 +24,7 @@ impl<'l> StringScanner<'l> {
     }
 
     pub fn peek(&mut self) -> Option<char> {
-        if let None = self.current {
+        if self.current.is_none() {
             self.current = self.collect_next();
         }
 

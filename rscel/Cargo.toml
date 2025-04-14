@@ -7,25 +7,26 @@ license = { workspace = true }
 readme = "../README.md"
 
 [features]
-default = ["type_prop", "protobuf"]
+default = ["type_prop", "protobuf", "neg_index"]
 ast_ser = []
 debug_output = []
 type_prop = []
+neg_index = []
 protobuf = ["dep:protobuf"]
 
 [build-dependencies]
-protobuf-codegen = { version = "3.4.0" }
-protoc-bin-vendored = { version = "3.0.0" }
+protobuf-codegen = { version = "3.7.1" }
+protoc-bin-vendored = { version = "3.1.0" }
 
 [dependencies]
-rscel-macro = { path = "../rscel-macro", version = "1.0.4" }
+rscel-macro = { path = "../rscel-macro" }
 test-case = "3.3.1"
-regex = "1.10.5"
-serde = { version = "1.0.204", features = ["derive", "rc"] }
-serde_with = { version = "3.9.0", features = ["chrono"] }
+regex = "1.11.1"
+serde = { version = "1.0.217", features = ["derive", "rc"] }
+serde_with = { version = "3.12.0", features = ["chrono"] }
 serde_json = { workspace = true }
 chrono = { workspace = true }
-duration-str = "0.11.2"
-protobuf = { version = "3.5.0", optional = true }
-chrono-tz = "0.9.0"
+duration-str = "0.13.0"
+protobuf = { version = "3.7.1", optional = true }
+chrono-tz = "0.10.1"
 num-traits = "0.2.19"
