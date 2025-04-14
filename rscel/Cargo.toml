@@ -7,10 +7,11 @@ license = { workspace = true }
 readme = "../README.md"
 
 [features]
-default = ["type_prop", "protobuf"]
+default = ["type_prop", "protobuf", "neg_index"]
 ast_ser = []
 debug_output = []
 type_prop = []
+neg_index = []
 protobuf = ["dep:protobuf"]
 
 [build-dependencies]
