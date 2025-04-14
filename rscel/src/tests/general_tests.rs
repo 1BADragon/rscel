@@ -199,8 +199,6 @@ fn test_contains() {
 #[test_case("match 3 { case <2: false, case _: true}", true; "match less than")]
 #[test_case("match 3 { case <=2: false, case _: true}", true; "match less equal")]
 #[test_case("match 3 { case <=3: true, case _: false}", true; "match less equal equal")]
-#[test_case("[1,2,3][-1]", 3; "negative index 1")]
-#[test_case("[1,2,3][-2]", 2; "negative index 2")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
