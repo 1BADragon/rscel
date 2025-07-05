@@ -31,6 +31,12 @@ impl SyntaxError {
 
 impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "line {}, column {}", self.loc.line(), self.loc.col())
+        write!(
+            f,
+            "{}: line {}, column {}",
+            self.message().unwrap_or("SYNTAX ERROR"),
+            self.loc().line(),
+            self.loc().col()
+        )
     }
 }

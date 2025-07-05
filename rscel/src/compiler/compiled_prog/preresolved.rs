@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Index};
 
 use crate::{interp::JmpWhen, types::CelByteCode, ByteCode};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PreResolvedCodePoint {
     Bytecode(ByteCode),
     Jmp { label: u32 },
@@ -114,6 +114,14 @@ impl PreResolvedByteCode {
     }
 }
 
+impl Index<usize> for PreResolvedByteCode {
+    type Output = PreResolvedCodePoint;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.inner[index]
+    }
+}
+
 impl From<CelByteCode> for PreResolvedByteCode {
     fn from(value: CelByteCode) -> Self {
         value.into_iter().collect()
@@ -149,5 +157,51 @@ impl FromIterator<PreResolvedCodePoint> for PreResolvedByteCode {
             inner: code_points,
             len: size,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{types::CelByteCode, ByteCode, CelValue};
+
+    use super::{PreResolvedByteCode, PreResolvedCodePoint};
+
+    #[test]
+    fn test_basic() {
+        let mut code = PreResolvedByteCode::new();
+
+        code.extend([
+            PreResolvedCodePoint::Label(0),
+            PreResolvedCodePoint::Bytecode(ByteCode::Push(2.into())),
+            PreResolvedCodePoint::Jmp { label: 0 },
+        ]);
+
+        let resolved = code.resolve();
+        assert_eq!(resolved.len(), 2);
+        assert_eq!(resolved[0], ByteCode::Push(CelValue::Int(2)));
+        assert_eq!(resolved[1], ByteCode::Jmp(-2));
+    }
+
+    #[test]
+    fn test_from_bytecode() {
+        let r: Vec<PreResolvedCodePoint> =
+            [ByteCode::Test].into_iter().collect::<CelByteCode>().into();
+
+        assert_eq!(r.len(), 1)
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_dup_label_panics() {
+        let mut code = PreResolvedByteCode::new();
+
+        code.extend([
+            PreResolvedCodePoint::Label(0),
+            PreResolvedCodePoint::Bytecode(ByteCode::Push(2.into())),
+            PreResolvedCodePoint::Jmp { label: 0 },
+            PreResolvedCodePoint::Label(0),
+        ]);
+
+        code.resolve();
     }
 }
