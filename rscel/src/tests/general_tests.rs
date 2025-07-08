@@ -409,6 +409,7 @@ fn test_timestamp_functions() {
 
     let progs = [
         ("time.getDate()", 10),
+        ("time.getDate('HST')", 9),
         ("time.getDayOfMonth()", 9),
         ("time.getDayOfWeek()", 3),
         ("time.getDayOfYear()", 9),
