@@ -14,6 +14,7 @@ pub enum DispatchArgType {
     Timestamp,
     Duration,
     CelResult,
+    CelValue,
 }
 
 impl DispatchArgType {
@@ -52,6 +53,7 @@ impl DispatchArgType {
                         "Duration" => DispatchArgType::Duration,
                         "CelResult" => DispatchArgType::CelResult,
                         "CelBytes" => DispatchArgType::Bytes,
+                        "CelValue" => DispatchArgType::CelValue,
                         other => panic!("Unknown type: {}", other),
                     },
                     None => panic!("No type info"),
@@ -74,6 +76,7 @@ impl DispatchArgType {
             DispatchArgType::Timestamp => 't',
             DispatchArgType::Duration => 'y',
             DispatchArgType::CelResult => 'r',
+            DispatchArgType::CelValue => 'z',
         }
     }
 

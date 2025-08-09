@@ -61,7 +61,7 @@ impl PyCelProgram {
         }
     }
 
-    fn serialize_to_bincode(slf: PyRefMut<'_, PyCelProgram>) -> PyResult<Cow<[u8]>> {
+    fn serialize_to_bincode(slf: PyRefMut<'_, PyCelProgram>) -> PyResult<Cow<'_, [u8]>> {
         if let Some(program) = &slf.program {
             match bincode::serialize(program) {
                 Ok(b) => Ok(Cow::Owned(b)),

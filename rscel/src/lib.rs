@@ -1,3 +1,4 @@
+#![feature(string_remove_matches)]
 //! RsCel is a CEL evaluator written in Rust. CEL is a google project that
 //! describes a turing-incomplete language that can be used to evaluate
 //! a user provdided expression. The language specification can be found

@@ -222,6 +222,24 @@ fn test_contains() {
 #[test_case("match 3 { case <2: false, case _: true}", true; "match less than")]
 #[test_case("match 3 { case <=2: false, case _: true}", true; "match less equal")]
 #[test_case("match 3 { case <=3: true, case _: false}", true; "match less equal equal")]
+#[test_case("[3,4,2,1].sort()", vec![1,2,3,4]; "sort int")]
+#[test_case("[3.4, 2.1, 4.8].sort()", vec![2.1, 3.4, 4.8]; "sort float")]
+#[test_case("['apple', 'cookie', 'bananas'].sort()", vec!["apple", "bananas", "cookie"]; "sort string")]
+#[test_case("['123LF3040'.remove('LF'), remove('123LF3040', 'LF')]", vec!["1233040", "1233040"]; "string remove")]
+#[test_case("'123M5'.replace('M', '4')", "12345"; "string replace")]
+#[test_case("'12131415'.rsplit('1')", vec!["5", "4", "3", "2", ""]; "string rsplit")]
+#[test_case("'12131415'.split('1')", vec!["", "2", "3", "4", "5"]; "string split")]
+#[test_case("'123456'.splitAt(3)", vec!["123", "456"]; "string splitAt")]
+#[test_case("'12345LF'.trimEndMatches('LF')", "12345"; "string trimEndMatches")]
+#[test_case("'LF12345'.trimStartMatches('LF')", "12345"; "string trimStartMatches")]
+#[test_case("zip([1, 2, 3], ['a', 'b', 'c'])",
+    CelValue::from_val_slice(&[
+        CelValue::from_val_slice(&[1.into(), "a".into()]),
+        CelValue::from_val_slice(&[2.into(), "b".into()]),
+        CelValue::from_val_slice(&[3.into(), "c".into()])]
+    ); "zip")]
+#[test_case(r#"'123abc555'.matchCaptures('([0-9]+)([a-z]+)555')"#, vec!["123abc555", "123", "abc"]; "string match captures")]
+#[test_case("'abab'.matchReplaceOnce('(?<first>a)(?<last>b)', '${last}${first}')", "baab"; "string matchReplaceOnce")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

@@ -2,9 +2,17 @@ use crate::{CelError, CelValue};
 
 pub mod contains;
 pub mod ends_with;
+pub mod match_captures;
+pub mod match_replace;
+pub mod match_replace_once;
 pub mod matches;
+pub mod remove;
+pub mod replace;
+pub mod split;
 pub mod split_whitespace;
 pub mod starts_with;
+pub mod trim_end_matches;
+pub mod trim_start_matches;
 
 macro_rules! string_func {
     ($cel_func_name: ident, $func_name:ident, $str_func:ident) => {
