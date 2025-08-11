@@ -1,5 +1,5 @@
 [workspace]
-members = ["rscel", "python", "wasm", "rscel-macro"]
+members = ["rscel", "python", "wasm", "rscel-macro", "extensions/to_sql"]
 default-members = ["rscel"]
 resolver = "2"
 

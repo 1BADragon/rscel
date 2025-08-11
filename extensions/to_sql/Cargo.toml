@@ -1,0 +1,10 @@
+[package]
+name = "rscel-to-sql"
+version = { workspace = true }
+edition = { workspace = true }
+description = { workspace = true }
+license = { workspace = true }
+readme = "../README.md"
+
+[dependencies]
+rscel = { path = "../../rscel"}
