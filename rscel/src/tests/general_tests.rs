@@ -58,7 +58,6 @@ fn test_contains() {
 #[test_case("\"hello world\".startsWith(\"hello\")", true; "test startsWith")]
 #[test_case("'FoObar'.startsWithI('foo')", true; "Test startsWithI")]
 #[test_case("\"abc123\".matches(\"[a-z]{3}[0-9]{3}\")", true; "test matches method")]
-#[test_case("matches('abc123', '[a-z]{3}[0-9]{3}')", true; "test matches function")]
 #[test_case("string(1)", "1"; "test string")]
 #[test_case("type(1)", CelValue::int_type(); "test type")]
 #[test_case("4 > 5", false; "test gt")]
@@ -225,7 +224,7 @@ fn test_contains() {
 #[test_case("[3,4,2,1].sort()", vec![1,2,3,4]; "sort int")]
 #[test_case("[3.4, 2.1, 4.8].sort()", vec![2.1, 3.4, 4.8]; "sort float")]
 #[test_case("['apple', 'cookie', 'bananas'].sort()", vec!["apple", "bananas", "cookie"]; "sort string")]
-#[test_case("['123LF3040'.remove('LF'), remove('123LF3040', 'LF')]", vec!["1233040", "1233040"]; "string remove")]
+#[test_case("'123LF3040'.remove('LF')", "1233040"; "string remove")]
 #[test_case("'123M5'.replace('M', '4')", "12345"; "string replace")]
 #[test_case("'12131415'.rsplit('1')", vec!["5", "4", "3", "2", ""]; "string rsplit")]
 #[test_case("'12131415'.split('1')", vec!["", "2", "3", "4", "5"]; "string split")]
@@ -240,6 +239,7 @@ fn test_contains() {
     ); "zip")]
 #[test_case(r#"'123abc555'.matchCaptures('([0-9]+)([a-z]+)555')"#, vec!["123abc555", "123", "abc"]; "string match captures")]
 #[test_case("'abab'.matchReplaceOnce('(?<first>a)(?<last>b)', '${last}${first}')", "baab"; "string matchReplaceOnce")]
+#[test_case("'abab'.matchReplace('(?<first>a)(?<last>b)', '${last}${first}')", "baba"; "string matchReplace")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
@@ -429,14 +429,23 @@ fn test_timestamp_functions() {
         ("time.getDate()", 10),
         ("time.getDate('HST')", 9),
         ("time.getDayOfMonth()", 9),
+        ("time.getDayOfMonth('US/Pacific')", 9),
         ("time.getDayOfWeek()", 3),
+        ("time.getDayOfWeek('US/Pacific')", 4),
         ("time.getDayOfYear()", 9),
+        ("time.getDayOfYear('US/Pacific')", 9),
         ("time.getFullYear()", 2024),
+        ("time.getFullYear('US/Pacific')", 2024),
         ("time.getHours()", 8),
+        ("time.getHours('US/Pacific')", 0),
         ("time.getMilliseconds()", 123),
+        ("time.getMilliseconds('US/Pacific')", 123),
         ("time.getMinutes()", 57),
+        ("time.getMinutes('US/Pacific')", 57),
         ("time.getMonth()", 0),
+        ("time.getMonth('US/Pacific')", 0),
         ("time.getSeconds()", 45),
+        ("time.getSeconds('US/Pacific')", 45),
     ];
 
     for prog in progs.iter() {

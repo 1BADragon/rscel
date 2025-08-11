@@ -10,10 +10,6 @@ mod methods {
         internal::match_replace_once(&this, &needle, &rep)
     }
 
-    fn match_replace_once(haystack: String, needle: String, rep: String) -> CelValue {
-        internal::match_replace_once(&haystack, &needle, &rep)
-    }
-
     mod internal {
         use regex::Regex;
 

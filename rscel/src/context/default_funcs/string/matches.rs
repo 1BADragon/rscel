@@ -10,10 +10,6 @@ mod methods {
         internal::matches(&this, &needle)
     }
 
-    fn matches(haystack: String, needle: String) -> CelResult<bool> {
-        internal::matches(&haystack, &needle)
-    }
-
     mod internal {
         use regex::Regex;
 

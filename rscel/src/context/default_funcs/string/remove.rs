@@ -11,10 +11,4 @@ mod remove {
 
         this
     }
-
-    fn remove(mut target: String, pattern: String) -> String {
-        target.remove_matches(&pattern);
-
-        target
-    }
 }

@@ -11,10 +11,6 @@ mod rsplit {
     fn rsplit(this: String, needle: String) -> Vec<CelValue> {
         this.rsplit(&needle).map(|s| s.into()).collect()
     }
-
-    fn rsplit(target: String, needle: String) -> Vec<CelValue> {
-        target.rsplit(&needle).map(|s| s.into()).collect()
-    }
 }
 
 #[dispatch]
@@ -24,10 +20,6 @@ mod split {
     fn split(this: String, needle: String) -> Vec<CelValue> {
         this.split(&needle).map(|s| s.into()).collect()
     }
-
-    fn split(target: String, needle: String) -> Vec<CelValue> {
-        target.split(&needle).map(|s| s.into()).collect()
-    }
 }
 
 #[dispatch]
@@ -36,12 +28,6 @@ mod split_at {
 
     fn split_at(this: String, at: i64) -> Vec<CelValue> {
         let (left, right) = this.split_at(at as usize);
-
-        vec![left.into(), right.into()].into()
-    }
-
-    fn split_at(target: String, at: i64) -> Vec<CelValue> {
-        let (left, right) = target.split_at(at as usize);
 
         vec![left.into(), right.into()].into()
     }

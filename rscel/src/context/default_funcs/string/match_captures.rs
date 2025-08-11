@@ -10,10 +10,6 @@ mod methods {
         internal::matches(&this, &needle)
     }
 
-    fn match_captures(haystack: String, needle: String) -> CelValue {
-        internal::matches(&haystack, &needle)
-    }
-
     mod internal {
         use regex::Regex;
 

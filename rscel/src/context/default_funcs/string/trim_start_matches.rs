@@ -9,8 +9,4 @@ mod trim_start_matches {
     fn trim_start_matches(this: String, pattern: String) -> String {
         this.trim_start_matches(&pattern).to_owned()
     }
-
-    fn trim_start_matches(target: String, pattern: String) -> String {
-        target.trim_start_matches(&pattern).to_owned()
-    }
 }

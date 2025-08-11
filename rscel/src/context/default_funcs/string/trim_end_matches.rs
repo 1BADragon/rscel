@@ -9,8 +9,4 @@ mod trim_end_matches {
     fn trim_end_matches(this: String, pattern: String) -> String {
         this.trim_end_matches(&pattern).to_owned()
     }
-
-    fn trim_end_matches(target: String, pattern: String) -> String {
-        target.trim_end_matches(&pattern).to_owned()
-    }
 }
