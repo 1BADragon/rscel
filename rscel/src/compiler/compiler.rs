@@ -36,11 +36,6 @@ impl<'l> CelCompiler<'l> {
         }
     }
 
-    pub fn with_bind_context<'o: 'l>(&mut self, ctx: BindContext<'o>) -> &mut Self {
-        self.bindings = ctx;
-        self
-    }
-
     pub fn compile(mut self) -> CelResult<Program> {
         let (cprog, ast) = self.parse_expression()?;
 
@@ -1443,5 +1438,15 @@ mod test {
         CelCompiler::with_tokenizer(&mut tokenizer)
             .compile()
             .unwrap();
+    }
+
+    #[test]
+    fn syntax_error() {
+        let mut tokenizer = StringTokenizer::with_input("3 + 4 ) - 3");
+
+        let e = CelCompiler::with_tokenizer(&mut tokenizer).compile();
+
+        assert!(e.is_err());
+        let _ = format!("{}", e.unwrap_err());
     }
 }

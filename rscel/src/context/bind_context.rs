@@ -156,3 +156,17 @@ impl<'a> BindContext<'a> {
         self.types.get(name)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::BindContext;
+
+    #[test]
+    fn basic() {
+        let mut b = BindContext::new();
+
+        b.bind_param("foo", 4.into());
+
+        assert!(b.is_bound("foo"))
+    }
+}

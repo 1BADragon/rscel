@@ -28,14 +28,6 @@ impl TokenWithLoc {
         &self.token
     }
 
-    pub fn start(&self) -> SourceLocation {
-        self.loc.start()
-    }
-
-    pub fn end(&self) -> SourceLocation {
-        self.loc.end()
-    }
-
     pub fn into_token(self) -> Token {
         self.token
     }
@@ -44,12 +36,6 @@ impl TokenWithLoc {
 impl AsToken for TokenWithLoc {
     fn as_token(&self) -> Option<&Token> {
         Some(&self.token)
-    }
-}
-
-impl IntoToken for TokenWithLoc {
-    fn into_token(self) -> Option<Token> {
-        Some(self.token)
     }
 }
 

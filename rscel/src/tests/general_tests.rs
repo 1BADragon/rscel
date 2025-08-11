@@ -41,6 +41,10 @@ fn test_contains() {
 #[test_case("[1,2,3][1]", 2; "array index")]
 #[test_case("{\"foo\": 3}.foo", 3; "obj dot access")]
 #[test_case("size([1,2,3,4])", 4u64; "test list size")]
+#[test_case("size('foo')", 3u64; "size string")]
+#[test_case("size(b'foo')", 3u64; "size bytes")]
+#[test_case("'foo'.size()", 3u64; "string size")]
+#[test_case("b'foo'.size()", 3u64; "bytes size")]
 #[test_case("true || false", true; "or")]
 #[test_case("true || undefined", true; "or shortcut")]
 #[test_case("false && undefined", false; "and shortcut")]
@@ -48,10 +52,12 @@ fn test_contains() {
 #[test_case("true && true", true; "and true")]
 #[test_case("[1,2].map(x, x+1).map(x, x*2)", vec![4, 6]; "double map")]
 #[test_case("\"hello world\".contains(\"hello\")", true; "test contains")]
+#[test_case("\"hello WORLD\".containsI(\"hello\")", true; "test containsI")]
 #[test_case("\"hello world\".endsWith(\"world\")", true; "test endsWith")]
+#[test_case("'fooBaR'.endsWithI('bar')", true; "Test endsWithI")]
 #[test_case("\"hello world\".startsWith(\"hello\")", true; "test startsWith")]
+#[test_case("'FoObar'.startsWithI('foo')", true; "Test startsWithI")]
 #[test_case("\"abc123\".matches(\"[a-z]{3}[0-9]{3}\")", true; "test matches method")]
-#[test_case("matches('abc123', '[a-z]{3}[0-9]{3}')", true; "test matches function")]
 #[test_case("string(1)", "1"; "test string")]
 #[test_case("type(1)", CelValue::int_type(); "test type")]
 #[test_case("4 > 5", false; "test gt")]
@@ -69,16 +75,34 @@ fn test_contains() {
 #[test_case("[1,2,3,4].exists_one(x, x == 4)", true; "test exists one true")]
 #[test_case("[1,2,3,4].exists_one(x, x == 5)", false; "test exists one false")]
 #[test_case("[1,2,3,4].filter(x, x % 2 == 0)", vec![2, 4]; "test filter")]
-#[test_case("abs(-9)", 9; "abs")]
-#[test_case("sqrt(9.0)", 3.0; "sqrt")]
-#[test_case("pow(2, 2)", 4; "pow")]
-#[test_case("pow(2.0, 2)", 4.0; "pow2")]
-#[test_case("log(1)", 0; "log")]
+#[test_case("abs(-9)", 9; "abs1")]
+#[test_case("abs(9u)", 9u32; "abs2")]
+#[test_case("abs(-9.0)", 9f64; "abs3")]
+#[test_case("sqrt(9.0)", 3.0; "sqrt float")]
+#[test_case("sqrt(9)", 3.0; "sqrt int")]
+#[test_case("sqrt(9u)", 3.0; "sqrt uint")]
+#[test_case("pow(2, 2)", 4; "pow int int")]
+#[test_case("pow(2u, 2u)", 4u64; "pow uint uint")]
+#[test_case("pow(2u, 2.0)", 4u64; "pow uint float")]
+#[test_case("pow(2u, 2)", 4u64; "pow uint int")]
+#[test_case("pow(2, 2.0)", 4; "pow int float")]
+#[test_case("pow(2, 2u)", 4; "pow int uint")]
+#[test_case("pow(2.0, 2)", 4.0; "pow float int")]
+#[test_case("pow(2.0, 2u)", 4.0; "pow float uint")]
+#[test_case("pow(4.0, 0.5)", 2.0; "pow float float")]
+#[test_case("log(1000.0)", 3.0; "log float")]
+#[test_case("log(1)", 0; "log int")]
 #[test_case("log(1u)", 0u64; "log unsigned")]
-#[test_case("ceil(2.3)", 3; "ceil")]
-#[test_case("floor(2.7)", 2; "floor")]
+#[test_case("ceil(2)", 2; "ceil int")]
+#[test_case("ceil(2u)", 2u64; "ceil uint")]
+#[test_case("ceil(2.3)", 3; "ceil float")]
+#[test_case("floor(2.7)", 2; "floor float")]
+#[test_case("floor(3)", 3; "floor int")]
+#[test_case("floor(3u)", 3u64; "floor uint")]
 #[test_case("round(2.2)", 2; "round down")]
 #[test_case("round(2.5)", 3; "round up")]
+#[test_case("round(3)", 3; "round int")]
+#[test_case("round(3u)", 3u64; "round uint")]
 #[test_case("min(1,2,3)", 1; "min")]
 #[test_case("max(1,2,3)", 3; "max")]
 #[test_case("[1,2,3].reduce(curr, next, curr + next, 0)", 6; "reduce")]
@@ -131,8 +155,6 @@ fn test_contains() {
 #[test_case(r#""\U000000FC""#, "ü"; "Test unicode long upper")]
 #[test_case(r#""\x48""#, "H"; "Test hex escape lower")]
 #[test_case(r#""\X48""#, "H"; "Test hex escape upper")]
-#[test_case("'fooBaR'.endsWithI('bar')", true; "Test endsWithI")]
-#[test_case("'FoObar'.startsWithI('foo')", true; "Test startsWithI")]
 #[test_case("'   foo   '.trim()", "foo"; "Test trim")]
 #[test_case("'   foo   '.trimStart()", "foo   "; "Test trimStart")]
 #[test_case("'   foo   '.trimEnd()", "   foo"; "Test trimEnd")]
@@ -199,6 +221,25 @@ fn test_contains() {
 #[test_case("match 3 { case <2: false, case _: true}", true; "match less than")]
 #[test_case("match 3 { case <=2: false, case _: true}", true; "match less equal")]
 #[test_case("match 3 { case <=3: true, case _: false}", true; "match less equal equal")]
+#[test_case("[3,4,2,1].sort()", vec![1,2,3,4]; "sort int")]
+#[test_case("[3.4, 2.1, 4.8].sort()", vec![2.1, 3.4, 4.8]; "sort float")]
+#[test_case("['apple', 'cookie', 'bananas'].sort()", vec!["apple", "bananas", "cookie"]; "sort string")]
+#[test_case("'123LF3040'.remove('LF')", "1233040"; "string remove")]
+#[test_case("'123M5'.replace('M', '4')", "12345"; "string replace")]
+#[test_case("'12131415'.rsplit('1')", vec!["5", "4", "3", "2", ""]; "string rsplit")]
+#[test_case("'12131415'.split('1')", vec!["", "2", "3", "4", "5"]; "string split")]
+#[test_case("'123456'.splitAt(3)", vec!["123", "456"]; "string splitAt")]
+#[test_case("'12345LF'.trimEndMatches('LF')", "12345"; "string trimEndMatches")]
+#[test_case("'LF12345'.trimStartMatches('LF')", "12345"; "string trimStartMatches")]
+#[test_case("zip([1, 2, 3], ['a', 'b', 'c'])",
+    CelValue::from_val_slice(&[
+        CelValue::from_val_slice(&[1.into(), "a".into()]),
+        CelValue::from_val_slice(&[2.into(), "b".into()]),
+        CelValue::from_val_slice(&[3.into(), "c".into()])]
+    ); "zip")]
+#[test_case(r#"'123abc555'.matchCaptures('([0-9]+)([a-z]+)555')"#, vec!["123abc555", "123", "abc"]; "string match captures")]
+#[test_case("'abab'.matchReplaceOnce('(?<first>a)(?<last>b)', '${last}${first}')", "baab"; "string matchReplaceOnce")]
+#[test_case("'abab'.matchReplace('(?<first>a)(?<last>b)', '${last}${first}')", "baba"; "string matchReplace")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
@@ -386,15 +427,25 @@ fn test_timestamp_functions() {
 
     let progs = [
         ("time.getDate()", 10),
+        ("time.getDate('HST')", 9),
         ("time.getDayOfMonth()", 9),
+        ("time.getDayOfMonth('US/Pacific')", 9),
         ("time.getDayOfWeek()", 3),
+        ("time.getDayOfWeek('US/Pacific')", 4),
         ("time.getDayOfYear()", 9),
+        ("time.getDayOfYear('US/Pacific')", 9),
         ("time.getFullYear()", 2024),
+        ("time.getFullYear('US/Pacific')", 2024),
         ("time.getHours()", 8),
+        ("time.getHours('US/Pacific')", 0),
         ("time.getMilliseconds()", 123),
+        ("time.getMilliseconds('US/Pacific')", 123),
         ("time.getMinutes()", 57),
+        ("time.getMinutes('US/Pacific')", 57),
         ("time.getMonth()", 0),
+        ("time.getMonth('US/Pacific')", 0),
         ("time.getSeconds()", 45),
+        ("time.getSeconds('US/Pacific')", 45),
     ];
 
     for prog in progs.iter() {

@@ -34,3 +34,40 @@ impl<T> AstNode<T> {
         &self.node
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::AstNode;
+    use crate::{SourceLocation, SourceRange};
+
+    #[derive(Debug, PartialEq)]
+    struct FakeNode {
+        v: u32,
+    }
+
+    #[test]
+    fn basic() {
+        let a = AstNode::new(
+            FakeNode { v: 42 },
+            SourceRange::new(SourceLocation::new(0, 0), SourceLocation::new(0, 20)),
+        );
+
+        assert_eq!(a.start(), SourceLocation::new(0, 0));
+        assert_eq!(a.end(), SourceLocation::new(0, 20));
+
+        assert_eq!(
+            a.range(),
+            SourceRange::new(SourceLocation::new(0, 0), SourceLocation::new(0, 20))
+        );
+
+        assert_eq!(*a.node(), FakeNode { v: 42 });
+
+        let (node, range) = a.into_parts();
+        assert_eq!(
+            range,
+            SourceRange::new(SourceLocation::new(0, 0), SourceLocation::new(0, 20))
+        );
+
+        assert_eq!(node.v, 42);
+    }
+}

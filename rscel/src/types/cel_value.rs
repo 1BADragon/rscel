@@ -371,7 +371,7 @@ impl CelValue {
         })
     }
 
-    fn ord(self, rhs_value: CelValue) -> CelResult<Option<Ordering>> {
+    pub fn ord(self, rhs_value: CelValue) -> CelResult<Option<Ordering>> {
         let type1 = self.as_type();
         let type2 = rhs_value.as_type();
 

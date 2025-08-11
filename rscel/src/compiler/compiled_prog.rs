@@ -264,3 +264,244 @@ impl NodeValue {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    use crate::{
+        compiler::compiled_prog::PreResolvedCodePoint, types::CelByteCode, ByteCode, CelValue,
+        ProgramDetails,
+    };
+
+    use super::{CompiledProg, NodeValue};
+
+    mod helpers {
+        use super::CelValue;
+        use std::ops::Add as _;
+
+        pub fn add_values(values: Vec<CelValue>) -> CelValue {
+            values.into_iter().reduce(|v1, v2| v1 + v2).unwrap()
+        }
+
+        pub fn add_2(val1: &CelValue, val2: &CelValue) -> Option<CelValue> {
+            Some(val1.clone().add(val2.clone()))
+        }
+    }
+
+    #[test]
+    fn node_basic() {
+        let a = NodeValue::ConstExpr(CelValue::Int(32));
+        let b = NodeValue::Bytecode(
+            [
+                ByteCode::Push(0.into()),
+                ByteCode::Push(3.into()),
+                ByteCode::Mul,
+            ]
+            .into_iter()
+            .collect(),
+        );
+
+        assert!(a.is_const());
+        assert!(!b.is_const());
+
+        let a_bc = a.into_bytecode();
+        assert_eq!(a_bc.len(), 1);
+        assert_eq!(
+            a_bc[0],
+            PreResolvedCodePoint::Bytecode(ByteCode::Push(32.into()))
+        );
+    }
+
+    #[test]
+    fn compprog_basic() {
+        let details = ProgramDetails::new();
+        let node = NodeValue::ConstExpr(0.into());
+
+        fn is_empty(prog: CompiledProg) -> bool {
+            return prog.is_const() || prog.bytecode_len() == 0;
+        }
+
+        // test the basic contructors
+        assert!(is_empty(CompiledProg::new(node.clone(), details.clone())));
+        assert!(is_empty(CompiledProg::empty()));
+        assert!(is_empty(CompiledProg::from_node(CompiledProg::empty())));
+        assert!(is_empty(CompiledProg::with_bytecode(CelByteCode::new())));
+        assert!(is_empty(CompiledProg::with_code_points(Vec::new())));
+
+        assert!(CompiledProg::empty().details().params().is_empty());
+        let mut const_prog = CompiledProg::with_const(42.into());
+        assert!(const_prog.is_const());
+        assert!(const_prog.bytecode_len() == 1);
+
+        const_prog.append_if_bytecode([PreResolvedCodePoint::Bytecode(ByteCode::Dup)]);
+        assert!(const_prog.is_const());
+        assert!(const_prog.bytecode_len() == 1);
+
+        let (node, details) = const_prog.into_parts();
+
+        if let NodeValue::ConstExpr(inner) = node {
+            assert_eq!(inner, 42.into());
+        } else {
+            assert!(false);
+        }
+
+        assert!(details.params().is_empty());
+
+        let mut bc_prog = CompiledProg::empty();
+        assert!(!bc_prog.is_const());
+        assert!(bc_prog.bytecode_len() == 0);
+        bc_prog.append_if_bytecode([PreResolvedCodePoint::Bytecode(ByteCode::Dup)]);
+        assert!(bc_prog.bytecode_len() == 1);
+    }
+
+    #[test]
+    fn from_child_2_nonconst() {
+        let c1 = CompiledProg::with_bytecode([ByteCode::Push(2.into())].into_iter().collect());
+        let c2 = CompiledProg::with_bytecode([ByteCode::Push(5.into())].into_iter().collect());
+
+        let c3 = CompiledProg::from_children2_w_bytecode_cannone(
+            c1,
+            c2,
+            vec![ByteCode::Add],
+            helpers::add_2,
+        );
+
+        assert!(!c3.is_const());
+        assert_eq!(c3.bytecode_len(), 3);
+
+        assert_eq!(
+            c3.into_unresolved_bytecode().resolve(),
+            [
+                ByteCode::Push(2.into()),
+                ByteCode::Push(5.into()),
+                ByteCode::Add
+            ]
+            .into_iter()
+            .collect()
+        )
+    }
+
+    #[test]
+    fn from_child_2_const() {
+        let c1 = CompiledProg::with_const(2.into());
+        let c2 = CompiledProg::with_const(5.into());
+
+        let c3 = CompiledProg::from_children2_w_bytecode_cannone(
+            c1.clone(),
+            c2.clone(),
+            vec![ByteCode::Add],
+            helpers::add_2,
+        );
+
+        assert!(c3.is_const());
+        assert_eq!(c3.clone().const_val(), 7.into());
+        assert_eq!(
+            c3.into_unresolved_bytecode().resolve(),
+            [ByteCode::Push(7.into()),].into_iter().collect()
+        );
+
+        let c4 = CompiledProg::from_children2_w_bytecode_cannone(
+            c1.clone(),
+            c2.clone(),
+            vec![ByteCode::Add],
+            |_v1, _v2| None,
+        );
+
+        assert!(!c4.is_const());
+        assert_eq!(c4.bytecode_len(), 3);
+        assert_eq!(
+            c4.into_unresolved_bytecode().resolve(),
+            [
+                ByteCode::Push(2.into()),
+                ByteCode::Push(5.into()),
+                ByteCode::Add
+            ]
+            .into_iter()
+            .collect()
+        )
+    }
+
+    #[test]
+    fn from_children_w_bytecode_nonconst() {
+        let c1 = CompiledProg::with_bytecode([ByteCode::Push(2.into())].into_iter().collect());
+        let c2 = CompiledProg::with_bytecode([ByteCode::Push(5.into())].into_iter().collect());
+
+        let c3 = CompiledProg::from_children_w_bytecode(
+            vec![c1, c2],
+            vec![ByteCode::Add],
+            helpers::add_values,
+        );
+
+        assert!(!c3.is_const());
+        assert_eq!(c3.bytecode_len(), 3);
+
+        assert_eq!(
+            c3.into_unresolved_bytecode().resolve(),
+            [
+                ByteCode::Push(2.into()),
+                ByteCode::Push(5.into()),
+                ByteCode::Add
+            ]
+            .into_iter()
+            .collect()
+        )
+    }
+
+    #[test]
+    fn from_children_w_bytecode_const() {
+        let c1 = CompiledProg::with_const(2.into());
+        let c2 = CompiledProg::with_const(5.into());
+
+        let c3 = CompiledProg::from_children_w_bytecode(
+            vec![c1, c2],
+            vec![ByteCode::Add],
+            helpers::add_values,
+        );
+
+        assert!(c3.is_const());
+        assert_eq!(c3.clone().const_val(), 7.into());
+        assert_eq!(
+            c3.into_unresolved_bytecode().resolve(),
+            [ByteCode::Push(7.into()),].into_iter().collect()
+        );
+    }
+
+    #[test]
+    fn consume_child() {
+        let c = CompiledProg::with_const(5.into());
+
+        let p = CompiledProg::empty();
+
+        let r = p.consume_child(c);
+
+        assert!(!r.is_const());
+        assert_eq!(r.bytecode_len(), 1)
+    }
+
+    #[test]
+    fn program() {
+        let p = CompiledProg::with_bytecode(
+            [
+                ByteCode::Push(CelValue::from_ident("foo")),
+                ByteCode::Push(4.into()),
+                ByteCode::Mul,
+            ]
+            .into_iter()
+            .collect(),
+        )
+        .add_ident("foo")
+        .into_program("foo * 4".to_owned());
+
+        assert_eq!(p.params(), vec!["foo"]);
+        assert_eq!(
+            p.bytecode(),
+            &([
+                ByteCode::Push(CelValue::from_ident("foo")),
+                ByteCode::Push(4.into()),
+                ByteCode::Mul
+            ]
+            .into_iter()
+            .collect::<CelByteCode>())
+        );
+    }
+}

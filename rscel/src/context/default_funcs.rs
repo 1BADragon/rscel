@@ -3,6 +3,7 @@ use crate::{BindContext, CelError, CelValue};
 
 mod math;
 mod size;
+mod sort;
 mod string;
 mod time_funcs;
 
@@ -10,16 +11,36 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("contains", &string::contains::contains),
     ("containsI", &string::contains::contains_i),
     ("size", &size::size),
+    ("sort", &sort::sort),
     ("startsWith", &string::starts_with::starts_with),
     ("endsWith", &string::ends_with::ends_with),
     ("startsWithI", &string::starts_with::starts_with_i),
     ("endsWithI", &string::ends_with::ends_with_i),
     ("matches", &string::matches::matches),
+    ("matchCaptures", &string::match_captures::match_captures),
+    (
+        "matchReplaceOnce",
+        &string::match_replace_once::match_replace_once,
+    ),
+    ("matchReplace", &string::match_replace::match_replace),
     ("toLower", &string::to_lower_impl),
     ("toUpper", &string::to_upper_impl),
+    ("remove", &string::remove::remove),
+    ("replace", &string::replace::replace),
+    ("rsplit", &string::split::rsplit),
+    ("split", &string::split::split),
+    ("splitAt", &string::split::split_at),
     ("trim", &string::trim_impl),
     ("trimStart", &string::trim_start_impl),
+    (
+        "trimStartMatches",
+        &string::trim_start_matches::trim_start_matches,
+    ),
     ("trimEnd", &string::trim_end_impl),
+    (
+        "trimEndMatches",
+        &string::trim_end_matches::trim_end_matches,
+    ),
     (
         "splitWhiteSpace",
         &string::split_whitespace::split_whitespace,
@@ -55,6 +76,7 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("getMinutes", &time_funcs::get_minutes::get_minutes),
     ("getMonth", &time_funcs::get_month::get_month),
     ("getSeconds", &time_funcs::get_seconds::get_seconds),
+    ("zip", &zip_impl),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
@@ -109,4 +131,35 @@ fn max_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
         Some(v) => v.clone(),
         None => CelValue::from_null(),
     }
+}
+
+fn zip_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
+    if args.is_empty() {
+        return CelValue::from_val_slice(&[]);
+    }
+
+    let mut ret_val: Vec<CelValue> = Vec::new();
+    let mut vecs = Vec::new();
+
+    for arg in args.into_iter() {
+        if let CelValue::List(l) = arg {
+            vecs.push(l);
+        } else {
+            return CelValue::from_err(CelError::Value(
+                "All inputs to zip must be lists".to_owned(),
+            ));
+        }
+    }
+
+    let min_len = vecs.iter().map(|v| v.len()).min().unwrap_or(0);
+
+    let mut iters: Vec<_> = vecs.into_iter().map(|v| v.into_iter()).collect();
+
+    for _ in 0..min_len {
+        let zipped: Vec<_> = iters.iter_mut().map(|i| i.next().unwrap()).collect();
+
+        ret_val.push(zipped.into());
+    }
+
+    ret_val.into()
 }

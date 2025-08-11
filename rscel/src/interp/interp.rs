@@ -29,7 +29,7 @@ impl<'a, 'b> InterpStack<'a, 'b> {
         self.stack.push(CelStackValue::Value(val));
     }
 
-    fn pop(&mut self) -> CelResult<CelStackValue> {
+    fn pop(&mut self) -> CelResult<CelStackValue<'_>> {
         match self.stack.pop() {
             Some(stack_val) => {
                 if let CelStackValue::Value(val) = stack_val {
@@ -126,7 +126,7 @@ impl<'a> Interpreter<'a> {
         self.cel.cloned()
     }
 
-    pub fn bindings_copy(&self) -> Option<BindContext> {
+    pub fn bindings_copy(&self) -> Option<BindContext<'_>> {
         self.bindings.cloned()
     }
 
@@ -553,7 +553,7 @@ impl<'a> Interpreter<'a> {
         self.bindings?.get_type(name)
     }
 
-    fn callable_by_name(&self, name: &str) -> CelResult<RsCallable> {
+    fn callable_by_name(&self, name: &str) -> CelResult<RsCallable<'_>> {
         if let Some(func) = self.get_func_by_name(name) {
             Ok(RsCallable::Function(func))
         } else if let Some(macro_) = self.get_macro_by_name(name) {
