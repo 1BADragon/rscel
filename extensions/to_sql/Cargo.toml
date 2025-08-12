@@ -7,4 +7,7 @@ license = { workspace = true }
 readme = "../README.md"
 
 [dependencies]
-rscel = { path = "../../rscel"}
+rscel = { path = "../../rscel" }
+
+[dev-dependencies]
+test-case = "3.3.1"

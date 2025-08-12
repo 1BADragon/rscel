@@ -11,7 +11,12 @@ fn main() {
 
     let p = Program::from_source(&args[1]).expect("Failed to compile program");
 
-    let sql = p.ast().unwrap().to_sql().expect("Failed to generate SQL");
+    let sql_builder = p
+        .ast()
+        .unwrap()
+        .to_sql()
+        .expect("Failed to generate SQL builder");
+    let sql = sql_builder.to_sql().expect("Failed to generate SQL");
 
     println!("{}", sql);
 }

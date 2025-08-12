@@ -18,3 +18,5 @@ impl std::fmt::Display for ToSqlError {
         }
     }
 }
+
+impl std::error::Error for ToSqlError {}

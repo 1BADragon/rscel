@@ -1,9 +1,10 @@
 use rscel::AstNode;
 
-use crate::traits::ToSql;
+use crate::error::ToSqlError;
+use crate::traits::{SqlBuilder, ToSql};
 
 impl<T: ToSql> ToSql for AstNode<T> {
-    fn to_sql(&self) -> crate::error::ToSqlResult<String> {
+    fn to_sql(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         self.node().to_sql()
     }
 }
