@@ -1180,8 +1180,9 @@ impl<'l> CelCompiler<'l> {
                     obj_init.into_iter().unzip();
 
                 let mut children_ast_iter = children_ast.into_iter();
-                while let Some(key_ast) = children_ast_iter.next() {
-                    let val_ast = children_ast_iter.next().unwrap();
+                // init is created as value then key for mkdict stack
+                while let Some(val_ast) = children_ast_iter.next() {
+                    let key_ast = children_ast_iter.next().unwrap();
 
                     let range = key_ast.range().surrounding(val_ast.range());
 
