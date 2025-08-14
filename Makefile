@@ -36,6 +36,9 @@ all: wasm-binding python-binding build
 run-tests:
 	RSCEL_TEST_PROTO=1 cargo test -q $(CARGO_ARGS)
 
+run-no-sql-tests:
+	cargo test --manifest-path=extensions/to_sql/Cargo.toml -q
+
 run-no-feature-tests:
 	cargo test -q --no-default-features $(CARGO_ARGS)
 
@@ -55,4 +58,4 @@ run-wasm-tests:
 	$(MAKE_COMMAND) -C wasm wasm-tests
 
 .PHONY: run-all-tests
-run-all-tests: run-tests run-no-feature-tests run-python-tests run-wasm-tests
+run-all-tests: run-tests run-no-feature-tests run-no-sql-tests run-python-tests run-wasm-tests
