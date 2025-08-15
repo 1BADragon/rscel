@@ -55,3 +55,12 @@ assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), 7.into());
 ```
 
 Build status: [![Rust](https://github.com/1BADragon/rscel/actions/workflows/rust.yml/badge.svg)](https://github.com/1BADragon/rscel/actions/workflows/rust.yml)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to file issues, run tests, and submit patches.
+
+## Code of Conduct
+
+This project adheres to the [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+
