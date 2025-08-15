@@ -14,6 +14,8 @@
 
 use regex::Regex;
 
+mod functions;
+
 use crate::compiler::tokens::FStringSegment;
 use crate::{
     AddOp, Addition, AstNode, CelValue, ConditionalAnd, ConditionalOr, Expr, ExprList, Ident,
@@ -49,7 +51,7 @@ pub trait ToSql {
 }
 
 /// Shift placeholder numbers in `sql` by `offset`.
-fn shift_placeholders(sql: &str, offset: usize) -> String {
+pub(super) fn shift_placeholders(sql: &str, offset: usize) -> String {
     if offset == 0 {
         return sql.to_string();
     }
@@ -69,6 +71,36 @@ fn merge_fragments(lhs: SqlFragment, rhs: SqlFragment, join: &str) -> SqlFragmen
     SqlFragment {
         sql: format!("({} {} {})", lhs.sql, join, rhs_sql),
         params,
+    }
+}
+
+pub(super) fn join_fragments(args: Vec<SqlFragment>) -> (Vec<String>, Vec<CelValue>) {
+    let mut parts = Vec::new();
+    let mut params = Vec::new();
+    for frag in args {
+        let offset = params.len();
+        let sql = shift_placeholders(&frag.sql, offset);
+        params.extend(frag.params);
+        parts.push(sql);
+    }
+    (parts, params)
+}
+
+pub(super) fn default_call(name: &str, args: Vec<SqlFragment>) -> SqlFragment {
+    let (parts, params) = join_fragments(args);
+    SqlFragment {
+        sql: format!("{}({})", name, parts.join(", ")),
+        params,
+    }
+}
+
+impl SqlCompiler {
+    fn call_function(&self, name: &str, args: Vec<SqlFragment>) -> SqlFragment {
+        if let Some(func) = functions::FUNCTIONS.get(name) {
+            func(args)
+        } else {
+            default_call(name, args)
+        }
     }
 }
 
@@ -430,8 +462,42 @@ impl ToSql for Member {
         let mut chain_sql = String::new();
         let mut chain_params: Vec<CelValue> = Vec::new();
 
-        for m in &self.member {
+        let mut iter = self.member.iter().peekable();
+        while let Some(m) = iter.next() {
             match m.node() {
+                MemberPrime::MemberAccess { ident } => {
+                    if let Some(next) = iter.peek() {
+                        if let MemberPrime::Call { call } = next.node() {
+                            // method call
+                            if !chain_sql.is_empty() {
+                                if let Some(pos) = chain_sql.rfind("->") {
+                                    chain_sql.replace_range(pos..pos + 2, "->>");
+                                }
+                                frag.sql.push_str(&chain_sql);
+                                frag.params.extend(chain_params.drain(..));
+                                chain_sql.clear();
+                            }
+                            iter.next();
+                            let mut args: Vec<SqlFragment> = vec![frag];
+                            for expr in call.node().exprs.iter().rev() {
+                                args.push(expr.to_sql(compiler));
+                            }
+                            frag = compiler.call_function(&ident.node().0, args);
+                        } else {
+                            let current = m.to_sql(compiler);
+                            let offset = frag.params.len() + chain_params.len();
+                            let sql = shift_placeholders(&current.sql, offset);
+                            chain_sql.push_str(&sql);
+                            chain_params.extend(current.params);
+                        }
+                    } else {
+                        let current = m.to_sql(compiler);
+                        let offset = frag.params.len() + chain_params.len();
+                        let sql = shift_placeholders(&current.sql, offset);
+                        chain_sql.push_str(&sql);
+                        chain_params.extend(current.params);
+                    }
+                }
                 MemberPrime::Call { call } => {
                     if !chain_sql.is_empty() {
                         if let Some(pos) = chain_sql.rfind("->") {
@@ -441,11 +507,11 @@ impl ToSql for Member {
                         frag.params.extend(chain_params.drain(..));
                         chain_sql.clear();
                     }
-                    let call_frag = call.to_sql(compiler);
-                    let offset = frag.params.len();
-                    let call_sql = shift_placeholders(&call_frag.sql, offset);
-                    frag.sql.push_str(&format!("({})", call_sql));
-                    frag.params.extend(call_frag.params);
+                    let mut args: Vec<SqlFragment> = Vec::new();
+                    for expr in call.node().exprs.iter().rev() {
+                        args.push(expr.to_sql(compiler));
+                    }
+                    frag = compiler.call_function(&frag.sql, args);
                 }
                 _ => {
                     let current = m.to_sql(compiler);
