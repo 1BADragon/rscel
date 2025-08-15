@@ -1,21 +1,21 @@
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
-use super::{default_call, join_fragments, SqlFragment};
+use super::{default_call, join_fragments, SqlFragment, SqlResult};
 
-pub type SqlFunc = Box<dyn Fn(Vec<SqlFragment>) -> SqlFragment + Send + Sync>;
+pub type SqlFunc = Box<dyn Fn(Vec<SqlFragment>) -> SqlResult<SqlFragment> + Send + Sync>;
 
 fn simple(name: &'static str) -> SqlFunc {
-    Box::new(move |args| default_call(name, args))
+    Box::new(move |args| Ok(default_call(name, args)))
 }
 
 fn extract(part: &'static str) -> SqlFunc {
     Box::new(move |args| {
         let (parts, params) = join_fragments(args);
-        SqlFragment {
+        Ok(SqlFragment {
             sql: format!("EXTRACT({} FROM {})", part, parts[0]),
             params,
-        }
+        })
     })
 }
 
@@ -43,30 +43,30 @@ pub static FUNCTIONS: Lazy<HashMap<&'static str, SqlFunc>> = Lazy::new(|| {
         "contains",
         Box::new(|args| {
             let (parts, params) = join_fragments(args);
-            SqlFragment {
+            Ok(SqlFragment {
                 sql: format!("({} LIKE '%' || {} || '%')", parts[0], parts[1]),
                 params,
-            }
+            })
         }),
     );
     m.insert(
         "startsWith",
         Box::new(|args| {
             let (parts, params) = join_fragments(args);
-            SqlFragment {
+            Ok(SqlFragment {
                 sql: format!("({} LIKE {} || '%')", parts[0], parts[1]),
                 params,
-            }
+            })
         }),
     );
     m.insert(
         "endsWith",
         Box::new(|args| {
             let (parts, params) = join_fragments(args);
-            SqlFragment {
+            Ok(SqlFragment {
                 sql: format!("({} LIKE '%' || {})", parts[0], parts[1]),
                 params,
-            }
+            })
         }),
     );
 
