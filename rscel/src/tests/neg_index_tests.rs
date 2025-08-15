@@ -18,3 +18,14 @@ fn test_neg_index() {
         assert!(ctx.exec("test2", &bindings).is_err());
     }
 }
+
+#[test]
+fn test_neg_index_out_of_range() {
+    let mut ctx = CelContext::new();
+    let bindings = BindContext::new();
+
+    ctx.add_program_str("test", "[1,2,3][-4]")
+        .expect("Failed to compile program");
+
+    assert!(ctx.exec("test", &bindings).is_err());
+}
