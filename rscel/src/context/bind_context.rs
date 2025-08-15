@@ -14,8 +14,8 @@ use super::{default_funcs::load_default_funcs, type_funcs::load_default_types};
 /// Rust-accelerated functions can be used to extend
 /// the base language's functionality. The `this` argument refers to an object the function
 /// is being run on (i.e. `foo.bar()`). The `args` argument refers to any arguments passed
-/// to the function within the parenthesis, in order passed. The return value of a function
-/// should be a single `ValueCell` wrapped in a `ValueCellResult`.
+/// to the function within the parentheses, in the order they were passed. The return value of a function
+/// should be a single `CelValue` wrapped in a `CelResult`.
 ///
 /// An example of a function impl that collects the keys of an object and returns them as a
 /// list:
@@ -23,7 +23,7 @@ use super::{default_funcs::load_default_funcs, type_funcs::load_default_types};
 /// use rscel::*;
 ///
 /// fn keys_impl(this: CelValue, args: &[CelValue]) -> CelResult<CelValue> {
-///     if args.len() == 0 {
+///     if args.len() != 0 {
 ///         return Err(CelError::misc("keys() expects 0 arguments"));
 ///     }
 ///
@@ -40,9 +40,9 @@ pub type RsCelFunction = dyn Fn(CelValue, Vec<CelValue>) -> CelValue;
 ///
 /// Rust-accelerated macros can be used to modify and evaluate
 /// program bytecode within the macro arguments. Instead of being given values, macros are
-/// provided the bytecode generated from the argument expression. Like functions, the this
+/// provided the bytecode generated from the argument expressions. Like functions, the `this`
 /// argument is the resolved value the macro is being run on (i.e `my_list.map()`) however
-/// all arguents passed to the macro are left unresolved bytecode. An additional argument,
+/// all arguments passed to the macro are left as unresolved bytecode. An additional argument,
 /// the Interpreter context, is provided to the macro for bytecode resolution.
 pub type RsCelMacro =
     dyn for<'a, 'b> Fn(&'a Interpreter<'a>, CelValue, &[&CelByteCode]) -> CelValue;
@@ -63,7 +63,7 @@ pub struct BindContext<'a> {
 }
 
 impl<'a> BindContext<'a> {
-    /// Create a new bind context contain default functions and macros.
+    /// Create a new bind context containing the default functions, macros, and types.
     pub fn new() -> BindContext<'a> {
         let mut ctx = BindContext {
             params: HashMap::new(),
@@ -97,7 +97,7 @@ impl<'a> BindContext<'a> {
         self.params.insert(name.to_owned(), value);
     }
 
-    /// Cheater function to bind the keys of an JSON object with its values
+    /// Cheater function to bind the keys of a JSON object to their values
     pub fn bind_params_from_json_obj(&mut self, values: Value) -> CelResult<()> {
         let obj = if let Value::Object(o) = values {
             o
