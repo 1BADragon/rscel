@@ -67,7 +67,7 @@ pub use compiler::{
 pub use context::{BindContext, CelContext, RsCelFunction, RsCelMacro};
 pub use interp::ByteCode;
 pub use program::{Program, ProgramDetails};
-pub use sql::{SqlCompiler, SqlFragment, ToSql};
+pub use sql::{SqlCompiler, SqlError, SqlFragment, ToSql};
 pub use types::{CelError, CelResult, CelValue, CelValueDyn};
 
 // Some re-exports to allow a consistent use of serde
