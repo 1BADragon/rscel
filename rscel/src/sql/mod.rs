@@ -17,6 +17,9 @@ use std::fmt;
 
 mod functions;
 
+#[cfg(test)]
+mod tests;
+
 use crate::compiler::tokens::FStringSegment;
 use crate::{
     AddOp, Addition, AstNode, CelValue, ConditionalAnd, ConditionalOr, Expr, ExprList, Ident,
