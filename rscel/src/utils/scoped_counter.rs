@@ -1,45 +1,41 @@
-use std::cell::RefCell;
+use std::cell::Cell;
 
 pub struct ScopedCounter {
-    count: RefCell<usize>,
+    count: Cell<usize>,
 }
 
 pub struct ScopedCounterRef<'a> {
-    count: &'a RefCell<usize>,
+    count: &'a Cell<usize>,
 }
 
 impl ScopedCounter {
     pub fn new() -> ScopedCounter {
         ScopedCounter {
-            count: RefCell::new(0),
+            count: Cell::new(0),
         }
     }
 
     pub fn count(&self) -> usize {
-        *self.count.borrow()
+        self.count.get()
     }
 
     pub fn inc<'a>(&'a self) -> ScopedCounterRef<'a> {
-        {
-            let mut count = self.count.borrow_mut();
-
-            *count += 1;
-        }
+        let count = self.count.get();
+        self.count.set(count + 1);
         ScopedCounterRef { count: &self.count }
     }
 }
 
 impl<'a> ScopedCounterRef<'a> {
     pub fn count(&self) -> usize {
-        *self.count.borrow()
+        self.count.get()
     }
 }
 
 impl<'a> Drop for ScopedCounterRef<'a> {
     fn drop(&mut self) {
-        let mut count = self.count.borrow_mut();
-
-        *count -= 1;
+        let count = self.count.get();
+        self.count.set(count - 1);
     }
 }
 

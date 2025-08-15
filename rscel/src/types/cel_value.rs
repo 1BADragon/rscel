@@ -570,15 +570,23 @@ impl CelValue {
                                 }
                             } + (index as isize);
 
-                            if adjusted_index < 0
-                                || TryInto::<usize>::try_into(adjusted_index).unwrap() >= list.len()
-                            {
+                            let adjusted_index_usize =
+                                match TryInto::<usize>::try_into(adjusted_index) {
+                                    Ok(v) => v,
+                                    Err(_) => {
+                                        return CelValue::from_err(CelError::value(
+                                            "List access out of bounds 3",
+                                        ))
+                                    }
+                                };
+
+                            if adjusted_index < 0 || adjusted_index_usize >= list.len() {
                                 return CelValue::from_err(CelError::value(
                                     "List access out of bounds 3",
                                 ));
                             }
 
-                            list[adjusted_index as usize].clone()
+                            list[adjusted_index_usize].clone()
                         } else {
                             return CelValue::from_err(CelError::value(
                                 "Negative index is not allowed",

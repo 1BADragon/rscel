@@ -14,9 +14,9 @@ struct InterpStack<'a, 'b> {
 }
 
 impl<'a, 'b> InterpStack<'a, 'b> {
-    fn new(ctx: &'b Interpreter) -> InterpStack<'a, 'b> {
+    fn new(ctx: &'b Interpreter, capacity: usize) -> InterpStack<'a, 'b> {
         InterpStack {
-            stack: Vec::new(),
+            stack: Vec::with_capacity(capacity),
             ctx,
         }
     }
@@ -142,7 +142,7 @@ impl<'a> Interpreter<'a> {
 
     pub fn run_raw(&self, prog: &CelByteCode, resolve: bool) -> CelResult<CelValue> {
         let mut pc: usize = 0;
-        let mut stack = InterpStack::new(self);
+        let mut stack = InterpStack::new(self, prog.len());
 
         let count = self.depth.inc();
 
@@ -405,7 +405,7 @@ impl<'a> Interpreter<'a> {
                 ByteCode::Call(n_args) => {
                     match stack.pop_noresolve()? {
                         CelStackValue::BoundCall { callable, value } => {
-                            let mut args = Vec::new();
+                            let mut args = Vec::with_capacity(*n_args as usize);
 
                             for _ in 0..*n_args {
                                 args.push(stack.pop()?.into_value()?)
@@ -417,12 +417,16 @@ impl<'a> Interpreter<'a> {
                                     stack.push_val(func(value, arg_values));
                                 }
                                 RsCallable::Macro(macro_) => {
-                                    stack.push_val(self.call_macro(&value, &args, macro_)?);
+                                    stack.push_val(self.call_macro(
+                                        &value,
+                                        args.as_slice(),
+                                        macro_,
+                                    )?);
                                 }
                             }
                         }
                         CelStackValue::Value(value) => {
-                            let mut args = Vec::new();
+                            let mut args = Vec::with_capacity(*n_args as usize);
 
                             for _ in 0..*n_args {
                                 args.push(stack.pop()?.into_value()?)
@@ -437,7 +441,7 @@ impl<'a> Interpreter<'a> {
                                     {
                                         stack.push_val(self.call_macro(
                                             &CelValue::from_null(),
-                                            &args,
+                                            args.as_slice(),
                                             macro_,
                                         )?);
                                     } else if let Some(CelValue::Type(type_name)) =
@@ -510,7 +514,7 @@ impl<'a> Interpreter<'a> {
     fn call_macro(
         &self,
         this: &CelValue,
-        args: &Vec<CelValue>,
+        args: &[CelValue],
         macro_: &RsCelMacro,
     ) -> Result<CelValue, CelError> {
         let mut v = Vec::new();
