@@ -4,13 +4,16 @@
 //! expressions into SQL fragments consisting of SQL text and a list
 //! of bound parameters.
 //!
-//! # JSON assumptions
+//! # PostgreSQL and JSON assumptions
 //!
-//! The generated SQL targets PostgreSQL `jsonb` values. Field and array
-//! accesses are translated into `jsonb` operator chains (`->` and `->>`),
-//! with the final segment in a chain extracted using `->>` to produce a
-//! text value. Array indices use `jsonb` subscripting. The JSON documents
-//! are assumed to contain the referenced structure at runtime.
+//! Generated SQL is intended for PostgreSQL. CEL variables are assumed
+//! to map to `jsonb` columns, and field or array accesses are translated
+//! into chains of the `->` and `->>` operators with the final segment
+//! extracted using `->>` to produce a text value. Array indices use
+//! `jsonb` subscripting. Literal values become numbered placeholders
+//! (`$1`, `$2`, ...), which should be bound in prepared statements. The
+//! referenced JSON structure is expected to exist at runtime; missing
+//! fields result in `NULL` values.
 
 use regex::Regex;
 use std::fmt;
