@@ -1,0 +1,13 @@
+[build-system]
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
+
+[project]
+name = "rscel"
+version = "1.0.6"
+description = "Python bindings for the rscel package"
+readme = "../README.md"
+license = { file = "../LICENSE" }
+requires-python = ">=3.9"
+authors = [{ name = "rscel developers" }]
+
