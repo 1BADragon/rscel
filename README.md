@@ -50,7 +50,7 @@ let mut exec_ctx = BindContext::new();
 ctx.add_program_str("main", "p.x + 3").unwrap();
 exec_ctx.bind_protobuf_msg("p", p);
 
-assert_eq!(ctx.exec("main", &exec_ctx), 7.into());
+assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), 7.into());
   
 ```
 
