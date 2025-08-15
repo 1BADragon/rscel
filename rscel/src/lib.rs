@@ -1,13 +1,13 @@
 #![feature(string_remove_matches)]
-//! RsCel is a CEL evaluator written in Rust. CEL is a google project that
+//! RsCel is a CEL evaluator written in Rust. CEL is a Google project that
 //! describes a turing-incomplete language that can be used to evaluate
-//! a user provdided expression. The language specification can be found
+//! a user provided expression. The language specification can be found
 //! [here](https://github.com/google/cel-spec/blob/master/doc/langdef.md).
 //!
-//! The design goals of this project were are as follows:
+//! The design goals of this project are as follows:
 //!   * Flexible enough to allow for a user to bend the spec if needed
-//!   * Sandbox'ed in such a way that only specific values can be bound
-//!   * Can be used as a wasm depenedency (or other ffi)
+//!   * Sandboxed in such a way that only specific values can be bound
+//!   * Can be used as a wasm dependency (or other ffi)
 //!
 //! The basic example of how to use:
 //! ```
@@ -22,7 +22,7 @@
 //! let res = ctx.exec("main", &exec_ctx).unwrap(); // CelValue::Int(6)
 //! assert_eq!(res, 6.into());
 //! ```
-//! As of 0.10.0 binding protobuf messages from the protobuf crate is now available! Given
+//! Binding protobuf messages from the protobuf crate is available! Given
 //! the following protobuf message:
 //! ```protobuf
 //!
@@ -37,7 +37,7 @@
 //! ```ignore
 //! use rscel::{CelContext, BindContext};
 //!
-//! // currently rscel required protobuf messages to be in a box
+//! // currently rscel requires protobuf messages to be in a box
 //! let p = Box::new(protos::Point::new());
 //! p.x = 4;
 //! p.y = 5;
