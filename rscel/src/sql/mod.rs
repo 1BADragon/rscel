@@ -3,6 +3,14 @@
 //! This module provides a minimal interface for converting CEL
 //! expressions into SQL fragments consisting of SQL text and a list
 //! of bound parameters.
+//!
+//! # JSON assumptions
+//!
+//! The generated SQL targets PostgreSQL `jsonb` values. Field and array
+//! accesses are translated into `jsonb` operator chains (`->` and `->>`),
+//! with the final segment in a chain extracted using `->>` to produce a
+//! text value. Array indices use `jsonb` subscripting. The JSON documents
+//! are assumed to contain the referenced structure at runtime.
 
 use regex::Regex;
 
@@ -419,13 +427,44 @@ impl ToSql for Unary {
 impl ToSql for Member {
     fn to_sql(&self, compiler: &SqlCompiler) -> SqlFragment {
         let mut frag = self.primary.to_sql(compiler);
+        let mut chain_sql = String::new();
+        let mut chain_params: Vec<CelValue> = Vec::new();
+
         for m in &self.member {
-            let current = m.to_sql(compiler);
-            let offset = frag.params.len();
-            let sql = shift_placeholders(&current.sql, offset);
-            frag.sql = format!("{}{}", frag.sql, sql);
-            frag.params.extend(current.params);
+            match m.node() {
+                MemberPrime::Call { call } => {
+                    if !chain_sql.is_empty() {
+                        if let Some(pos) = chain_sql.rfind("->") {
+                            chain_sql.replace_range(pos..pos + 2, "->>");
+                        }
+                        frag.sql.push_str(&chain_sql);
+                        frag.params.extend(chain_params.drain(..));
+                        chain_sql.clear();
+                    }
+                    let call_frag = call.to_sql(compiler);
+                    let offset = frag.params.len();
+                    let call_sql = shift_placeholders(&call_frag.sql, offset);
+                    frag.sql.push_str(&format!("({})", call_sql));
+                    frag.params.extend(call_frag.params);
+                }
+                _ => {
+                    let current = m.to_sql(compiler);
+                    let offset = frag.params.len() + chain_params.len();
+                    let sql = shift_placeholders(&current.sql, offset);
+                    chain_sql.push_str(&sql);
+                    chain_params.extend(current.params);
+                }
+            }
         }
+
+        if !chain_sql.is_empty() {
+            if let Some(pos) = chain_sql.rfind("->") {
+                chain_sql.replace_range(pos..pos + 2, "->>");
+            }
+            frag.sql.push_str(&chain_sql);
+            frag.params.extend(chain_params);
+        }
+
         frag
     }
 }
@@ -434,20 +473,20 @@ impl ToSql for MemberPrime {
     fn to_sql(&self, compiler: &SqlCompiler) -> SqlFragment {
         match self {
             MemberPrime::MemberAccess { ident } => SqlFragment {
-                sql: format!(".{}", ident.node().0.clone()),
+                sql: format!(" -> '{}'", ident.node().0),
                 params: Vec::new(),
             },
             MemberPrime::Call { call } => {
                 let frag = call.to_sql(compiler);
                 SqlFragment {
-                    sql: format!("({})", frag.sql),
+                    sql: frag.sql,
                     params: frag.params,
                 }
             }
             MemberPrime::ArrayAccess { access } => {
                 let frag = access.to_sql(compiler);
                 SqlFragment {
-                    sql: format!("[{}]", frag.sql),
+                    sql: format!(" -> ({})", frag.sql),
                     params: frag.params,
                 }
             }
