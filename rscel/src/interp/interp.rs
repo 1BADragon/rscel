@@ -14,9 +14,9 @@ struct InterpStack<'a, 'b> {
 }
 
 impl<'a, 'b> InterpStack<'a, 'b> {
-    fn new(ctx: &'b Interpreter) -> InterpStack<'a, 'b> {
+    fn new(ctx: &'b Interpreter, capacity: usize) -> InterpStack<'a, 'b> {
         InterpStack {
-            stack: Vec::new(),
+            stack: Vec::with_capacity(capacity),
             ctx,
         }
     }
@@ -142,7 +142,7 @@ impl<'a> Interpreter<'a> {
 
     pub fn run_raw(&self, prog: &CelByteCode, resolve: bool) -> CelResult<CelValue> {
         let mut pc: usize = 0;
-        let mut stack = InterpStack::new(self);
+        let mut stack = InterpStack::new(self, prog.len());
 
         let count = self.depth.inc();
 
