@@ -10,9 +10,8 @@ This repository provides a Rust implementation of the [CEL](https://github.com/g
 - Follow standard Rust naming conventions (`snake_case` for functions/variables, `CamelCase` for types).
 
 ## Testing
-- Run the full Rust test suite before committing:
-  - `cargo +nightly-2025-08-08 test`
-  - `cargo +nightly-2025-08-08 test --no-default-features`
+- Before committing, run the complete test suite with `make run-all-tests`.
+- The repository's `rust-toolchain.toml` pins the nightly toolchain, so `cargo test` automatically uses the correct version.
 - If your changes affect the Python bindings or tests, rebuild the wheel and run the Python tests:
   - `make run-python-tests`
 - For WebAssembly changes, run `make run-wasm-tests`.
