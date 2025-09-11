@@ -2,7 +2,7 @@
 #![feature(unboxed_closures)]
 use py_cel_error::PyCelError;
 use py_cel_value::PyCelValue;
-use rscel::{BindContext, CelContext, CelValue};
+use rscel::{BindContext, CelContext, CelValue, Program};
 
 use pyo3::{
     exceptions::PyException,
@@ -24,6 +24,7 @@ use celpycallable::CelPyCallable;
 use py_bind_context::PyBindContext;
 use py_cel_context::PyCelContext;
 use py_cel_program::PyCelProgram;
+use rscel_to_sql::IntoSqlBuilder;
 
 /* Eval entry point */
 #[pyfunction]
@@ -69,11 +70,34 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &Bound<PyDict>) -> PyResult<
     }
 }
 
+#[pyfunction]
+fn to_sql(py: Python<'_>, prog_str: String) -> PyResult<Py<PyString>> {
+    let p = match Program::from_source(&prog_str) {
+        Ok(p) => p,
+        Err(err) => return Err(PyException::new_err(err.to_string())),
+    };
+
+    let sql_str = if let Some(ast) = p.ast() {
+        match ast.into_sql_builder() {
+            Ok(b) => b.to_sql(),
+            Err(e) => return Err(PyException::new_err(e.to_string())),
+        }
+    } else {
+        return Err(PyException::new_err("Internal Error".to_string()));
+    };
+
+    match sql_str {
+        Ok(s) => Ok(PyString::new(py, &s).unbind()),
+        Err(e) => Err(PyException::new_err(e.to_string())),
+    }
+}
+
 /* Module decl */
 #[pymodule]
 #[pyo3(name = "rscel")]
 fn rscel_module(_py: Python<'_>, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(eval, m)?)?;
+    m.add_function(wrap_pyfunction!(to_sql, m)?)?;
     m.add_class::<PyCelContext>()?;
     m.add_class::<PyBindContext>()?;
     m.add_class::<PyCelProgram>()?;
