@@ -39,6 +39,7 @@ impl<'a> AstDumper<'a> {
                 self.dump_or_node(true_clause, depth + 1);
                 self.dump_expr_node(false_clause, depth + 1);
             }
+            Expr::Walwrus { .. } => todo!(),
             Expr::Match { .. } => todo!(),
         }
     }

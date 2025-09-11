@@ -28,6 +28,10 @@ pub enum Expr {
         condition: Box<AstNode<Expr>>,
         cases: Vec<AstNode<MatchCase>>,
     },
+    Walwrus {
+        ident: AstNode<Ident>,
+        expr: Box<AstNode<Expr>>,
+    },
     Unary(Box<AstNode<ConditionalOr>>),
 }
 

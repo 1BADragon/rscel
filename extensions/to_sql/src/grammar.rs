@@ -26,6 +26,9 @@ impl IntoSqlBuilder for Expr {
                     false_clause: false_builder,
                 }))
             }
+            Expr::Walwrus { .. } => Err(ToSqlError::Unsupported(
+                "Walwrus op not supported".to_owned(),
+            )),
             Expr::Match {
                 condition: _,
                 cases: _,

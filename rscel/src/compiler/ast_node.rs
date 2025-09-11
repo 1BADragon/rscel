@@ -4,9 +4,9 @@ use super::{source_location::SourceLocation, source_range::SourceRange};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AstNode<T> {
-    loc: SourceRange,
+    pub loc: SourceRange,
 
-    node: T,
+    pub node: T,
 }
 
 impl<T> AstNode<T> {

@@ -27,6 +27,7 @@ pub enum Token {
     AndAnd,                          // &&
     LessEqual,                       // <=
     GreaterEqual,                    // >=
+    Walwrus,                         // :=
     EqualEqual,                      // ==
     NotEqual,                        // !=
     In,                              // 'in'

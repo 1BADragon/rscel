@@ -9,8 +9,8 @@ use crate::{
 
 struct InterpStack<'a, 'b> {
     stack: Vec<CelStackValue<'b>>,
-
     ctx: &'a Interpreter<'b>,
+    locals: HashMap<String, CelValue>,
 }
 
 impl<'a, 'b> InterpStack<'a, 'b> {
@@ -18,6 +18,7 @@ impl<'a, 'b> InterpStack<'a, 'b> {
         InterpStack {
             stack: Vec::new(),
             ctx,
+            locals: HashMap::new(),
         }
     }
 
@@ -38,7 +39,7 @@ impl<'a, 'b> InterpStack<'a, 'b> {
                             return Ok(CelStackValue::Value(val.clone()));
                         }
 
-                        if let Some(val) = self.ctx.get_param_by_name(&name) {
+                        if let Some(val) = self.ctx.get_param_by_name(&name, &self) {
                             return Ok(CelStackValue::Value(val.clone()));
                         }
 
@@ -76,7 +77,7 @@ impl<'a, 'b> InterpStack<'a, 'b> {
         match self.stack.pop() {
             Some(val) => match val.try_into()? {
                 CelValue::Ident(name) => {
-                    if let Some(val) = self.ctx.get_param_by_name(&name) {
+                    if let Some(val) = self.ctx.get_param_by_name(&name, self) {
                         Ok(val.clone().into())
                     } else {
                         Ok(CelStackValue::Value(CelValue::from_ident(&name)))
@@ -485,6 +486,20 @@ impl<'a> Interpreter<'a> {
 
                     stack.push_val(CelValue::String(working));
                 }
+                ByteCode::Store => {
+                    let ident = stack.pop_noresolve()?;
+                    let value = stack.pop_val()?;
+
+                    if let CelStackValue::Value(CelValue::Ident(i)) = ident {
+                        stack.locals.insert(i, value.clone());
+                    } else {
+                        return Err(CelError::Runtime(
+                            "Store required ident on top of stack".to_string(),
+                        ));
+                    }
+
+                    stack.push_val(value);
+                }
             };
         }
 
@@ -537,8 +552,15 @@ impl<'a> Interpreter<'a> {
         Ok(arg_values)
     }
 
-    fn get_param_by_name(&self, name: &str) -> Option<&'a CelValue> {
-        self.bindings?.get_param(name)
+    fn get_param_by_name(
+        &self,
+        name: &str,
+        stack: &'a InterpStack<'_, '_>,
+    ) -> Option<&'a CelValue> {
+        match stack.locals.get(name) {
+            Some(v) => Some(v),
+            None => self.bindings?.get_param(name),
+        }
     }
 
     fn get_func_by_name(&self, name: &str) -> Option<&'a RsCelFunction> {
@@ -561,5 +583,25 @@ impl<'a> Interpreter<'a> {
         } else {
             Err(CelError::value(&format!("{} is not callable", name)))
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{interp::Interpreter, types::CelByteCode, ByteCode, CelValue};
+
+    #[test]
+    fn store() {
+        let c = CelByteCode::from_vec(vec![
+            ByteCode::Push(3.into()),
+            ByteCode::Push(CelValue::Ident("foo".to_owned())),
+            ByteCode::Store,
+        ]);
+
+        let i = Interpreter::empty();
+
+        let res = i.run_raw(&c, true).expect("Failed to run interp");
+
+        assert_eq!(res, 3.into());
     }
 }

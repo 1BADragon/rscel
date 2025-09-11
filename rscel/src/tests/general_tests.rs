@@ -240,6 +240,8 @@ fn test_contains() {
 #[test_case(r#"'123abc555'.matchCaptures('([0-9]+)([a-z]+)555')"#, vec!["123abc555", "123", "abc"]; "string match captures")]
 #[test_case("'abab'.matchReplaceOnce('(?<first>a)(?<last>b)', '${last}${first}')", "baab"; "string matchReplaceOnce")]
 #[test_case("'abab'.matchReplace('(?<first>a)(?<last>b)', '${last}${first}')", "baba"; "string matchReplace")]
+#[test_case("foo := 3 * 2", 6; "walwrus operator simple")]
+#[test_case("(foo := (2 + 3)) > 2 ? foo + 1 : 0", 6; "walwrus operator complex")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

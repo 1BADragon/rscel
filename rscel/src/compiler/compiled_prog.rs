@@ -78,6 +78,13 @@ impl CompiledProg {
         }
     }
 
+    pub fn from_node_as_bytecode(other: CompiledProg) -> Self {
+        CompiledProg {
+            inner: NodeValue::Bytecode(other.inner.into_bytecode()),
+            details: other.details,
+        }
+    }
+
     pub fn with_bytecode(bytecode: CelByteCode) -> CompiledProg {
         CompiledProg {
             inner: NodeValue::Bytecode(bytecode.into()),
@@ -249,6 +256,10 @@ impl CompiledProg {
             NodeValue::ConstExpr(c) => c,
             _ => panic!("Internal Error: not const"),
         }
+    }
+
+    pub fn add_details(&mut self, details: ProgramDetails) {
+        self.details.union_from(details);
     }
 }
 

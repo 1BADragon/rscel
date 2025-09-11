@@ -65,6 +65,11 @@ impl<'l> CelCompiler<'l> {
             let (lhs_node, lhs_ast) = self.parse_conditional_or()?;
 
             match self.tokenizer.peek()?.as_token() {
+                Some(Token::Walwrus) => {
+                    self.tokenizer.next()?;
+
+                    self.parse_walwrus_expression((lhs_node, lhs_ast))
+                }
                 Some(Token::Question) => {
                     self.tokenizer.next()?;
                     self.parse_turnary_expression(lhs_node, lhs_ast)
@@ -193,6 +198,90 @@ impl<'l> CelCompiler<'l> {
                 range,
             ),
         ))
+    }
+
+    fn parse_walwrus_expression(
+        &mut self,
+        lhs: (CompiledProg, AstNode<ConditionalOr>),
+    ) -> CelResult<(CompiledProg, AstNode<Expr>)> {
+        let (_, lhs_ast) = lhs;
+
+        let lhs_range = lhs_ast.range().clone();
+
+        // lol
+        let ident = if let AstNode {
+            loc: _,
+            node:
+                ConditionalOr::Unary(AstNode {
+                    loc: _,
+                    node:
+                        ConditionalAnd::Unary(AstNode {
+                            loc: _,
+                            node:
+                                Relation::Unary(AstNode {
+                                    loc: _,
+                                    node:
+                                        Addition::Unary(AstNode {
+                                            loc: _,
+                                            node:
+                                                Multiplication::Unary(AstNode {
+                                                    loc: _,
+                                                    node:
+                                                        Unary::Member(AstNode {
+                                                            loc: _,
+                                                            node:
+                                                                Member {
+                                                                    primary:
+                                                                        AstNode {
+                                                                            loc: _,
+                                                                            node:
+                                                                                Primary::Ident(ident),
+                                                                        },
+                                                                    member,
+                                                                },
+                                                        }),
+                                                }),
+                                        }),
+                                }),
+                        }),
+                }),
+        } = lhs_ast
+        {
+            if !member.is_empty() {
+                return Err(CelError::Syntax(
+                    SyntaxError::from_location(self.tokenizer.location())
+                        .with_message("Walwrus op expects ident on lhs".to_owned()),
+                ));
+            }
+
+            ident.clone()
+        } else {
+            return Err(CelError::Syntax(
+                SyntaxError::from_location(self.tokenizer.location())
+                    .with_message("Walwrus op expects ident on lhs".to_owned()),
+            ));
+        };
+
+        let (rhs_node, rhs_ast) = self.parse_expression()?;
+
+        let range = lhs_range.clone().surrounding(rhs_ast.range());
+
+        let ast = AstNode::new(
+            Expr::Walwrus {
+                ident: AstNode::new(ident.clone(), lhs_range),
+                expr: Box::new(rhs_ast),
+            },
+            range,
+        );
+
+        let mut node = CompiledProg::from_node_as_bytecode(rhs_node);
+
+        node.append_if_bytecode([
+            PreResolvedCodePoint::Bytecode(ByteCode::Push(CelValue::Ident(ident.0))),
+            PreResolvedCodePoint::Bytecode(ByteCode::Store),
+        ]);
+
+        Ok((node, ast))
     }
 
     fn parse_match_expression(&mut self) -> CelResult<(CompiledProg, AstNode<Expr>)> {

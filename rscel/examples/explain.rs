@@ -116,6 +116,7 @@ impl AstDumper {
                 ]
                 .into_iter(),
             )),
+            Expr::Walwrus { .. } => todo!(),
             Expr::Match { .. } => todo!(),
         }
     }

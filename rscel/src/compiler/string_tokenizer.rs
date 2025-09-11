@@ -46,7 +46,13 @@ impl<'l> StringTokenizer<'l> {
         let res = if let Some(input_char) = curr_char {
             match input_char {
                 '?' => Ok(Some(Token::Question)),
-                ':' => Ok(Some(Token::Colon)),
+                ':' => match self.scanner.peek() {
+                    Some('=') => {
+                        self.scanner.next();
+                        Ok(Some(Token::Walwrus))
+                    }
+                    _ => Ok(Some(Token::Colon)),
+                },
                 '+' => Ok(Some(Token::Add)),
                 '-' => Ok(Some(Token::Minus)),
                 '*' => Ok(Some(Token::Multiply)),
