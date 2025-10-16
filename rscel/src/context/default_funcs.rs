@@ -6,6 +6,7 @@ mod size;
 mod sort;
 mod string;
 mod time_funcs;
+mod uom;
 
 const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("contains", &string::contains::contains),
@@ -77,6 +78,7 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("getMonth", &time_funcs::get_month::get_month),
     ("getSeconds", &time_funcs::get_seconds::get_seconds),
     ("zip", &zip_impl),
+    ("uomConvert", &uom::uom_convert),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
