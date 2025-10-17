@@ -221,36 +221,46 @@ fn type_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
 }
 
 fn timestamp_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
-    if args.len() != 1 {
-        return CelValue::from_err(CelError::argument("timestamp() expect one argument"));
+    if args.is_empty() {
+        return CelValue::from_timestamp(Utc::now());
     }
 
-    if let CelValue::String(str_val) = &args[0] {
-        if let Ok(val) = str_val.parse::<DateTime<Utc>>() {
-            CelValue::from_timestamp(val)
-        } else if let Ok(val) = DateTime::parse_from_rfc2822(str_val) {
-            CelValue::from_timestamp(val.to_utc())
-        } else if let Ok(val) = DateTime::parse_from_rfc3339(str_val) {
-            CelValue::from_timestamp(val.to_utc())
-        } else {
-            CelValue::from_err(CelError::value("Invalid timestamp format"))
+    if args.len() != 1 {
+        return CelValue::from_err(CelError::argument(
+            "timestamp() expects zero or one argument",
+        ));
+    }
+
+    match args.into_iter().next().unwrap() {
+        CelValue::String(str_val) => {
+            if let Ok(val) = str_val.parse::<DateTime<Utc>>() {
+                CelValue::from_timestamp(val)
+            } else if let Ok(val) = DateTime::parse_from_rfc2822(&str_val) {
+                CelValue::from_timestamp(val.to_utc())
+            } else if let Ok(val) = DateTime::parse_from_rfc3339(&str_val) {
+                CelValue::from_timestamp(val.to_utc())
+            } else {
+                CelValue::from_err(CelError::value("Invalid timestamp format"))
+            }
         }
-    } else if let CelValue::Int(i) = args[0] {
-        use chrono::MappedLocalTime;
-        match Utc.timestamp_opt(i, 0) {
-            MappedLocalTime::Single(s) => CelValue::from_timestamp(s),
-            _ => CelValue::from_err(CelError::value("Invalid timestamp value")),
+        CelValue::Int(i) => {
+            use chrono::MappedLocalTime;
+
+            match Utc.timestamp_opt(i, 0) {
+                MappedLocalTime::Single(s) => CelValue::from_timestamp(s),
+                _ => CelValue::from_err(CelError::value("Invalid timestamp value")),
+            }
         }
-    } else if let CelValue::UInt(i) = args[0] {
-        use chrono::MappedLocalTime;
-        match Utc.timestamp_opt(i as i64, 0) {
-            MappedLocalTime::Single(s) => CelValue::from_timestamp(s),
-            _ => CelValue::from_err(CelError::value("Invalid timestamp value")),
+        CelValue::UInt(i) => {
+            use chrono::MappedLocalTime;
+
+            match Utc.timestamp_opt(i as i64, 0) {
+                MappedLocalTime::Single(s) => CelValue::from_timestamp(s),
+                _ => CelValue::from_err(CelError::value("Invalid timestamp value")),
+            }
         }
-    } else if let CelValue::TimeStamp(ts) = args[0] {
-        CelValue::from_timestamp(ts)
-    } else {
-        CelValue::from_err(CelError::value("timestamp() expects a string argument"))
+        CelValue::TimeStamp(ts) => CelValue::from_timestamp(ts),
+        _ => CelValue::from_err(CelError::value("timestamp() expects a string argument")),
     }
 }
 
