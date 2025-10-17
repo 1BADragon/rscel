@@ -77,6 +77,7 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("getMinutes", &time_funcs::get_minutes::get_minutes),
     ("getMonth", &time_funcs::get_month::get_month),
     ("getSeconds", &time_funcs::get_seconds::get_seconds),
+    ("now", &now_impl),
     ("zip", &zip_impl),
     ("uomConvert", &uom::uom_convert),
 ];
@@ -164,4 +165,12 @@ fn zip_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     }
 
     ret_val.into()
+}
+
+fn now_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
+    if !args.is_empty() {
+        return CelValue::from_err(CelError::argument("now() expects no arguments"));
+    }
+
+    CelValue::from_timestamp(chrono::Utc::now())
 }

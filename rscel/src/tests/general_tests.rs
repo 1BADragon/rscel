@@ -285,6 +285,23 @@ fn test_timestamp_now() {
 }
 
 #[test]
+fn test_now_function() {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", "now()").unwrap();
+    let eval_res = ctx.exec("main", &exec_ctx).unwrap();
+
+    let CelValue::TimeStamp(ts) = eval_res else {
+        panic!("now() should return a timestamp");
+    };
+
+    let now = Utc::now();
+    let delta = now.signed_duration_since(ts).num_seconds().abs();
+    assert!(delta <= 5, "now() delta too large: {delta}s");
+}
+
+#[test]
 fn test_timeduration() {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

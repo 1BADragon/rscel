@@ -185,12 +185,11 @@ fn string_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
         return CelValue::from_err(CelError::argument("string() expects exactly one argument"));
     }
 
-    let arg_type = args[0].as_type();
+    let mut iter = args.into_iter();
+    let arg = iter.next().unwrap();
+    debug_assert!(iter.next().is_none());
 
-    let arg = match TryInto::<[CelValue; 1]>::try_into(args) {
-        Ok([i]) => i,
-        _ => return CelValue::from_err(CelError::argument("string expects 1 argument")),
-    };
+    let arg_type = arg.as_type();
 
     match arg {
         Int(i) => i.to_string().into(),
@@ -214,7 +213,7 @@ fn string_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
 
 fn type_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
-        return CelValue::from_err(CelError::argument("type() expects one argument"));
+        return CelValue::from_err(CelError::argument("type() expects exactly one argument"));
     }
 
     args[0].as_type()
@@ -260,41 +259,54 @@ fn timestamp_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
             }
         }
         CelValue::TimeStamp(ts) => CelValue::from_timestamp(ts),
-        _ => CelValue::from_err(CelError::value("timestamp() expects a string argument")),
+        other => CelValue::from_err(CelError::value(&format!(
+            "timestamp() expects zero arguments or one of string, int, uint, timestamp but got {}",
+            other.as_type()
+        ))),
     }
 }
 
 fn duration_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
-    if args.len() == 1 {
-        match &args[0] {
-            CelValue::String(str_val) => match duration_str::parse_chrono(str_val) {
+    match args.len() {
+        1 => match args.into_iter().next().unwrap() {
+            CelValue::String(str_val) => match duration_str::parse_chrono(&str_val) {
                 Ok(val) => CelValue::from_duration(val),
                 Err(_) => CelValue::from_err(CelError::value("Invalid duration format")),
             },
-            CelValue::Int(int_val) => match Duration::new(*int_val, 0) {
+            CelValue::Int(int_val) => match Duration::new(int_val, 0) {
                 Some(d) => d.into(),
                 None => CelValue::from_err(CelError::value("Invalid argument for duration")),
             },
-            CelValue::Duration(d) => CelValue::Duration(d.clone()),
-            _ => CelValue::from_err(CelError::value("Duration expects either string or int")),
-        }
-    } else if args.len() == 2 {
-        if let (CelValue::Int(sec), CelValue::Int(nsec)) = (&args[0], &args[1]) {
-            match Duration::new(*sec, *nsec as u32) {
-                Some(d) => d.into(),
-                None => CelValue::from_err(CelError::value("Invalid argument for duration")),
+            CelValue::Duration(d) => CelValue::Duration(d),
+            other => CelValue::from_err(CelError::argument(&format!(
+                "duration() expects a string, int, or duration but got {}",
+                other.as_type()
+            ))),
+        },
+        2 => {
+            let mut iter = args.into_iter();
+            let first = iter.next().unwrap();
+            let second = iter.next().unwrap();
+            if let (CelValue::Int(sec), CelValue::Int(nsec)) = (first, second) {
+                match Duration::new(sec, nsec as u32) {
+                    Some(d) => d.into(),
+                    None => CelValue::from_err(CelError::value("Invalid argument for duration")),
+                }
+            } else {
+                CelValue::from_err(CelError::argument(
+                    "duration() with two arguments expects (int seconds, int nanos)",
+                ))
             }
-        } else {
-            CelValue::from_err(CelError::value("Duration expects 2 ints"))
         }
-    } else {
-        CelValue::from_err(CelError::value("duration call not correct"))
+        _ => CelValue::from_err(CelError::argument(
+            "duration() expects one argument or two integer arguments",
+        )),
     }
 }
 
 fn dyn_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     if args.len() != 1 {
-        return CelValue::from_err(CelError::argument("dyn() expects one argument"));
+        return CelValue::from_err(CelError::argument("dyn() expects exactly one argument"));
     }
 
     args[0].clone()
