@@ -15,11 +15,13 @@ pub enum DispatchArgType {
     Duration,
     CelResult,
     CelValue,
+    Null,
 }
 
 impl DispatchArgType {
     pub fn from_type(pat: &Type) -> Self {
         match pat {
+            Type::Tuple(tuple) if tuple.elems.is_empty() => DispatchArgType::Null,
             Type::Path(path) => {
                 if path.qself.is_some() {
                     panic!("Path qualifiers not allowed");
@@ -54,6 +56,8 @@ impl DispatchArgType {
                         "CelResult" => DispatchArgType::CelResult,
                         "CelBytes" => DispatchArgType::Bytes,
                         "CelValue" => DispatchArgType::CelValue,
+                        "CelValueMap" => DispatchArgType::Map,
+                        "HashMap" => DispatchArgType::Map,
                         other => panic!("Unknown type: {}", other),
                     },
                     None => panic!("No type info"),
@@ -77,6 +81,7 @@ impl DispatchArgType {
             DispatchArgType::Duration => 'y',
             DispatchArgType::CelResult => 'r',
             DispatchArgType::CelValue => 'z',
+            DispatchArgType::Null => 'n',
         }
     }
 
@@ -92,6 +97,7 @@ impl DispatchArgType {
             DispatchArgType::Map => "Map",
             DispatchArgType::Timestamp => "TimeStamp",
             DispatchArgType::Duration => "Duration",
+            DispatchArgType::Null => "Null",
             _ => unreachable!(),
         }
     }

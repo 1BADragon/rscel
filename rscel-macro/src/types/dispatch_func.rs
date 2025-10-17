@@ -51,7 +51,7 @@ impl DispatchFunc {
         let mut arg_index = 0usize;
 
         if self.args.len() > arg_index && self.args[arg_index].is_this() {
-            elems.push(Pat::TupleStruct(self.args[0].as_tuple_struct("this")));
+            elems.push(self.args[0].as_pat("this"));
             args.push(syn::Expr::Path(syn::ExprPath {
                 attrs: Vec::new(),
                 qself: None,
@@ -103,7 +103,7 @@ impl DispatchFunc {
                 }));
             } else {
                 let a = format!("a{}", i);
-                elems.push(Pat::TupleStruct(self.args[arg_index].as_tuple_struct(&a)));
+                elems.push(self.args[arg_index].as_pat(&a));
                 args.push(syn::Expr::Path(syn::ExprPath {
                     attrs: Vec::new(),
                     qself: None,

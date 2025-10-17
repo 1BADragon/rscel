@@ -45,35 +45,44 @@ impl DispatchArg {
         self.this
     }
 
-    pub fn as_tuple_struct(&self, ident: &str) -> PatTupleStruct {
-        PatTupleStruct {
-            attrs: Vec::new(),
-            qself: None,
-            path: syn::Path {
-                leading_colon: None,
-                segments: [
-                    PathSegment {
-                        ident: Ident::new("CelValue", Span::call_site()),
-                        arguments: syn::PathArguments::None,
-                    },
-                    PathSegment {
-                        ident: Ident::new(self.arg_type.celvalue_enum(), Span::call_site()),
-                        arguments: syn::PathArguments::None,
-                    },
-                ]
-                .into_iter()
-                .collect(),
-            },
-            paren_token: token::Paren::default(),
-            elems: [Pat::Ident(PatIdent {
+    pub fn as_pat(&self, ident: &str) -> Pat {
+        match self.arg_type {
+            DispatchArgType::CelValue => Pat::Ident(PatIdent {
                 attrs: Vec::new(),
                 by_ref: None,
                 mutability: None,
                 ident: Ident::new(ident, Span::call_site()),
                 subpat: None,
-            })]
-            .into_iter()
-            .collect(),
+            }),
+            _ => Pat::TupleStruct(PatTupleStruct {
+                attrs: Vec::new(),
+                qself: None,
+                path: syn::Path {
+                    leading_colon: None,
+                    segments: [
+                        PathSegment {
+                            ident: Ident::new("CelValue", Span::call_site()),
+                            arguments: syn::PathArguments::None,
+                        },
+                        PathSegment {
+                            ident: Ident::new(self.arg_type.celvalue_enum(), Span::call_site()),
+                            arguments: syn::PathArguments::None,
+                        },
+                    ]
+                    .into_iter()
+                    .collect(),
+                },
+                paren_token: token::Paren::default(),
+                elems: [Pat::Ident(PatIdent {
+                    attrs: Vec::new(),
+                    by_ref: None,
+                    mutability: None,
+                    ident: Ident::new(ident, Span::call_site()),
+                    subpat: None,
+                })]
+                .into_iter()
+                .collect(),
+            }),
         }
     }
 }
