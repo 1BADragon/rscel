@@ -1,5 +1,8 @@
 use proc_macro2::Span;
-use syn::{punctuated::Punctuated, token, Arm, Ident, ItemFn, Pat, PatPath, PatTuple, PathSegment};
+use syn::{
+    punctuated::Punctuated, token, Arm, Attribute, Ident, ItemFn, Pat, PatPath, PatTuple,
+    PathSegment,
+};
 
 use super::{dispatch_arg::DispatchArg, dispatch_arg_type::DispatchArgType};
 
@@ -46,6 +49,17 @@ impl DispatchFunc {
     }
 
     pub fn as_arm(&self, max_args: usize) -> Arm {
+        let attrs: Vec<Attribute> = self
+            .func
+            .attrs
+            .iter()
+            .filter(|attr| {
+                let path = attr.path();
+                path.is_ident("cfg") || path.is_ident("cfg_attr")
+            })
+            .cloned()
+            .collect();
+
         let mut elems = Vec::new();
         let mut args: Vec<syn::Expr> = Vec::new();
         let mut arg_index = 0usize;
@@ -114,7 +128,7 @@ impl DispatchFunc {
         }
 
         Arm {
-            attrs: Vec::new(),
+            attrs,
             pat: Pat::Tuple(PatTuple {
                 attrs: Vec::new(),
                 paren_token: token::Paren::default(),

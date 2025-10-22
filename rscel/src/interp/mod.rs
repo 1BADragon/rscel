@@ -8,7 +8,10 @@ pub use types::*;
 mod test {
     use crate::{types::CelByteCode, CelValue};
 
-    use super::{types::{ByteCode, JmpWhen}, Interpreter};
+    use super::{
+        types::{ByteCode, JmpWhen},
+        Interpreter,
+    };
     use test_case::test_case;
 
     #[test_case(ByteCode::Add, 7.into())]
