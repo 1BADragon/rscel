@@ -1,4 +1,10 @@
-import { celDetails, celEval } from "rscel_wasm";
+import {
+  celDetails,
+  celEval,
+  CelContext,
+  BindContext,
+  CelProgram,
+} from "rscel_wasm";
 import { describe, it, expect } from "vitest";
 
 describe("Rscel Basic Tests", () => {
@@ -106,5 +112,45 @@ describe("Rscel Basic Tests", () => {
     const dets = celDetails("3 +");
 
     expect(dets.isSuccess()).toBe(false);
+  });
+
+  it("context supports multiple programs", () => {
+    const ctx = new CelContext();
+    ctx.addProgramStr("one", "foo + 1");
+    ctx.addProgramStr("two", "double(foo)");
+
+    const params = new BindContext();
+    params.bindParam("foo", 3n);
+
+    const resOne = ctx.exec("one", params);
+    expect(resOne.result()).toEqual(4n);
+
+    const bindings = new BindContext();
+    bindings.bindParam("foo", 4n);
+    bindings.bindFunc("double", (value) => {
+      const v = typeof value === "bigint" ? value : BigInt(value);
+      return v * 2n;
+    });
+
+    const resTwo = ctx.exec("two", bindings);
+    expect(resTwo.result()).toEqual(8n);
+  });
+
+  it("can execute program instances", () => {
+    const program = new CelProgram();
+    program.addSource("triple(x)");
+
+    const ctx = new CelContext();
+    ctx.addProgram("triple", program);
+
+    const bindings = new BindContext();
+    bindings.bindFunc("triple", (value) => {
+      const v = typeof value === "bigint" ? value : BigInt(value);
+      return v * 3n;
+    });
+    bindings.bindParam("x", 2n);
+
+    const result = ctx.exec("triple", bindings);
+    expect(result.result()).toEqual(6n);
   });
 });
