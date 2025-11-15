@@ -8,7 +8,10 @@ pub use types::*;
 mod test {
     use crate::{types::CelByteCode, CelValue};
 
-    use super::{types::ByteCode, Interpreter};
+    use super::{
+        types::{ByteCode, JmpWhen},
+        Interpreter,
+    };
     use test_case::test_case;
 
     #[test_case(ByteCode::Add, 7.into())]
@@ -29,5 +32,27 @@ mod test {
         let interp = Interpreter::empty();
 
         assert!(interp.run_raw(&prog, true).unwrap() == expected);
+    }
+
+    #[test]
+    fn test_backward_jump_loop_executes() {
+        let prog = CelByteCode::from_vec(vec![
+            ByteCode::Push(0.into()),
+            ByteCode::Dup,
+            ByteCode::Push(2.into()),
+            ByteCode::Lt,
+            ByteCode::JmpCond {
+                when: JmpWhen::False,
+                dist: 3,
+            },
+            ByteCode::Push(1.into()),
+            ByteCode::Add,
+            ByteCode::Jmp(-7),
+        ]);
+
+        let interp = Interpreter::empty();
+        let result = interp.run_raw(&prog, true).unwrap();
+
+        assert_eq!(result, 2.into());
     }
 }

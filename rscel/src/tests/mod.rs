@@ -1,6 +1,7 @@
 mod general_tests;
 mod neg_index_tests;
 mod type_prop_tests;
+mod uom_tests;
 
 #[cfg(test_protos)]
 #[cfg(feature = "protobuf")]

@@ -6,6 +6,7 @@ mod size;
 mod sort;
 mod string;
 mod time_funcs;
+mod uom;
 
 const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("contains", &string::contains::contains),
@@ -49,6 +50,7 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("sqrt", &math::sqrt::sqrt),
     ("pow", &math::pow::pow),
     ("log", &math::log::log),
+    ("lg", &math::lg::lg),
     ("ceil", &math::ceil::ceil),
     ("floor", &math::floor::floor),
     ("round", &math::round::round),
@@ -76,7 +78,9 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("getMinutes", &time_funcs::get_minutes::get_minutes),
     ("getMonth", &time_funcs::get_month::get_month),
     ("getSeconds", &time_funcs::get_seconds::get_seconds),
+    ("now", &now_impl),
     ("zip", &zip_impl),
+    ("uomConvert", &uom::uom_convert),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
@@ -162,4 +166,12 @@ fn zip_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     }
 
     ret_val.into()
+}
+
+fn now_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
+    if !args.is_empty() {
+        return CelValue::from_err(CelError::argument("now() expects no arguments"));
+    }
+
+    CelValue::from_timestamp(chrono::Utc::now())
 }
