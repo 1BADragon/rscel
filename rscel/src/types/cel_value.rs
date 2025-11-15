@@ -670,11 +670,11 @@ impl CelValueDyn for CelValue {
         let self_type = self.as_type();
 
         match self {
-            CelValue::Map(ref map) => match map.get(key) {
+            CelValue::Map(map) => match map.get(key) {
                 Some(val) => val.clone(),
                 None => CelValue::from_err(CelError::attribute("obj", key)),
             },
-            CelValue::Dyn(ref d) => d.access(key),
+            CelValue::Dyn(d) => d.access(key),
             #[cfg(feature = "protobuf")]
             CelValue::Message(msg) => {
                 let desc = msg.descriptor_dyn();
