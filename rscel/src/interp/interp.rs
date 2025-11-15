@@ -274,18 +274,18 @@ impl<'a> Interpreter<'a> {
 
                     stack.push_val(lhs.in_(rhs));
                 }
-                ByteCode::Jmp(dist) => pc = pc + *dist as usize,
+                ByteCode::Jmp(dist) => pc = Self::checked_jump_target(pc, *dist, prog.len())?,
                 ByteCode::JmpCond { when, dist } => {
                     let v1 = stack.pop_val()?;
                     match v1 {
                         CelValue::Bool(b) => {
                             if b == when.as_bool() {
-                                pc += *dist as usize
+                                pc = Self::checked_jump_target(pc, *dist, prog.len())?
                             }
                         }
                         CelValue::Err(_) => {
                             if *when == JmpWhen::False {
-                                pc += *dist as usize
+                                pc = Self::checked_jump_target(pc, *dist, prog.len())?
                             }
                         }
                         v => {
@@ -560,6 +560,18 @@ impl<'a> Interpreter<'a> {
             Ok(RsCallable::Macro(macro_))
         } else {
             Err(CelError::value(&format!("{} is not callable", name)))
+        }
+    }
+
+    fn checked_jump_target(pc: usize, dist: i32, len: usize) -> CelResult<usize> {
+        let target = (pc as isize)
+            .checked_add(dist as isize)
+            .ok_or_else(|| CelError::runtime("Jump target out of range"))?;
+
+        if target < 0 || target > len as isize {
+            Err(CelError::runtime("Jump target out of range"))
+        } else {
+            Ok(target as usize)
         }
     }
 }
