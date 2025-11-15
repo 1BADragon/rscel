@@ -2,7 +2,7 @@
 
 RsCel is a CEL evaluator written in Rust. CEL is a google project that
 describes a turing-incomplete language that can be used to evaluate
-a user provdided expression. The language specification can be found
+a user provided expression. The language specification can be found
 [here](https://github.com/google/cel-spec/blob/master/doc/langdef.md).
 
 The design goals of this project were are as follows:

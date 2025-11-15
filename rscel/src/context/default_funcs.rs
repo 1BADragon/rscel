@@ -50,6 +50,7 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("sqrt", &math::sqrt::sqrt),
     ("pow", &math::pow::pow),
     ("log", &math::log::log),
+    ("lg", &math::lg::lg),
     ("ceil", &math::ceil::ceil),
     ("floor", &math::floor::floor),
     ("round", &math::round::round),

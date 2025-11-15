@@ -105,6 +105,7 @@ All string helpers expect `this` to be a string; non-string inputs produce `valu
 - `sqrt(number)` – Square root returning `double`.
 - `pow(base, exponent)` – Exponentiation for numeric combinations (integer exponents for integral bases).
 - `log(number)` – Base-10 logarithm (`ilog10` for integers/unsigned integers).
+- `lg(number)` - Base-2 logarithm
 - `ceil(number)`, `floor(number)`, `round(number)` – Standard rounding family; integral inputs are returned unchanged.
 
 ### Time & date helpers

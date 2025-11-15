@@ -1,6 +1,7 @@
 pub mod abs;
 pub mod ceil;
 pub mod floor;
+pub mod lg;
 pub mod log;
 pub mod pow;
 pub mod round;
