@@ -122,6 +122,15 @@ All time functions operate on `timestamp()` or `duration()` results. Where noted
 - `getMinutes(timestamp | duration[, timezone])` – Minute of hour or total minutes of a duration.
 - `getSeconds(timestamp | duration[, timezone])` – Second of minute or total seconds of a duration.
 - `getMilliseconds(timestamp | duration[, timezone])` – Millisecond component or total milliseconds of a duration.
+- `setFullYear(timestamp, year[, timezone])` – Returns a new UTC timestamp with the year set.
+- `setMonth(timestamp, month[, timezone])` – Returns a new UTC timestamp with the zero-based month set.
+- `setDate(timestamp, day[, timezone])` – Returns a new UTC timestamp with the day-of-month set.
+- `setHours(timestamp, hour[, timezone])` – Returns a new UTC timestamp with the hour set.
+- `setMinutes(timestamp, minute[, timezone])` – Returns a new UTC timestamp with the minute set.
+- `setSeconds(timestamp, second[, timezone])` – Returns a new UTC timestamp with the second set.
+- `setMilliseconds(timestamp, ms[, timezone])` – Returns a new UTC timestamp with the millisecond component set.
+- `toRfc3339(timestamp[, timezone])` – RFC3339 string for the timestamp.
+- `toTimestampString(timestamp[, timezone])` – Alias for `toRfc3339`.
 - `now()` – Current UTC timestamp (no arguments).
 
 ### Unit conversion
@@ -158,4 +167,3 @@ Combine macros and helpers freely. Errors or type mismatches surface as `CelErro
 ## Extending the environment
 
 You can bind additional values, functions, and macros via `BindContext::bind_param`, `bind_func`, and `bind_macro`. All defaults documented above remain available unless you intentionally replace them.
-

@@ -500,6 +500,86 @@ fn test_timestamp_functions() {
 }
 
 #[test]
+#[allow(deprecated)]
+fn test_timestamp_set_functions() {
+    let mut ctx = CelContext::new();
+    let mut exec = BindContext::new();
+
+    let dt = Utc
+        .ymd(2024, 01, 10)
+        .and_hms_milli_opt(8, 57, 45, 123)
+        .unwrap();
+    exec.bind_param("time", CelValue::from_timestamp(dt));
+
+    let progs = [
+        (
+            "time.setFullYear(2025).toRfc3339()",
+            "2025-01-10T08:57:45.123+00:00",
+        ),
+        (
+            "time.setFullYear(2025, 'US/Pacific').toRfc3339()",
+            "2025-01-10T08:57:45.123+00:00",
+        ),
+        (
+            "time.setMonth(5).toRfc3339()",
+            "2024-06-10T08:57:45.123+00:00",
+        ),
+        (
+            "time.setMonth(5, 'US/Pacific').toRfc3339()",
+            "2024-06-10T07:57:45.123+00:00",
+        ),
+        (
+            "time.setDate(11).toRfc3339()",
+            "2024-01-11T08:57:45.123+00:00",
+        ),
+        (
+            "time.setDate(11, 'US/Pacific').toRfc3339()",
+            "2024-01-11T08:57:45.123+00:00",
+        ),
+        (
+            "time.setHours(2).toRfc3339()",
+            "2024-01-10T02:57:45.123+00:00",
+        ),
+        (
+            "time.setHours(5, 'US/Pacific').toRfc3339()",
+            "2024-01-10T13:57:45.123+00:00",
+        ),
+        (
+            "time.setMinutes(30).toRfc3339()",
+            "2024-01-10T08:30:45.123+00:00",
+        ),
+        (
+            "time.setMinutes(30, 'US/Pacific').toRfc3339()",
+            "2024-01-10T08:30:45.123+00:00",
+        ),
+        (
+            "time.setSeconds(9).toRfc3339()",
+            "2024-01-10T08:57:09.123+00:00",
+        ),
+        (
+            "time.setSeconds(9, 'US/Pacific').toRfc3339()",
+            "2024-01-10T08:57:09.123+00:00",
+        ),
+        (
+            "time.setMilliseconds(987).toRfc3339()",
+            "2024-01-10T08:57:45.987+00:00",
+        ),
+        (
+            "time.setMilliseconds(987, 'US/Pacific').toRfc3339()",
+            "2024-01-10T08:57:45.987+00:00",
+        ),
+    ];
+
+    for (prog, expected) in progs.iter() {
+        ctx.add_program_str("entry", prog).unwrap();
+
+        let res = ctx.exec("entry", &exec).unwrap();
+        println!("{}:{} == {}", prog, res, expected);
+        assert!(res == (*expected).into());
+    }
+}
+
+#[test]
 fn test_coalesce() {
     let mut ctx = CelContext::new();
     let mut exec = BindContext::new();
@@ -515,6 +595,41 @@ fn test_coalesce() {
     assert_eq!(ctx.exec("prog1", &exec).unwrap(), 4.into());
     assert_eq!(ctx.exec("prog2", &exec).unwrap(), 3.into());
     assert_eq!(ctx.exec("prog3", &exec).unwrap(), 3.into());
+}
+
+#[test]
+fn test_usage_running_example() {
+    let mut ctx = CelContext::new();
+    let mut exec = BindContext::new();
+
+    ctx.add_program_str("main", "greeting + ' ' + subject")
+        .unwrap();
+    exec.bind_param("greeting", "hello".into());
+    exec.bind_param("subject", "world".into());
+
+    let value = ctx.exec("main", &exec).unwrap();
+    assert_eq!(value, "hello world".into());
+}
+
+#[test]
+fn test_usage_putting_it_together_example() {
+    let mut ctx = CelContext::new();
+    let mut exec = BindContext::new();
+
+    let accounts = serde_json::from_str::<Value>(
+        r#"[{"id":"a1","balance_cents":150},{"id":"b2","balance_cents":0},{"id":"c3","balance_cents":250}]"#,
+    )
+    .unwrap();
+    exec.bind_param("accounts", accounts.into());
+
+    ctx.add_program_str(
+        "main",
+        "accounts.map(a, a.balance_cents > 0, {'id': a.id, 'balance': a.balance_cents / 100}).reduce(total, acct, total + acct.balance, 0)",
+    )
+    .unwrap();
+
+    let value = ctx.exec("main", &exec).unwrap();
+    assert_eq!(value, 3.into());
 }
 
 #[test]
