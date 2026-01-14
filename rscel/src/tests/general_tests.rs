@@ -228,7 +228,8 @@ fn test_contains() {
 #[test_case("'123M5'.replace('M', '4')", "12345"; "string replace")]
 #[test_case("'12131415'.rsplit('1')", vec!["5", "4", "3", "2", ""]; "string rsplit")]
 #[test_case("'12131415'.split('1')", vec!["", "2", "3", "4", "5"]; "string split")]
-#[test_case("'123456'.splitAt(3)", vec!["123", "456"]; "string splitAt")]
+#[test_case("'123456'.splitAt(3)", vec!["123", "456"]; "string splitAt signed index")]
+#[test_case("'123456'.splitAt(3u)", vec!["123", "456"]; "string splitAt unsigned index")]
 #[test_case("'12345LF'.trimEndMatches('LF')", "12345"; "string trimEndMatches")]
 #[test_case("'LF12345'.trimStartMatches('LF')", "12345"; "string trimStartMatches")]
 #[test_case("zip([1, 2, 3], ['a', 'b', 'c'])",
@@ -240,6 +241,9 @@ fn test_contains() {
 #[test_case(r#"'123abc555'.matchCaptures('([0-9]+)([a-z]+)555')"#, vec!["123abc555", "123", "abc"]; "string match captures")]
 #[test_case("'abab'.matchReplaceOnce('(?<first>a)(?<last>b)', '${last}${first}')", "baab"; "string matchReplaceOnce")]
 #[test_case("'abab'.matchReplace('(?<first>a)(?<last>b)', '${last}${first}')", "baba"; "string matchReplace")]
+#[test_case("timestamp('2023-01-01T04:00:00-01:00').toRfc3339()", "2023-01-01T05:00:00+00:00"; "timestamp to_rfc3339")]
+#[test_case("timestamp('2023-01-01T04:00:00-01:00').toRfc3339('EST')", "2023-01-01T00:00:00-05:00"; "timestamp to_rfc3339 with timezone EST")]
+#[test_case("timestamp('2023-01-01T04:00:00-01:00').toRfc3339('America/New_York')", "2023-01-01T00:00:00-05:00"; "timestamp to_rfc3339 with timezone America/New_York")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

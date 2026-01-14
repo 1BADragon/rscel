@@ -78,6 +78,8 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("getMinutes", &time_funcs::get_minutes::get_minutes),
     ("getMonth", &time_funcs::get_month::get_month),
     ("getSeconds", &time_funcs::get_seconds::get_seconds),
+    ("toRfc3339", &time_funcs::to_rfc3339::to_rfc3339),
+    ("toTimestampString", &time_funcs::to_rfc3339::to_rfc3339),
     ("now", &now_impl),
     ("zip", &zip_impl),
     ("uomConvert", &uom::uom_convert),

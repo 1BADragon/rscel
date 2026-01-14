@@ -31,4 +31,10 @@ mod split_at {
 
         vec![left.into(), right.into()].into()
     }
+
+    fn split_at(this: String, at: u64) -> Vec<CelValue> {
+        let (left, right) = this.split_at(at as usize);
+
+        vec![left.into(), right.into()].into()
+    }
 }
