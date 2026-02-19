@@ -1,4 +1,4 @@
-mod helpers;
+pub mod helpers;
 
 pub mod get_date;
 pub mod get_day_of_month;

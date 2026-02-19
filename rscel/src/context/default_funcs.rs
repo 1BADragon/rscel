@@ -1,6 +1,7 @@
 use super::bind_context::RsCelFunction;
 use crate::{BindContext, CelError, CelValue};
 
+mod format;
 mod math;
 mod size;
 mod sort;
@@ -93,6 +94,7 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("now", &now_impl),
     ("zip", &zip_impl),
     ("uomConvert", &uom::uom_convert),
+    ("format", &format::format),
 ];
 
 pub fn load_default_funcs(exec_ctx: &mut BindContext) {
