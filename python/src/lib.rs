@@ -28,11 +28,11 @@ use rscel_to_sql::IntoSqlBuilder;
 
 /* Eval entry point */
 #[pyfunction]
-fn eval(py: Python<'_>, prog_str: String, bindings: &Bound<PyDict>) -> PyResult<PyObject> {
+fn eval(py: Python<'_>, prog_str: String, bindings: &Bound<PyDict>) -> PyResult<Py<PyAny>> {
     let callables = {
         let mut callables = Vec::new();
-        for keyobj in bindings.keys().iter() {
-            let key = keyobj.downcast::<PyString>()?;
+        for keyobj in bindings.keys() {
+            let key = keyobj.cast::<PyString>()?;
             let val = bindings.get_item(key).unwrap().unwrap().clone();
 
             if val.is_callable() {
@@ -48,8 +48,8 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &Bound<PyDict>) -> PyResult<
         return Err(PyCelError::new(e).into());
     }
 
-    for keyobj in bindings.keys().iter() {
-        let key = keyobj.downcast::<PyString>()?;
+    for keyobj in bindings.keys() {
+        let key = keyobj.cast::<PyString>()?;
 
         let val = bindings.get_item(key).unwrap().unwrap();
 

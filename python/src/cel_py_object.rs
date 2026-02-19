@@ -1,19 +1,19 @@
-use pyo3::{types::PyAnyMethods, PyObject, Python};
+use pyo3::{types::PyAnyMethods, Py, PyAny, Python};
 use rscel::{CelError, CelValue, CelValueDyn};
 use std::fmt;
 
 use crate::py_cel_value::PyCelValue;
 
 pub struct CelPyObject {
-    inner: PyObject,
+    inner: Py<PyAny>,
 }
 
 impl CelPyObject {
-    pub fn new(inner: PyObject) -> Self {
+    pub fn new(inner: Py<PyAny>) -> Self {
         Self { inner }
     }
 
-    pub fn as_inner(&self) -> &PyObject {
+    pub fn as_inner(&self) -> &Py<PyAny> {
         &self.inner
     }
 }
@@ -32,7 +32,7 @@ impl fmt::Debug for CelPyObject {
 
 impl CelValueDyn for CelPyObject {
     fn as_type(&self) -> CelValue {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let inner = self.inner.bind(py);
             let name = inner.repr().unwrap();
 
@@ -41,7 +41,7 @@ impl CelValueDyn for CelPyObject {
     }
 
     fn access(&self, key: &str) -> CelValue {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let obj = self.inner.bind(py);
 
             match obj.getattr(key) {
@@ -60,7 +60,7 @@ impl CelValueDyn for CelPyObject {
 
         if let CelValue::Dyn(rhs) = rhs {
             if let Some(rhs_obj) = rhs.any_ref().downcast_ref::<CelPyObject>() {
-                return Python::with_gil(|py| {
+                return Python::attach(|py| {
                     let lhs_obj = self.inner.bind(py);
                     let rhs_obj = rhs_obj.inner.bind(py);
 
@@ -79,7 +79,7 @@ impl CelValueDyn for CelPyObject {
     }
 
     fn is_truthy(&self) -> bool {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let inner = self.inner.bind(py);
 
             match inner.is_truthy() {

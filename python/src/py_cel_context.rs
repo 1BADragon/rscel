@@ -2,7 +2,7 @@ use crate::{py_cel_program::PyCelProgram, py_cel_value::PyCelValue};
 
 use super::py_bind_context::PyBindContext;
 use pyo3::{
-    exceptions::PyValueError, pyclass, pymethods, IntoPyObjectExt, PyObject, PyRefMut, PyResult,
+    exceptions::PyValueError, pyclass, pymethods, IntoPyObjectExt, Py, PyAny, PyRefMut, PyResult,
 };
 use rscel::{BindContext, CelContext};
 
@@ -43,7 +43,7 @@ impl PyCelContext {
         mut slf: PyRefMut<'_, Self>,
         name: &str,
         bindings: &PyBindContext,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let mut bindctx = BindContext::new();
 
         for (key, val) in bindings.bindings().iter() {
