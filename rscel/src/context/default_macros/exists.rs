@@ -36,6 +36,7 @@ pub fn exists_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCode])
 
             false.into()
         }
+        CelValue::Err(e) => CelValue::Err(e),
         _ => CelValue::from_err(CelError::value("exists() only available on list")),
     }
 }

@@ -244,6 +244,8 @@ fn test_contains() {
 #[test_case("timestamp('2023-01-01T04:00:00-01:00').toRfc3339()", "2023-01-01T05:00:00+00:00"; "timestamp to_rfc3339")]
 #[test_case("timestamp('2023-01-01T04:00:00-01:00').toRfc3339('EST')", "2023-01-01T00:00:00-05:00"; "timestamp to_rfc3339 with timezone EST")]
 #[test_case("timestamp('2023-01-01T04:00:00-01:00').toRfc3339('America/New_York')", "2023-01-01T00:00:00-05:00"; "timestamp to_rfc3339 with timezone America/New_York")]
+#[test_case(r#"timestamp("2026-02-19T13:00:04-00:00").format("%B %d, %Y %H:%M")"#, "February 19, 2026 13:00"; "format timestamp")]
+#[test_case(r#"timestamp("2026-02-19T13:00:04-00:00").format("America/Los_Angeles", "%B %d, %Y %H:%M")"#, "February 19, 2026 05:00"; "format timestamp w/ timezone")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

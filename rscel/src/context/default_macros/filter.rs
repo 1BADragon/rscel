@@ -19,6 +19,7 @@ pub fn filter_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCode])
     match this {
         CelValue::List(list) => filter_list(ctx, list, &ident_name, bytecode[1]),
         CelValue::Map(map) => filter_map(ctx, map, &ident_name, bytecode[1]),
+        CelValue::Err(e) => CelValue::Err(e),
         _ => CelValue::from_err(CelError::value("filter() only available on list")),
     }
 }

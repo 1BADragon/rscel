@@ -429,6 +429,9 @@ impl<'a> Interpreter<'a> {
                             }
 
                             match value {
+                                CelValue::Err(e) => {
+                                    return Err(e);
+                                }
                                 CelValue::Ident(func_name) => {
                                     if let Some(func) = self.get_func_by_name(&func_name) {
                                         let arg_values = self.resolve_args(args)?;

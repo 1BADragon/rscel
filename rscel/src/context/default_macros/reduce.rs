@@ -41,6 +41,7 @@ pub fn reduce_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCode])
 
             cur_value
         }
+        CelValue::Err(e) => CelValue::Err(e),
         _ => CelValue::from_err(CelError::value("reduce() only availble on list")),
     }
 }

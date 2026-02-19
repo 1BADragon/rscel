@@ -40,6 +40,7 @@ pub fn exists_one_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCo
 
             (count == 1).into()
         }
+        CelValue::Err(e) => CelValue::Err(e),
         _ => CelValue::from_err(CelError::value("exists_one() only available on list")),
     }
 }

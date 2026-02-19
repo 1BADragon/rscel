@@ -36,6 +36,7 @@ pub fn all_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCode]) ->
 
             true.into()
         }
+        CelValue::Err(e) => CelValue::Err(e),
         _ => CelValue::from_err(CelError::value("all() only available on list")),
     }
 }

@@ -19,6 +19,7 @@ pub fn map_impl(ctx: &Interpreter, this: CelValue, bytecode: &[&CelByteCode]) ->
     match this {
         CelValue::List(list) => map_list(ctx, list, &ident_name, bytecode),
         CelValue::Map(map) => map_map(ctx, map, &ident_name, bytecode),
+        CelValue::Err(e) => CelValue::Err(e),
         _ => CelValue::from_err(CelError::value("map() only available on list")),
     }
 }
