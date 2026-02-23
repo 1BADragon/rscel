@@ -66,11 +66,21 @@ impl DispatchFunc {
 
         if self.args.len() > arg_index && self.args[arg_index].is_this() {
             elems.push(self.args[0].as_pat("this"));
-            args.push(syn::Expr::Path(syn::ExprPath {
-                attrs: Vec::new(),
-                qself: None,
-                path: Ident::new("this", Span::call_site()).into(),
-            }));
+
+            if matches!(self.args[0].arg_type(), DispatchArgType::Null) {
+                args.push(syn::Expr::Tuple(syn::ExprTuple {
+                    attrs: Vec::new(),
+                    paren_token: token::Paren::default(),
+                    elems: Punctuated::new(),
+                }))
+            } else {
+                args.push(syn::Expr::Path(syn::ExprPath {
+                    attrs: Vec::new(),
+                    qself: None,
+                    path: Ident::new("this", Span::call_site()).into(),
+                }));
+            }
+
             arg_index += 1;
         } else {
             elems.push(Pat::Path(PatPath {
@@ -118,11 +128,22 @@ impl DispatchFunc {
             } else {
                 let a = format!("a{}", i);
                 elems.push(self.args[arg_index].as_pat(&a));
-                args.push(syn::Expr::Path(syn::ExprPath {
-                    attrs: Vec::new(),
-                    qself: None,
-                    path: Ident::new(&a, Span::call_site()).into(),
-                }));
+
+                // For Null, pass () as the argument since there's no bound value
+                if matches!(self.args[arg_index].arg_type(), DispatchArgType::Null) {
+                    args.push(syn::Expr::Tuple(syn::ExprTuple {
+                        attrs: Vec::new(),
+                        paren_token: token::Paren::default(),
+                        elems: Punctuated::new(),
+                    }));
+                } else {
+                    args.push(syn::Expr::Path(syn::ExprPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path: Ident::new(&a, Span::call_site()).into(),
+                    }));
+                }
+
                 arg_index += 1;
             }
         }

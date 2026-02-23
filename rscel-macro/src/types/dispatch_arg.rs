@@ -29,6 +29,10 @@ impl DispatchArg {
         }
     }
 
+    pub fn arg_type(&self) -> &DispatchArgType {
+        &self.arg_type
+    }
+
     pub fn mangle_sym(&self) -> String {
         let mut s = if self.this {
             String::from_str("z").unwrap()
@@ -53,6 +57,25 @@ impl DispatchArg {
                 mutability: None,
                 ident: Ident::new(ident, Span::call_site()),
                 subpat: None,
+            }),
+            DispatchArgType::Null => Pat::Path(syn::PatPath {
+                attrs: Vec::new(),
+                qself: None,
+                path: syn::Path {
+                    leading_colon: None,
+                    segments: [
+                        PathSegment {
+                            ident: Ident::new("CelValue", Span::call_site()),
+                            arguments: syn::PathArguments::None,
+                        },
+                        PathSegment {
+                            ident: Ident::new("Null", Span::call_site()),
+                            arguments: syn::PathArguments::None,
+                        },
+                    ]
+                    .into_iter()
+                    .collect(),
+                },
             }),
             _ => Pat::TupleStruct(PatTupleStruct {
                 attrs: Vec::new(),
