@@ -262,6 +262,21 @@ fn test_contains() {
 #[test_case(r#"'123abc555'.matchCaptures('([0-9]+)([a-z]+)555')"#, vec!["123abc555", "123", "abc"]; "string match captures")]
 #[test_case("'abab'.matchReplaceOnce('(?<first>a)(?<last>b)', '${last}${first}')", "baab"; "string matchReplaceOnce")]
 #[test_case("'abab'.matchReplace('(?<first>a)(?<last>b)', '${last}${first}')", "baba"; "string matchReplace")]
+#[test_case("'hello world'.indexOf('world')", 6i64; "string indexOf found")]
+#[test_case("'hello world'.indexOf('xyz')", -1i64; "string indexOf not found")]
+#[test_case("'abcabc'.lastIndexOf('b')", 4i64; "string lastIndexOf found")]
+#[test_case("'abcabc'.lastIndexOf('xyz')", -1i64; "string lastIndexOf not found")]
+#[test_case("'ha'.repeat(3)", "hahaha"; "string repeat int")]
+#[test_case("'ab'.repeat(0)", ""; "string repeat zero")]
+#[test_case("'Hello World'.replaceI('hello', 'Hi')", "Hi World"; "string replaceI case insensitive")]
+#[test_case("'HELLO hello'.replaceI('hello', 'bye')", "bye bye"; "string replaceI replaces all")]
+#[test_case("'--hello--'.trimMatches('-')", "hello"; "string trimMatches")]
+#[test_case("'hello'.padStart(8)", "   hello"; "string padStart space")]
+#[test_case("'hello'.padStart(8, '0')", "000hello"; "string padStart custom char")]
+#[test_case("'hello'.padStart(3)", "hello"; "string padStart noop when already long enough")]
+#[test_case("'hello'.padEnd(8)", "hello   "; "string padEnd space")]
+#[test_case("'hello'.padEnd(8, '!')", "hello!!!"; "string padEnd custom char")]
+#[test_case("'hello'.padEnd(3)", "hello"; "string padEnd noop when already long enough")]
 #[test_case("timestamp('2023-01-01T04:00:00-01:00').toRfc3339()", "2023-01-01T05:00:00+00:00"; "timestamp to_rfc3339")]
 #[test_case("timestamp('2023-01-01T04:00:00-01:00').toRfc3339('EST')", "2023-01-01T00:00:00-05:00"; "timestamp to_rfc3339 with timezone EST")]
 #[test_case("timestamp('2023-01-01T04:00:00-01:00').toRfc3339('America/New_York')", "2023-01-01T00:00:00-05:00"; "timestamp to_rfc3339 with timezone America/New_York")]
@@ -806,4 +821,23 @@ fn test_map_literal_member_access_const_folds() {
         "expected single Push(Int(1)), got:\n{}",
         prog.dumps_bc()
     );
+}
+
+#[test]
+fn test_match_captures_all() {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", r#"'one1two2three3'.matchCapturesAll('([a-z]+)([0-9])')"#)
+        .unwrap();
+
+    let result = ctx.exec("main", &exec_ctx).unwrap();
+
+    let expected = CelValue::from_val_slice(&[
+        CelValue::from_val_slice(&["one1".into(), "one".into(), "1".into()]),
+        CelValue::from_val_slice(&["two2".into(), "two".into(), "2".into()]),
+        CelValue::from_val_slice(&["three3".into(), "three".into(), "3".into()]),
+    ]);
+
+    assert_eq!(result, expected);
 }
