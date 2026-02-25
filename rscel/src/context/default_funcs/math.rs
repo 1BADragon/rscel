@@ -1,8 +1,12 @@
 pub mod abs;
+pub mod cbrt;
 pub mod ceil;
+pub mod exp;
 pub mod floor;
 pub mod lg;
+pub mod ln;
 pub mod log;
 pub mod pow;
 pub mod round;
 pub mod sqrt;
+pub mod trunc;
