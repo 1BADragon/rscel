@@ -39,6 +39,8 @@ fn test_contains() {
 #[test_case("[1, 2, 3].map(x, x+2)", vec![3, 4, 5]; "test map")]
 #[test_case("[1, 2, 3].map(x, x % 2 == 1, x + 1)", vec![2, 4]; "test map 2")]
 #[test_case("[1,2,3][1]", 2; "array index")]
+#[test_case("[[1, 2], [3, 4]][1][0]", 3; "nested list chained index")]
+#[test_case("{'a': {'b': 42}}['a']['b']", 42; "nested map chained index")]
 #[test_case("{\"foo\": 3}.foo", 3; "obj dot access")]
 #[test_case("size([1,2,3,4])", 4u64; "test list size")]
 #[test_case("size('foo')", 3u64; "size string")]
@@ -489,6 +491,30 @@ fn test_object_access_in_array() {
     exec.bind_param("my_list", obj);
 
     assert_eq!(ctx.exec("entry", &exec).unwrap(), "value".into());
+}
+
+#[test]
+fn test_chained_index_on_binding() {
+    let mut ctx = CelContext::new();
+    let mut exec = BindContext::new();
+
+    // data = {"users": [{"name": "alice", "scores": [10, 20, 30]},
+    //                   {"name": "bob",   "scores": [40, 50, 60]}]}
+    let data: CelValue = serde_json::from_str::<Value>(
+        r#"{"users": [{"name": "alice", "scores": [10, 20, 30]},
+                      {"name": "bob",   "scores": [40, 50, 60]}]}"#,
+    )
+    .unwrap()
+    .into();
+    exec.bind_param("data", data);
+
+    ctx.add_program_str("user_name", "data['users'][1]['name']")
+        .unwrap();
+    ctx.add_program_str("score", "data['users'][0]['scores'][2]")
+        .unwrap();
+
+    assert_eq!(ctx.exec("user_name", &exec).unwrap(), "bob".into());
+    assert_eq!(ctx.exec("score", &exec).unwrap(), 30.into());
 }
 
 #[test]

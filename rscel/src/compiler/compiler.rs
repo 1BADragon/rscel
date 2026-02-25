@@ -1136,7 +1136,7 @@ impl<'l> CelCompiler<'l> {
             if !matches!(
                 self.tokenizer.peek()?,
                 Some(&TokenWithLoc {
-                    token: Token::Dot,
+                    token: Token::Dot | Token::LParen | Token::LBracket,
                     ..
                 })
             ) {
