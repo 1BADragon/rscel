@@ -1,4 +1,4 @@
-pub use super::types::{ByteCode, CelStackValue, JmpWhen, RsCallable};
+pub use super::types::{ByteCode, JmpWhen};
 use crate::{types::CelByteCode, CelValueDyn};
 use std::{collections::HashMap, fmt};
 
@@ -8,7 +8,7 @@ use crate::{
 };
 
 struct InterpStack<'a, 'b> {
-    stack: Vec<CelStackValue<'b>>,
+    stack: Vec<CelValue>,
 
     ctx: &'a Interpreter<'b>,
 }
@@ -21,38 +21,37 @@ impl<'a, 'b> InterpStack<'a, 'b> {
         }
     }
 
-    fn push(&mut self, val: CelStackValue<'b>) {
+    fn push(&mut self, val: CelValue) {
         self.stack.push(val);
     }
 
-    fn push_val(&mut self, val: CelValue) {
-        self.stack.push(CelStackValue::Value(val));
+    fn pop_noresolve(&mut self) -> CelResult<CelValue> {
+        match self.stack.pop() {
+            Some(v) => Ok(v),
+            None => Err(CelError::runtime("No value on stack!")),
+        }
     }
 
-    fn pop(&mut self) -> CelResult<CelStackValue<'_>> {
+    fn pop(&mut self) -> CelResult<CelValue> {
         match self.stack.pop() {
             Some(stack_val) => {
-                if let CelStackValue::Value(val) = stack_val {
-                    if let CelValue::Ident(name) = val {
-                        if let Some(val) = self.ctx.get_type_by_name(&name) {
-                            return Ok(CelStackValue::Value(val.clone()));
-                        }
-
-                        if let Some(val) = self.ctx.get_param_by_name(&name) {
-                            return Ok(CelStackValue::Value(val.clone()));
-                        }
-
-                        if let Some(ctx) = self.ctx.cel {
-                            // Allow for loaded programs to run as values
-                            if let Some(prog) = ctx.get_program(&name) {
-                                return self.ctx.run_raw(prog.bytecode(), true).map(|x| x.into());
-                            }
-                        }
-
-                        Ok(CelValue::from_err(CelError::binding(&name)).into())
-                    } else {
-                        Ok(val.into())
+                if let CelValue::Ident(name) = stack_val {
+                    if let Some(val) = self.ctx.get_type_by_name(&name) {
+                        return Ok(val.clone());
                     }
+
+                    if let Some(val) = self.ctx.get_param_by_name(&name) {
+                        return Ok(val.clone());
+                    }
+
+                    if let Some(ctx) = self.ctx.cel {
+                        // Allow for loaded programs to run as values
+                        if let Some(prog) = ctx.get_program(&name) {
+                            return self.ctx.run_raw(prog.bytecode(), true).map(|x| x.into());
+                        }
+                    }
+
+                    Ok(CelValue::from_err(CelError::binding(&name)).into())
                 } else {
                     Ok(stack_val)
                 }
@@ -61,28 +60,17 @@ impl<'a, 'b> InterpStack<'a, 'b> {
         }
     }
 
-    fn pop_val(&mut self) -> CelResult<CelValue> {
-        self.pop()?.into_value()
-    }
-
-    fn pop_noresolve(&mut self) -> CelResult<CelStackValue<'b>> {
+    fn pop_tryresolve(&mut self) -> CelResult<CelValue> {
         match self.stack.pop() {
-            Some(val) => Ok(val),
-            None => Err(CelError::runtime("No value on stack!")),
-        }
-    }
-
-    fn pop_tryresolve(&mut self) -> CelResult<CelStackValue<'b>> {
-        match self.stack.pop() {
-            Some(val) => match val.try_into()? {
+            Some(val) => match val {
                 CelValue::Ident(name) => {
                     if let Some(val) = self.ctx.get_param_by_name(&name) {
-                        Ok(val.clone().into())
+                        Ok(val.clone())
                     } else {
-                        Ok(CelStackValue::Value(CelValue::from_ident(&name)))
+                        Ok(CelValue::from_ident(&name))
                     }
                 }
-                other => Ok(CelStackValue::Value(other.into())),
+                other => Ok(other),
             },
             None => Err(CelError::runtime("No value on stack!")),
         }
@@ -154,19 +142,19 @@ impl<'a> Interpreter<'a> {
             let oldpc = pc;
             pc += 1;
             match &prog[oldpc] {
-                ByteCode::Push(val) => stack.push_val(val.clone()),
+                ByteCode::Push(val) => stack.push(val.clone()),
                 ByteCode::Pop => {
-                    stack.pop_val()?;
+                    stack.pop()?;
                 }
                 ByteCode::Test => {
-                    let v = stack.pop_val()?;
+                    let v = stack.pop()?;
 
                     if v.is_err() {
-                        stack.push_val(v);
+                        stack.push(v);
                     } else if cfg!(feature = "type_prop") {
-                        stack.push_val(v.is_truthy().into());
+                        stack.push(v.is_truthy().into());
                     } else if let CelValue::Bool(b) = v {
-                        stack.push_val(b.into())
+                        stack.push(b.into())
                     } else {
                         return Err(CelError::invalid_op(&format!(
                             "TEST invalid on type {:?}",
@@ -175,108 +163,108 @@ impl<'a> Interpreter<'a> {
                     }
                 }
                 ByteCode::Dup => {
-                    let v = stack.pop_val()?;
+                    let v = stack.pop()?;
 
-                    stack.push_val(v.clone());
-                    stack.push_val(v);
+                    stack.push(v.clone());
+                    stack.push(v);
                 }
                 ByteCode::Or => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1.or(&v2))
+                    stack.push(v1.or(&v2))
                 }
                 ByteCode::And => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1.and(v2))
+                    stack.push(v1.and(v2))
                 }
                 ByteCode::Not => {
-                    let v1 = stack.pop_val()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(!v1);
+                    stack.push(!v1);
                 }
                 ByteCode::Neg => {
-                    let v1 = stack.pop_val()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(-v1);
+                    stack.push(-v1);
                 }
                 ByteCode::Add => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1 + v2);
+                    stack.push(v1 + v2);
                 }
                 ByteCode::Sub => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1 - v2);
+                    stack.push(v1 - v2);
                 }
                 ByteCode::Mul => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1 * v2);
+                    stack.push(v1 * v2);
                 }
                 ByteCode::Div => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1 / v2);
+                    stack.push(v1 / v2);
                 }
                 ByteCode::Mod => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1 % v2);
+                    stack.push(v1 % v2);
                 }
                 ByteCode::Lt => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1.lt(v2));
+                    stack.push(v1.lt(v2));
                 }
                 ByteCode::Le => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1.le(v2));
+                    stack.push(v1.le(v2));
                 }
                 ByteCode::Eq => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(CelValueDyn::eq(&v1, &v2));
+                    stack.push(CelValueDyn::eq(&v1, &v2));
                 }
                 ByteCode::Ne => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1.neq(v2));
+                    stack.push(v1.neq(v2));
                 }
                 ByteCode::Ge => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1.ge(v2));
+                    stack.push(v1.ge(v2));
                 }
                 ByteCode::Gt => {
-                    let v2 = stack.pop_val()?;
-                    let v1 = stack.pop_val()?;
+                    let v2 = stack.pop()?;
+                    let v1 = stack.pop()?;
 
-                    stack.push_val(v1.gt(v2));
+                    stack.push(v1.gt(v2));
                 }
                 ByteCode::In => {
-                    let rhs = stack.pop_val()?;
-                    let lhs = stack.pop_val()?;
+                    let rhs = stack.pop()?;
+                    let lhs = stack.pop()?;
 
-                    stack.push_val(lhs.in_(rhs));
+                    stack.push(lhs.in_(rhs));
                 }
                 ByteCode::Jmp(dist) => pc = Self::checked_jump_target(pc, *dist, prog.len())?,
                 ByteCode::JmpCond { when, dist } => {
-                    let v1 = stack.pop_val()?;
+                    let v1 = stack.pop()?;
                     match v1 {
                         CelValue::Bool(b) => {
                             if b == when.as_bool() {
@@ -300,62 +288,56 @@ impl<'a> Interpreter<'a> {
                     let mut v = Vec::new();
 
                     for _ in 0..*size {
-                        v.push(stack.pop_val()?)
+                        v.push(stack.pop()?)
                     }
 
                     v.reverse();
-                    stack.push_val(v.into());
+                    stack.push(v.into());
                 }
                 ByteCode::MkDict(size) => {
                     let mut map = HashMap::new();
 
                     for _ in 0..*size {
-                        let key = if let CelValue::String(key) = stack.pop_val()? {
+                        let key = if let CelValue::String(key) = stack.pop()? {
                             key
                         } else {
                             return Err(CelError::value("Only strings can be used as Object keys"));
                         };
 
-                        map.insert(key, stack.pop_val()?);
+                        map.insert(key, stack.pop()?);
                     }
 
-                    stack.push_val(map.into());
+                    stack.push(map.into());
                 }
                 ByteCode::Index => {
-                    let index = stack.pop_val()?;
-                    let obj = stack.pop_val()?;
+                    let index = stack.pop()?;
+                    let obj = stack.pop()?;
 
-                    stack.push_val(obj.index(index));
+                    stack.push(obj.index(index));
                 }
                 ByteCode::Access => {
                     let index = stack.pop_noresolve()?;
-                    if let CelValue::Ident(ident) = index.as_value()? {
-                        let obj = stack.pop()?.into_value()?;
+                    if let CelValue::Ident(ident) = index {
+                        let obj = stack.pop()?;
                         match obj {
                             CelValue::Map(ref map) => match map.get(ident.as_str()) {
-                                Some(val) => stack.push_val(val.clone()),
-                                None => match self.callable_by_name(ident.as_str()) {
-                                    Ok(callable) => stack.push(CelStackValue::BoundCall {
-                                        callable,
-                                        value: obj,
-                                    }),
-                                    Err(_) => {
-                                        stack.push(
-                                            CelValue::from_err(CelError::attribute(
-                                                "obj",
-                                                ident.as_str(),
-                                            ))
-                                            .into(),
-                                        );
-                                    }
-                                },
+                                Some(val) => stack.push(val.clone()),
+                                None => {
+                                    stack.push(
+                                        CelValue::from_err(CelError::attribute(
+                                            "obj",
+                                            ident.as_str(),
+                                        ))
+                                        .into(),
+                                    );
+                                }
                             },
                             #[cfg(feature = "protobuf")]
                             CelValue::Message(msg) => {
                                 let desc = msg.descriptor_dyn();
 
                                 if let Some(field) = desc.field_by_name(ident.as_str()) {
-                                    stack.push_val(
+                                    stack.push(
                                         field.get_singular_field_or_default(msg.as_ref()).into(),
                                     )
                                 } else {
@@ -363,116 +345,118 @@ impl<'a> Interpreter<'a> {
                                 }
                             }
                             CelValue::Dyn(d) => {
-                                stack.push_val(d.access(ident.as_str()));
+                                stack.push(d.access(ident.as_str()));
                             }
-                            _ => {
-                                if let Some(bindings) = self.bindings {
-                                    if bindings.get_func(ident.as_str()).is_some()
-                                        || bindings.get_macro(ident.as_str()).is_some()
-                                    {
-                                        stack.push(CelStackValue::BoundCall {
-                                            callable: self.callable_by_name(ident.as_str())?,
-                                            value: obj,
-                                        });
-                                    } else {
-                                        stack.push(
-                                            CelValue::from_err(CelError::attribute(
-                                                "obj",
-                                                ident.as_str(),
-                                            ))
-                                            .into(),
-                                        );
-                                    }
-                                } else {
-                                    return Err(CelError::Runtime(
-                                        "Invalid state: no bindings".to_string(),
-                                    ));
-                                }
-                            }
+                            CelValue::Err(e) => stack.push(CelValue::Err(e)),
+                            obj => stack.push(
+                                CelValue::from_err(CelError::value(&format!(
+                                    "Access operator invalid between {:?} and IDENT",
+                                    obj.as_type(),
+                                )))
+                                .into(),
+                            ),
                         }
                     } else {
-                        let obj_type = stack.pop()?.into_value()?.as_type();
+                        let obj_type = stack.pop()?.as_type();
                         stack.push(
                             CelValue::from_err(CelError::value(&format!(
-                                "Index operator invalid between {:?} and {:?}",
-                                index.into_value()?.as_type(),
-                                obj_type
+                                "Access operator invalid between {:?} and {:?}",
+                                obj_type,
+                                index.as_type(),
                             )))
                             .into(),
                         );
                     }
                 }
+                ByteCode::CallMethod(n_args) => {
+                    let method_name = stack.pop_noresolve()?;
+                    let this = stack.pop()?;
+                    let mut args = Vec::new();
+
+                    for _ in 0..*n_args {
+                        args.push(stack.pop()?)
+                    }
+                    match method_name {
+                        CelValue::Err(e) => {
+                            return Err(e);
+                        }
+                        CelValue::Ident(func_name) => {
+                            if let Some(func) = self.get_func_by_name(&func_name) {
+                                let arg_values = self.resolve_args(args)?;
+                                stack.push(func(this, arg_values));
+                            } else if let Some(macro_) = self.get_macro_by_name(&func_name) {
+                                stack.push(self.call_macro(&this, &args, macro_)?);
+                            } else {
+                                stack.push(CelValue::from_err(CelError::runtime(&format!(
+                                    "{} is not a method",
+                                    func_name
+                                ))));
+                            }
+                        }
+                        CelValue::Type(type_name) => {
+                            let arg_values = self.resolve_args(args)?;
+                            stack.push(construct_type(&type_name, arg_values));
+                        }
+                        other => stack.push(
+                            CelValue::from_err(CelError::runtime(&format!(
+                                "{:?} cannot be called",
+                                other
+                            )))
+                            .into(),
+                        ),
+                    };
+                }
                 ByteCode::Call(n_args) => {
-                    match stack.pop_noresolve()? {
-                        CelStackValue::BoundCall { callable, value } => {
-                            let mut args = Vec::new();
+                    let func_name = stack.pop_noresolve()?;
+                    let mut args = Vec::new();
 
-                            for _ in 0..*n_args {
-                                args.push(stack.pop()?.into_value()?)
-                            }
+                    for _ in 0..*n_args {
+                        args.push(stack.pop()?)
+                    }
 
-                            match callable {
-                                RsCallable::Function(func) => {
-                                    let arg_values = self.resolve_args(args)?;
-                                    stack.push_val(func(value, arg_values));
-                                }
-                                RsCallable::Macro(macro_) => {
-                                    stack.push_val(self.call_macro(&value, &args, macro_)?);
-                                }
+                    match func_name {
+                        CelValue::Err(e) => {
+                            return Err(e);
+                        }
+                        CelValue::Ident(func_name) => {
+                            if let Some(func) = self.get_func_by_name(&func_name) {
+                                let arg_values = self.resolve_args(args)?;
+                                stack.push(func(CelValue::from_null(), arg_values));
+                            } else if let Some(macro_) = self.get_macro_by_name(&func_name) {
+                                stack.push(self.call_macro(
+                                    &CelValue::from_null(),
+                                    &args,
+                                    macro_,
+                                )?);
+                            } else if let Some(CelValue::Type(type_name)) =
+                                self.get_type_by_name(&func_name)
+                            {
+                                let arg_values = self.resolve_args(args)?;
+                                stack.push(construct_type(type_name, arg_values));
+                            } else {
+                                stack.push(CelValue::from_err(CelError::runtime(&format!(
+                                    "{} is not callable",
+                                    func_name
+                                ))));
                             }
                         }
-                        CelStackValue::Value(value) => {
-                            let mut args = Vec::new();
-
-                            for _ in 0..*n_args {
-                                args.push(stack.pop()?.into_value()?)
-                            }
-
-                            match value {
-                                CelValue::Err(e) => {
-                                    return Err(e);
-                                }
-                                CelValue::Ident(func_name) => {
-                                    if let Some(func) = self.get_func_by_name(&func_name) {
-                                        let arg_values = self.resolve_args(args)?;
-                                        stack.push_val(func(CelValue::from_null(), arg_values));
-                                    } else if let Some(macro_) = self.get_macro_by_name(&func_name)
-                                    {
-                                        stack.push_val(self.call_macro(
-                                            &CelValue::from_null(),
-                                            &args,
-                                            macro_,
-                                        )?);
-                                    } else if let Some(CelValue::Type(type_name)) =
-                                        self.get_type_by_name(&func_name)
-                                    {
-                                        let arg_values = self.resolve_args(args)?;
-                                        stack.push_val(construct_type(type_name, arg_values));
-                                    } else {
-                                        stack.push_val(CelValue::from_err(CelError::runtime(
-                                            &format!("{} is not callable", func_name),
-                                        )));
-                                    }
-                                }
-                                CelValue::Type(type_name) => {
-                                    let arg_values = self.resolve_args(args)?;
-                                    stack.push_val(construct_type(&type_name, arg_values));
-                                }
-                                other => stack.push_val(
-                                    CelValue::from_err(CelError::runtime(&format!(
-                                        "{:?} cannot be called",
-                                        other
-                                    )))
-                                    .into(),
-                                ),
-                            }
+                        CelValue::Type(type_name) => {
+                            let arg_values = self.resolve_args(args)?;
+                            stack.push(construct_type(&type_name, arg_values));
                         }
+                        other => stack.push(
+                            CelValue::from_err(CelError::runtime(&format!(
+                                "{:?} cannot be called",
+                                other
+                            )))
+                            .into(),
+                        ),
                     };
                 }
                 ByteCode::FmtString(nsegments) => {
                     let mut segments = Vec::new();
                     for _ in 0..*nsegments {
-                        segments.push(stack.pop_val()?);
+                        segments.push(stack.pop()?);
                     }
 
                     let mut working = String::new();
@@ -486,25 +470,16 @@ impl<'a> Interpreter<'a> {
                         }
                     }
 
-                    stack.push_val(CelValue::String(working));
+                    stack.push(CelValue::String(working));
                 }
             };
         }
 
         if resolve {
-            match stack.pop() {
-                Ok(val) => {
-                    let cel: CelValue = val.try_into()?;
-                    cel.into_result()
-                }
-                Err(err) => Err(err),
-            }
+            stack.pop()?.into_result()
         } else {
             match stack.pop_tryresolve() {
-                Ok(val) => {
-                    let cel: CelValue = val.try_into()?;
-                    cel.into_result()
-                }
+                Ok(val) => val.into_result(),
                 Err(err) => Err(err),
             }
         }
@@ -554,16 +529,6 @@ impl<'a> Interpreter<'a> {
 
     fn get_type_by_name(&self, name: &str) -> Option<&'a CelValue> {
         self.bindings?.get_type(name)
-    }
-
-    fn callable_by_name(&self, name: &str) -> CelResult<RsCallable<'_>> {
-        if let Some(func) = self.get_func_by_name(name) {
-            Ok(RsCallable::Function(func))
-        } else if let Some(macro_) = self.get_macro_by_name(name) {
-            Ok(RsCallable::Macro(macro_))
-        } else {
-            Err(CelError::value(&format!("{} is not callable", name)))
-        }
     }
 
     fn checked_jump_target(pc: usize, dist: i32, len: usize) -> CelResult<usize> {

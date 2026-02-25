@@ -269,8 +269,8 @@ impl CelValue {
         CelValue::from_type("list")
     }
 
-    pub fn map_type() -> CelValue {
-        CelValue::from_type("map")
+    pub fn obj_type() -> CelValue {
+        CelValue::from_type("obj")
     }
 
     pub fn null_type() -> CelValue {
@@ -643,7 +643,7 @@ impl CelValueDyn for CelValue {
             CelValue::String(_) => CelValue::string_type(),
             CelValue::Bytes(_) => CelValue::bytes_type(),
             CelValue::List(_) => CelValue::list_type(),
-            CelValue::Map(_) => CelValue::map_type(),
+            CelValue::Map(_) => CelValue::obj_type(),
             CelValue::Null => CelValue::null_type(),
             CelValue::Ident(_) => CelValue::ident_type(),
             CelValue::Type(_) => CelValue::type_type(),

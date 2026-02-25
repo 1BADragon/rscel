@@ -894,66 +894,66 @@ impl<'l> CelCompiler<'l> {
         let mut member_prime_ast: Vec<AstNode<MemberPrime>> = Vec::new();
 
         loop {
-            match self.tokenizer.peek()? {
+            let mut ident_access_chain: Vec<(String, AstNode<Ident>)> = Vec::new();
+            while matches!(
+                self.tokenizer.peek()?,
                 Some(&TokenWithLoc {
                     token: Token::Dot,
-                    loc: dot_loc,
-                }) => {
-                    self.tokenizer.next()?;
-                    match self.tokenizer.next()? {
-                        Some(TokenWithLoc {
-                            token: Token::Ident(ident),
-                            loc,
-                        }) => {
-                            let res = CompiledProg::with_const(CelValue::from_ident(&ident));
-
-                            member_prime_node = CompiledProg::from_children2_w_bytecode_cannone(
-                                member_prime_node,
-                                res,
-                                vec![ByteCode::Access],
-                                |o, c| {
-                                    if let CelValue::Ident(s) = c {
-                                        // Allow for const eval for obj members in the
-                                        // off chance a user does somthing like this
-                                        // `{'a': 3}.a`. Its const value will be 3.
-                                        if o.is_obj() {
-                                            // So if this fails we should break the const
-                                            // status and let the compiler generate some
-                                            // bytecode for function discovery and such.
-                                            match o.access(&s) {
-                                                CelValue::Err(_) => None,
-                                                o => Some(o),
-                                            }
-                                        } else {
-                                            None
-                                        }
-                                    } else {
-                                        Some(CelValue::from_err(CelError::value(
-                                            "Accessor must be ident",
-                                        )))
-                                    }
-                                },
-                            );
-
-                            member_prime_ast.push(AstNode::new(
-                                MemberPrime::MemberAccess {
-                                    ident: AstNode::new(Ident(ident.clone()), loc),
-                                },
-                                dot_loc.surrounding(loc),
-                            ));
-                        }
-                        Some(other) => {
-                            return Err(SyntaxError::from_location(self.tokenizer.location())
-                                .with_message(format!("Expected IDENT got {:?}", other))
-                                .into());
-                        }
-                        None => {
-                            return Err(SyntaxError::from_location(self.tokenizer.location())
-                                .with_message("Expected IDENT got NOTHING".to_string())
-                                .into());
-                        }
+                    ..
+                })
+            ) {
+                self.tokenizer.next()?;
+                match self.tokenizer.next()? {
+                    Some(TokenWithLoc {
+                        token: Token::Ident(ident),
+                        loc,
+                    }) => ident_access_chain.push((ident.clone(), AstNode::new(Ident(ident), loc))),
+                    Some(other) => {
+                        return Err(SyntaxError::from_location(self.tokenizer.location())
+                            .with_message(format!("Expected IDENT got {:?}", other))
+                            .into());
+                    }
+                    None => {
+                        return Err(SyntaxError::from_location(self.tokenizer.location())
+                            .with_message("Expected IDENT got NOTHING".to_string())
+                            .into());
                     }
                 }
+            }
+
+            let last_ident = ident_access_chain.pop();
+
+            for (ident, ident_ast) in ident_access_chain {
+                let r = ident_ast.range().clone();
+                member_prime_ast.push(AstNode::new(
+                    MemberPrime::MemberAccess { ident: ident_ast },
+                    r,
+                ));
+
+                member_prime_node = CompiledProg::from_children2_w_bytecode_cannone(
+                    member_prime_node,
+                    CompiledProg::with_const(CelValue::from_ident(&ident)),
+                    vec![ByteCode::Access],
+                    |o, c| {
+                        if let CelValue::Ident(s) = c {
+                            if o.is_obj() {
+                                match o.access(&s) {
+                                    CelValue::Err(_) => None,
+                                    o => Some(o),
+                                }
+                            } else {
+                                None
+                            }
+                        } else {
+                            Some(CelValue::from_err(CelError::value(
+                                "Accessor must be ident",
+                            )))
+                        }
+                    },
+                )
+            }
+
+            match self.tokenizer.peek()? {
                 Some(&TokenWithLoc {
                     token: Token::LParen,
                     loc,
@@ -982,24 +982,43 @@ impl<'l> CelCompiler<'l> {
                                 ]))
                         }
 
-                        member_prime_node = args_node
-                            .consume_child(member_prime_node)
-                            .consume_child(CompiledProg::with_code_points(vec![ByteCode::Call(
-                                args_len as u32,
-                            )
-                            .into()]));
-
-                        member_prime_node = self.check_for_const(member_prime_node);
-
-                        member_prime_ast.push(AstNode::new(
-                            MemberPrime::Call {
-                                call: AstNode::new(
-                                    ExprList { exprs: args_ast },
-                                    loc.surrounding(rparen_loc),
+                        if let Some((last_ident, last_ident_ast)) = last_ident {
+                            member_prime_node = args_node.consume_child(
+                                CompiledProg::from_children2_w_bytecode_cannone(
+                                    member_prime_node,
+                                    CompiledProg::with_const(CelValue::Ident(last_ident)),
+                                    vec![ByteCode::CallMethod(args_len as u32)],
+                                    |_o, _c| None,
                                 ),
-                            },
-                            loc.surrounding(rparen_loc),
-                        ));
+                            );
+
+                            let r = last_ident_ast.range().clone();
+
+                            member_prime_ast.push(AstNode::new(
+                                MemberPrime::MemberAccess {
+                                    ident: last_ident_ast,
+                                },
+                                r,
+                            ));
+                        } else {
+                            member_prime_node = args_node
+                                .consume_child(member_prime_node)
+                                .consume_child(CompiledProg::with_code_points(vec![
+                                    ByteCode::Call(args_len as u32).into(),
+                                ]));
+
+                            member_prime_node = self.check_for_const(member_prime_node);
+
+                            member_prime_ast.push(AstNode::new(
+                                MemberPrime::Call {
+                                    call: AstNode::new(
+                                        ExprList { exprs: args_ast },
+                                        loc.surrounding(rparen_loc),
+                                    ),
+                                },
+                                loc.surrounding(rparen_loc),
+                            ));
+                        }
                     } else {
                         return Err(SyntaxError::from_location(self.tokenizer.location())
                             .with_message(format!(
@@ -1014,6 +1033,39 @@ impl<'l> CelCompiler<'l> {
                     loc,
                 }) => {
                     self.tokenizer.next()?;
+
+                    if let Some((last_ident, last_ident_ast)) = last_ident {
+                        member_prime_node = CompiledProg::from_children2_w_bytecode_cannone(
+                            member_prime_node,
+                            CompiledProg::with_const(CelValue::Ident(last_ident)),
+                            vec![ByteCode::Access.into()],
+                            |o, c| {
+                                if let CelValue::Ident(s) = c {
+                                    if o.is_obj() {
+                                        match o.access(&s) {
+                                            CelValue::Err(_) => None,
+                                            o => Some(o),
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    Some(CelValue::from_err(CelError::value(
+                                        "Accessor must be ident",
+                                    )))
+                                }
+                            },
+                        );
+
+                        let r = last_ident_ast.range().clone();
+
+                        member_prime_ast.push(AstNode::new(
+                            MemberPrime::MemberAccess {
+                                ident: last_ident_ast,
+                            },
+                            r,
+                        ));
+                    }
 
                     let (index_node, index_ast) = self.parse_expression()?;
 
@@ -1045,7 +1097,50 @@ impl<'l> CelCompiler<'l> {
                         }
                     }
                 }
-                _ => break,
+                _ => {
+                    if let Some((last_ident, last_ident_ast)) = last_ident {
+                        member_prime_node = CompiledProg::from_children2_w_bytecode_cannone(
+                            member_prime_node,
+                            CompiledProg::with_const(CelValue::Ident(last_ident)),
+                            vec![ByteCode::Access.into()],
+                            |o, c| {
+                                if let CelValue::Ident(s) = c {
+                                    if o.is_obj() {
+                                        match o.access(&s) {
+                                            CelValue::Err(_) => None,
+                                            o => Some(o),
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    Some(CelValue::from_err(CelError::value(
+                                        "Accessor must be ident",
+                                    )))
+                                }
+                            },
+                        );
+
+                        let r = last_ident_ast.range().clone();
+
+                        member_prime_ast.push(AstNode::new(
+                            MemberPrime::MemberAccess {
+                                ident: last_ident_ast,
+                            },
+                            r,
+                        ));
+                    }
+                }
+            }
+
+            if !matches!(
+                self.tokenizer.peek()?,
+                Some(&TokenWithLoc {
+                    token: Token::Dot,
+                    ..
+                })
+            ) {
+                break;
             }
         }
 

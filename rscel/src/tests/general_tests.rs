@@ -1,6 +1,6 @@
 use crate::{
     compiler::{compiler::CelCompiler, string_tokenizer::StringTokenizer},
-    BindContext, CelContext, CelError, CelValue, Program,
+    BindContext, ByteCode, CelContext, CelError, CelValue, Program,
 };
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use serde_json::Value;
@@ -741,4 +741,24 @@ fn test_keywords_as_access_idents() {
         Err(CelError::Attribute { .. }) => {}
         _ => panic!(),
     }
+}
+
+#[test]
+fn test_map_literal_member_access_const_folds() {
+    // {'a': 1}.a should be folded at compile time to a single Push(Int(1)),
+    // with no Access instruction emitted.
+    let prog = Program::from_source("{'a': 1}.a").unwrap();
+    let bc = prog.bytecode();
+
+    assert!(
+        !bc.iter().any(|op| matches!(op, ByteCode::Access)),
+        "expected no Access instruction, got:\n{}",
+        prog.dumps_bc()
+    );
+    assert_eq!(
+        bc.as_slice(),
+        &[ByteCode::Push(CelValue::Int(1))],
+        "expected single Push(Int(1)), got:\n{}",
+        prog.dumps_bc()
+    );
 }

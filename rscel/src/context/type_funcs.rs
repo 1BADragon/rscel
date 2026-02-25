@@ -51,7 +51,7 @@ pub fn load_default_types(bind_ctx: &mut BindContext) {
     bind_ctx.add_type("string", CelValue::string_type());
     bind_ctx.add_type("bytes", CelValue::bytes_type());
     bind_ctx.add_type("list", CelValue::list_type());
-    bind_ctx.add_type("obj", CelValue::map_type());
+    bind_ctx.add_type("obj", CelValue::obj_type());
     bind_ctx.add_type("type", CelValue::type_type());
     bind_ctx.add_type("timestamp", CelValue::timestamp_type());
     bind_ctx.add_type("duration", CelValue::duration_type());
