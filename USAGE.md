@@ -50,6 +50,9 @@ Macros operate on unresolved bytecode and therefore require identifiers for loop
 | `list.filter(var, predicate)` | `[items].filter(x, keep?)` | Builds a list of elements whose predicate is truthy. When invoked on a map, the identifier receives each key and returns the list of kept keys. |
 | `list.map(var, mapper)` | `[items].map(x, expr)` | Collects the mapper result for every element. A ternary form `[items].map(x, predicate, mapper)` first evaluates `predicate` and only maps elements where it is truthy. With maps, the variable receives each key and returns a list of mapped values. |
 | `list.reduce(acc, item, step, initial)` | `[items].reduce(curr, next, step_expr, seed)` | Initializes `curr` with `seed`; for each element binds `next` to the element, `curr` to the running total, evaluates `step_expr`, and stores the result back in `curr`. Returns the final accumulator. |
+| `list.count(var, predicate)` | `[items].count(x, test)` | Returns the number of elements for which `predicate` evaluates truthy. |
+| `list.find(var, predicate)` | `[items].find(x, test)` | Returns the first element for which `predicate` is truthy, or `null` if none match. |
+| `list.flatMap(var, mapper)` | `[items].flatMap(x, expr)` | Maps each element through `mapper`; list results are flattened one level into the output. Non-list results are appended directly. |
 
 ## Type Constructors (`type_funcs.rs`)
 
@@ -79,7 +82,12 @@ All functions can be called as free functions (`size(list)`) or as methods (`lis
 - `size(value)` – Length of a string, bytes, or list.
 - `sort(list)` – Returns a new list sorted using CEL ordering; non-comparable members yield `invalid_op` errors.
 - `zip(list1, list2, ...)` – Zips multiple lists into a list of same-length tuples (shortest list wins); arguments must all be lists.
-- `min(arg1, arg2, ...)` / `max(...)` – Vararg numeric/string comparator that returns the min/max; at least one argument required.
+- `min(arg1, arg2, ...)` / `max(...)` – Vararg numeric/string comparator that returns the min/max; at least one argument required. Also callable as a method on a list (`list.min()`, `list.max()`).
+- `sum(list)` – Returns the sum of all elements in a list; at least one element required. Also callable as a free function (`sum(a, b, ...)`).
+- `flatten(list)` – Flattens one level of nested lists; non-list elements are kept as-is.
+- `reverse(list)` – Returns a new list with elements in reverse order.
+- `slice(list, start, end)` – Returns the sub-list `[start, end)`. Negative indices count from the end. `start` must be ≤ `end` or an argument error is raised.
+- `unique(list)` – Returns a new list with duplicate elements removed, preserving first-occurrence order.
 
 ### String and text helpers
 
@@ -87,13 +95,21 @@ All functions can be called as free functions (`size(list)`) or as methods (`lis
 - `startsWith`, `startsWithI`, `endsWith`, `endsWithI` – Prefix/suffix checks.
 - `matches` – Returns `true` if a regex matches the entire string; invalid regex patterns raise a `value()` error.
 - `matchCaptures` – Returns a list of capture groups (entire match first) or `null` if the regex does not match.
+- `matchCapturesAll` – Returns a list of capture-group lists for every non-overlapping match of the regex, or an empty list if there are no matches.
 - `matchReplace`, `matchReplaceOnce` – Regex replacement across all matches or only the first match.
 - `remove` – Removes all non-overlapping occurrences of a literal substring.
 - `replace` – Literal string replacement.
+- `replaceI` – Case-insensitive literal string replacement (all occurrences).
+- `indexOf(str, needle)` – Returns the character index of the first occurrence of `needle`, or `-1` if not found.
+- `lastIndexOf(str, needle)` – Returns the character index of the last occurrence of `needle`, or `-1` if not found.
+- `repeat(str, n)` – Returns the string repeated `n` times.
+- `padStart(str, width[, char])` – Left-pads `str` to at least `width` characters using `char` (default `' '`). `char` must be a single character.
+- `padEnd(str, width[, char])` – Right-pads `str` to at least `width` characters using `char` (default `' '`). `char` must be a single character.
 - `split`, `rsplit` – Split on a literal delimiter from the left/right.
 - `splitAt` – Splits at an index, returning `[left, right]`.
 - `splitWhiteSpace` – Splits on any Unicode whitespace.
 - `trim`, `trimStart`, `trimEnd` – Trim ASCII whitespace.
+- `trimMatches(str, chars)` – Trims any characters in `chars` from both ends of the string.
 - `trimStartMatches`, `trimEndMatches` – Trim a literal prefix/suffix repeatedly.
 - `toLower`, `toUpper` – Case conversion.
 
@@ -103,10 +119,15 @@ All string helpers expect `this` to be a string; non-string inputs produce `valu
 
 - `abs(number)` – Absolute value for `int`, `uint`, and `double`.
 - `sqrt(number)` – Square root returning `double`.
+- `cbrt(number)` – Cube root returning `double`.
 - `pow(base, exponent)` – Exponentiation for numeric combinations (integer exponents for integral bases).
+- `exp(number)` – Returns e raised to the power of `number` as a `double`.
+- `ln(number)` – Natural logarithm returning `double`.
 - `log(number)` – Base-10 logarithm (`ilog10` for integers/unsigned integers).
-- `lg(number)` - Base-2 logarithm
+- `lg(number)` – Base-2 logarithm.
 - `ceil(number)`, `floor(number)`, `round(number)` – Standard rounding family; integral inputs are returned unchanged.
+- `trunc(number)` – Truncates toward zero; `double` input returns `int`, integral inputs are returned unchanged.
+- `clamp(value, min, max)` – Returns `min` if `value < min`, `max` if `value > max`, otherwise `value`.
 
 ### Time & date helpers
 
@@ -129,6 +150,9 @@ All time functions operate on `timestamp()` or `duration()` results. Where noted
 - `setMinutes(timestamp, minute[, timezone])` – Returns a new UTC timestamp with the minute set.
 - `setSeconds(timestamp, second[, timezone])` – Returns a new UTC timestamp with the second set.
 - `setMilliseconds(timestamp, ms[, timezone])` – Returns a new UTC timestamp with the millisecond component set.
+- `startOfDay(timestamp[, timezone])` – Returns a new UTC timestamp at midnight (00:00:00) of the same calendar day.
+- `startOfMonth(timestamp[, timezone])` – Returns a new UTC timestamp at the first moment of the first day of the same month.
+- `startOfYear(timestamp[, timezone])` – Returns a new UTC timestamp at the first moment of January 1st of the same year.
 - `toRfc3339(timestamp[, timezone])` – RFC3339 string for the timestamp.
 - `toTimestampString(timestamp[, timezone])` – Alias for `toRfc3339`.
 - `now()` – Current UTC timestamp (no arguments).
