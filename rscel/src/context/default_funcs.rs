@@ -2,6 +2,7 @@ use super::bind_context::RsCelFunction;
 use crate::{BindContext, CelError, CelValue};
 
 mod format;
+mod list;
 mod math;
 mod size;
 mod sort;
@@ -13,6 +14,11 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("contains", &string::contains::contains),
     ("containsI", &string::contains::contains_i),
     ("size", &size::size),
+    ("flatten", &list::flatten::flatten),
+    ("reverse", &list::reverse::reverse),
+    ("slice", &list::slice::slice),
+    ("sum", &list::sum_impl),
+    ("unique", &list::unique::unique),
     ("sort", &sort::sort),
     ("startsWith", &string::starts_with::starts_with),
     ("endsWith", &string::ends_with::ends_with),
@@ -102,6 +108,9 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("setMinutes", &time_funcs::set_minutes::set_minutes),
     ("setMonth", &time_funcs::set_month::set_month),
     ("setSeconds", &time_funcs::set_seconds::set_seconds),
+    ("startOfDay", &time_funcs::start_of_day::start_of_day),
+    ("startOfMonth", &time_funcs::start_of_month::start_of_month),
+    ("startOfYear", &time_funcs::start_of_year::start_of_year),
     ("toRfc3339", &time_funcs::to_rfc3339::to_rfc3339),
     ("toTimestampString", &time_funcs::to_rfc3339::to_rfc3339),
     ("now", &now_impl),

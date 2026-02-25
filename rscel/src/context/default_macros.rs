@@ -4,9 +4,12 @@ use super::bind_context::RsCelMacro;
 
 mod all;
 mod coalesce;
+mod count;
 mod exists;
 mod exists_one;
 mod filter;
+mod find;
+mod flat_map;
 mod has;
 mod helpers;
 mod map;
@@ -14,9 +17,12 @@ mod reduce;
 
 pub use all::all_impl;
 pub use coalesce::coalesce_impl;
+pub use count::count_impl;
 pub use exists::exists_impl;
 pub use exists_one::exists_one_impl;
 pub use filter::filter_impl;
+pub use find::find_impl;
+pub use flat_map::flat_map_impl;
 pub use has::has_impl;
 pub use map::map_impl;
 pub use reduce::reduce_impl;
@@ -24,9 +30,12 @@ pub use reduce::reduce_impl;
 const DEFAULT_MACROS: &[(&str, &'static RsCelMacro)] = &[
     ("has", &has_impl),
     ("all", &all_impl),
+    ("count", &count_impl),
     ("exists", &exists_impl),
     ("exists_one", &exists_one_impl),
     ("filter", &filter_impl),
+    ("find", &find_impl),
+    ("flatMap", &flat_map_impl),
     ("map", &map_impl),
     ("reduce", &reduce_impl),
     ("coalesce", &coalesce_impl),

@@ -17,4 +17,7 @@ pub mod set_milliseconds;
 pub mod set_minutes;
 pub mod set_month;
 pub mod set_seconds;
+pub mod start_of_day;
+pub mod start_of_month;
+pub mod start_of_year;
 pub mod to_rfc3339;
