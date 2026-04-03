@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use protobuf::MessageDyn;
 use serde_json::Value;
 
-use crate::{interp::Interpreter, types::CelByteCode, CelError, CelResult, CelValue};
+use crate::{interp::Interpreter, CelError, CelResult, CelValue, MacroArg};
 
 use super::default_macros::{load_compile_macros, load_default_macros};
 use super::{default_funcs::load_default_funcs, type_funcs::load_default_types};
@@ -45,7 +45,7 @@ pub type RsCelFunction = dyn Fn(CelValue, Vec<CelValue>) -> CelValue;
 /// all arguents passed to the macro are left unresolved bytecode. An additional argument,
 /// the Interpreter context, is provided to the macro for bytecode resolution.
 pub type RsCelMacro =
-    dyn for<'a, 'b> Fn(&'a Interpreter<'a>, CelValue, &[&CelByteCode]) -> CelValue;
+    dyn for<'a, 'b> Fn(&'a Interpreter<'a>, CelValue, &'b [MacroArg<'b>]) -> CelValue;
 
 /// Bindings context for a cel evaluation.
 ///
@@ -54,12 +54,17 @@ pub type RsCelMacro =
 /// and macros. This context is separate from the contents of the `CelContext` to allow
 /// for multiple runs with different bound values on the same programs without the need
 /// to maintain multiple copies of the programs.
+///
+/// A `BindContext` can optionally reference a parent via [`BindContext::child_scope`].
+/// Lookups fall through to the parent when not found locally, allowing macro iteration
+/// loops to bind loop variables cheaply without cloning the full function/macro/type tables.
 #[derive(Clone)]
 pub struct BindContext<'a> {
     params: HashMap<String, CelValue>,
     funcs: HashMap<String, &'a RsCelFunction>,
     macros: HashMap<String, &'a RsCelMacro>,
     types: HashMap<String, CelValue>,
+    parent: Option<&'a BindContext<'a>>,
 }
 
 impl<'a> BindContext<'a> {
@@ -70,6 +75,7 @@ impl<'a> BindContext<'a> {
             funcs: HashMap::new(),
             macros: HashMap::new(),
             types: HashMap::new(),
+            parent: None,
         };
 
         load_default_macros(&mut ctx);
@@ -84,12 +90,29 @@ impl<'a> BindContext<'a> {
             funcs: HashMap::new(),
             macros: HashMap::new(),
             types: HashMap::new(),
+            parent: None,
         };
 
         load_compile_macros(&mut ctx);
         load_default_funcs(&mut ctx);
         load_default_types(&mut ctx);
         ctx
+    }
+
+    /// Create a child scope that borrows this context's functions, macros, and types
+    /// through a parent pointer rather than cloning them. The child starts with empty
+    /// local param/func/macro/type tables; lookups fall through to the parent.
+    ///
+    /// Use this inside macro iteration loops where only the loop variable changes
+    /// between iterations, to avoid cloning the full context on each element.
+    pub fn child_scope(&'a self) -> BindContext<'a> {
+        BindContext {
+            params: HashMap::new(),
+            funcs: HashMap::new(),
+            macros: HashMap::new(),
+            types: HashMap::new(),
+            parent: Some(self),
+        }
     }
 
     /// Bind a param with the given name and value.
@@ -127,33 +150,46 @@ impl<'a> BindContext<'a> {
         self.macros.insert(name.to_owned(), macro_);
     }
 
-    /// Get a param by name.
+    /// Get a param by name. Checks local params first, then walks up the parent chain.
     pub fn get_param<'l>(&'l self, name: &str) -> Option<&'l CelValue> {
-        Some(self.params.get(name)?)
+        self.params
+            .get(name)
+            .or_else(|| self.parent?.get_param(name))
     }
 
-    /// Get a function by name.
+    /// Get a function by name. Checks local funcs first, then walks up the parent chain.
     pub fn get_func(&self, name: &str) -> Option<&'a RsCelFunction> {
-        Some(*self.funcs.get(name)?)
+        self.funcs
+            .get(name)
+            .copied()
+            .or_else(|| self.parent?.get_func(name))
     }
 
-    /// Get a macro by name.
+    /// Get a macro by name. Checks local macros first, then walks up the parent chain.
     pub fn get_macro(&self, name: &str) -> Option<&'a RsCelMacro> {
-        Some(*self.macros.get(name)?)
+        self.macros
+            .get(name)
+            .copied()
+            .or_else(|| self.parent?.get_macro(name))
     }
 
+    /// Returns true if the name is bound anywhere in the scope chain.
     pub fn is_bound(&self, name: &str) -> bool {
         self.params.contains_key(name)
             || self.funcs.contains_key(name)
             || self.macros.contains_key(name)
+            || self.parent.map_or(false, |p| p.is_bound(name))
     }
 
     pub(crate) fn add_type(&mut self, name: &str, r#type: CelValue) {
         self.types.insert(name.to_string(), r#type);
     }
 
+    /// Get a type by name. Checks local types first, then walks up the parent chain.
     pub(crate) fn get_type(&self, name: &str) -> Option<&CelValue> {
-        self.types.get(name)
+        self.types
+            .get(name)
+            .or_else(|| self.parent?.get_type(name))
     }
 }
 
@@ -168,5 +204,32 @@ mod test {
         b.bind_param("foo", 4.into());
 
         assert!(b.is_bound("foo"))
+    }
+
+    #[test]
+    fn child_scope_inherits_parent_funcs_and_macros() {
+        let parent = BindContext::new();
+        let mut child = parent.child_scope();
+
+        // Child should see parent's default functions
+        assert!(child.get_func("size").is_some());
+        assert!(child.get_macro("filter").is_some());
+
+        // Local param on child does not affect parent lookup
+        child.bind_param("x", 42.into());
+        assert!(child.get_param("x").is_some());
+        assert!(parent.get_param("x").is_none());
+    }
+
+    #[test]
+    fn child_scope_param_shadows_parent() {
+        let mut parent = BindContext::new();
+        parent.bind_param("x", 1.into());
+
+        let mut child = parent.child_scope();
+        child.bind_param("x", 2.into());
+
+        assert_eq!(*child.get_param("x").unwrap(), 2.into());
+        assert_eq!(*parent.get_param("x").unwrap(), 1.into());
     }
 }

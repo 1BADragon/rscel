@@ -57,6 +57,11 @@ pub enum CelValue {
     )]
     Duration(Duration),
     ByteCode(CelByteCode),
+    /// A bare-identifier macro argument encoded at compile time.
+    /// Only ever appears as `ByteCode::Push(CelValue::Binder(name))` in compiled programs;
+    /// consumed by `call_macro` and never evaluated directly by the interpreter.
+    #[serde(skip_serializing, skip_deserializing)]
+    Binder(String),
     #[cfg(feature = "protobuf")]
     #[serde(skip_serializing, skip_deserializing)]
     Message(Box<dyn MessageDyn>),
@@ -650,6 +655,7 @@ impl CelValueDyn for CelValue {
             CelValue::TimeStamp(_) => CelValue::timestamp_type(),
             CelValue::Duration(_) => CelValue::duration_type(),
             CelValue::ByteCode(_) => CelValue::bytecode_type(),
+            CelValue::Binder(_) => CelValue::from_type("binder"),
             #[cfg(feature = "protobuf")]
             CelValue::Message(msg) => CelValue::message_type(&msg.descriptor_dyn()),
             #[cfg(feature = "protobuf")]
@@ -1552,6 +1558,7 @@ impl fmt::Display for CelValue {
             TimeStamp(val) => write!(f, "{}", val),
             Duration(val) => write!(f, "{}", val),
             ByteCode(val) => write!(f, "{:?}", val),
+            Binder(name) => write!(f, "binder:{}", name),
             #[cfg(feature = "protobuf")]
             Message(msg) => write!(f, "{}", msg.as_ref()),
             #[cfg(feature = "protobuf")]

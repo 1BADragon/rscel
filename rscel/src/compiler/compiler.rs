@@ -971,14 +971,37 @@ impl<'l> CelCompiler<'l> {
                         let args_len = args.len();
 
                         let mut args_ast = Vec::new();
-                        let mut args_node = CompiledProg::empty();
-                        // Arguments are evaluated backwards so they get popped off the stack in order
-                        for (a, ast) in args.into_iter().rev() {
+                        let mut resolved_args: Vec<CelValue> = Vec::new();
+                        // Resolve each arg's bytecode and detect bare-identifier binders.
+                        // A single-ident arg (e.g. `x` in `list.map(x, ...)`) is encoded as
+                        // a Binder so macros can distinguish loop-variable names from
+                        // expression arguments without running bytecode through an interpreter.
+                        for (a, ast) in args.into_iter() {
                             args_ast.push(ast);
+                            let bc = a.into_unresolved_bytecode().resolve();
+                            let pushed_val = if bc.len() == 1 {
+                                if let ByteCode::Push(CelValue::Ident(name)) = &bc[0] {
+                                    CelValue::Binder(name.clone())
+                                } else {
+                                    bc.into()
+                                }
+                            } else {
+                                bc.into()
+                            };
+                            resolved_args.push(pushed_val);
+                        }
+
+                        // Validate argument shapes for known default macros at compile time.
+                        if let Some((ref macro_name, _)) = last_ident {
+                            Self::validate_macro_args(macro_name, &resolved_args, loc)?;
+                        }
+
+                        // Arguments are pushed in reverse so they are popped off the stack in order.
+                        let mut args_node = CompiledProg::empty();
+                        for pushed_val in resolved_args.into_iter().rev() {
                             args_node =
                                 args_node.append_result(CompiledProg::with_code_points(vec![
-                                    ByteCode::Push(a.into_unresolved_bytecode().resolve().into())
-                                        .into(),
+                                    ByteCode::Push(pushed_val).into(),
                                 ]))
                         }
 
@@ -1492,6 +1515,63 @@ impl<'l> CelCompiler<'l> {
     }
 
     #[inline]
+    /// Validate argument shapes for known default macros at compile time.
+    ///
+    /// Checks arity and that positional binder arguments (loop-variable names like `x` in
+    /// `list.map(x, x + 1)`) were encoded as [`CelValue::Binder`] rather than expressions.
+    /// Returns a [`SyntaxError`] if the call does not match the expected shape.
+    ///
+    /// Only validates names that match built-in macros; unknown names are passed through
+    /// unchanged so user-defined functions/macros with those names still compile.
+    fn validate_macro_args(
+        name: &str,
+        args: &[CelValue],
+        loc: SourceRange,
+    ) -> CelResult<()> {
+        // (min_args, max_args, binder_positions)
+        let (min_args, max_args, binder_positions): (usize, usize, &[usize]) = match name {
+            "has" => (1, 1, &[]),
+            "all" | "count" | "exists" | "exists_one" | "filter" | "find" | "flatMap" => {
+                (2, 2, &[0])
+            }
+            "map" => (2, 3, &[0]),
+            "reduce" => (4, 4, &[0, 1]),
+            "coalesce" => (1, usize::MAX, &[]),
+            _ => return Ok(()),
+        };
+
+        if args.len() < min_args || args.len() > max_args {
+            let arity_desc = if min_args == max_args {
+                format!("exactly {}", min_args)
+            } else if max_args == usize::MAX {
+                format!("at least {}", min_args)
+            } else {
+                format!("{} to {}", min_args, max_args)
+            };
+            return Err(SyntaxError::from_location(loc.start())
+                .with_message(format!(
+                    "macro `{}` expects {} argument(s), got {}",
+                    name,
+                    arity_desc,
+                    args.len()
+                ))
+                .into());
+        }
+
+        for &pos in binder_positions {
+            if pos < args.len() && !matches!(args[pos], CelValue::Binder(_)) {
+                return Err(SyntaxError::from_location(loc.start())
+                    .with_message(format!(
+                        "macro `{}` argument {} must be a bare identifier (e.g. `x`), not an expression",
+                        name, pos
+                    ))
+                    .into());
+            }
+        }
+
+        Ok(())
+    }
+
     fn check_for_const(&self, member_prime_node: CompiledProg) -> CompiledProg {
         let mut i = Interpreter::empty();
         i.add_bindings(&self.bindings);
@@ -1510,6 +1590,7 @@ mod test {
     use test_case::test_case;
 
     use crate::compiler::string_tokenizer::StringTokenizer;
+    use crate::{ByteCode, CelValue, Program};
 
     use super::CelCompiler;
 
@@ -1544,5 +1625,159 @@ mod test {
 
         assert!(e.is_err());
         let _ = format!("{}", e.unwrap_err());
+    }
+
+    // Wrapping a method-style macro in a standalone function call triggers check_for_const,
+    // which runs the full bytecode through the compile interpreter. For this to succeed, the
+    // macro must be registered in COMPILE_MACROS. These tests verify that count, find, and
+    // flatMap are correctly rolled up to constants at compile time.
+
+    #[test]
+    fn count_macro_compile_rollup() {
+        // bool() accepts Int, allowing check_for_const to evaluate the whole expression.
+        // count([1,2,3], x > 0) == 3, bool(3) == true.
+        let prog = Program::from_source("bool([1,2,3].count(x, x > 0))").unwrap();
+        let bc = prog.bytecode();
+
+        assert!(
+            !bc.iter().any(|op| matches!(op, ByteCode::CallMethod(_))),
+            "expected no CallMethod — count should be rolled up at compile time, got:\n{}",
+            prog.dumps_bc()
+        );
+        assert_eq!(
+            bc.as_slice(),
+            &[ByteCode::Push(CelValue::Bool(true))],
+            "expected single Push(Bool(true)), got:\n{}",
+            prog.dumps_bc()
+        );
+    }
+
+    #[test]
+    fn find_macro_compile_rollup() {
+        // bool() accepts any value, allowing check_for_const to evaluate the whole expression.
+        // find([1,2,3], x > 1) == 2, bool(2) == true.
+        let prog = Program::from_source("bool([1,2,3].find(x, x > 1))").unwrap();
+        let bc = prog.bytecode();
+
+        assert!(
+            !bc.iter().any(|op| matches!(op, ByteCode::CallMethod(_))),
+            "expected no CallMethod — find should be rolled up at compile time, got:\n{}",
+            prog.dumps_bc()
+        );
+        assert_eq!(
+            bc.as_slice(),
+            &[ByteCode::Push(CelValue::Bool(true))],
+            "expected single Push(Bool(true)), got:\n{}",
+            prog.dumps_bc()
+        );
+    }
+
+    #[test]
+    fn flat_map_macro_compile_rollup() {
+        // size() accepts a list, allowing check_for_const to evaluate the whole expression.
+        // flatMap([1,2,3], x, [x, x*10]) == [1,10,2,20,3,30], size(...) == 6.
+        let prog = Program::from_source("size([1,2,3].flatMap(x, [x, x*10]))").unwrap();
+        let bc = prog.bytecode();
+
+        assert!(
+            !bc.iter().any(|op| matches!(op, ByteCode::CallMethod(_))),
+            "expected no CallMethod — flatMap should be rolled up at compile time, got:\n{}",
+            prog.dumps_bc()
+        );
+        assert_eq!(
+            bc.as_slice(),
+            &[ByteCode::Push(CelValue::UInt(6))],
+            "expected single Push(UInt(6)), got:\n{}",
+            prog.dumps_bc()
+        );
+    }
+
+    // Compile-time macro argument shape validation tests.
+    // These verify that misuse of built-in macros is caught at parse/compile time
+    // rather than silently failing at runtime.
+
+    #[test]
+    fn filter_macro_rejects_expression_in_binder_position() {
+        // First arg to filter() must be a bare ident, not `x + 1`
+        let err = Program::from_source("[1,2,3].filter(x + 1, x > 0)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("argument 0") && msg.contains("bare identifier"),
+            "expected binder-position error, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn map_macro_rejects_expression_in_binder_position() {
+        let err = Program::from_source("[1,2,3].map(x * 2, x + 1)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("argument 0") && msg.contains("bare identifier"),
+            "expected binder-position error, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn reduce_macro_rejects_expression_in_second_binder_position() {
+        // Second arg of reduce() must be a bare ident too
+        let err = Program::from_source("[1,2,3].reduce(acc, n + 1, acc + n, 0)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("argument 1") && msg.contains("bare identifier"),
+            "expected binder-position error for arg 1, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn filter_macro_rejects_wrong_arity() {
+        let err = Program::from_source("[1,2,3].filter(x)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("filter") && msg.contains("exactly 2"),
+            "expected arity error for filter, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn has_macro_rejects_wrong_arity() {
+        let err = Program::from_source("foo.has(a, b)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("has") && msg.contains("exactly 1"),
+            "expected arity error for has, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn reduce_macro_rejects_wrong_arity() {
+        let err = Program::from_source("[1,2,3].reduce(a, b, a + b)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("reduce") && msg.contains("exactly 4"),
+            "expected arity error for reduce, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn map_macro_accepts_two_args() {
+        // Sanity: valid 2-arg map still compiles
+        Program::from_source("[1,2,3].map(x, x + 1)").unwrap();
+    }
+
+    #[test]
+    fn map_macro_accepts_three_args() {
+        // Sanity: valid 3-arg map (filter+map) still compiles
+        Program::from_source("[1,2,3].map(x, x > 1, x * 10)").unwrap();
+    }
+
+    #[test]
+    fn reduce_macro_accepts_four_args() {
+        Program::from_source("[1,2,3].reduce(acc, n, acc + n, 0)").unwrap();
     }
 }

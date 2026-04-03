@@ -43,9 +43,12 @@ const DEFAULT_MACROS: &[(&str, &'static RsCelMacro)] = &[
 
 const COMPILE_MACROS: &[(&str, &'static RsCelMacro)] = &[
     ("all", &all_impl),
+    ("count", &count_impl),
     ("exists", &exists_impl),
     ("exists_one", &exists_one_impl),
     ("filter", &filter_impl),
+    ("find", &find_impl),
+    ("flatMap", &flat_map_impl),
     ("map", &map_impl),
     ("reduce", &reduce_impl),
 ];

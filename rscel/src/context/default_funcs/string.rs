@@ -1,5 +1,6 @@
 use crate::{CelError, CelValue};
 
+pub(super) mod regex_cache;
 pub mod contains;
 pub mod ends_with;
 pub mod index_of;
