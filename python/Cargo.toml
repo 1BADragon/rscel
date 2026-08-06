@@ -12,7 +12,11 @@ crate-type = ["cdylib"]
 [dependencies]
 rscel = { path = "../rscel" }
 rscel-to-sql = { path = "../extensions/to_sql" }
+# abi3 targets CPython's stable ABI, so one build loads on 3.11 and every later
+# version. Without it, pyo3 compiles the API surface of whichever interpreter the
+# build script happens to detect, which made the extension silently 3.11-only.
 pyo3 = { version = "0.28.1", features = [
+    "abi3-py311",
     "py-clone",
     "extension-module",
     "chrono",
