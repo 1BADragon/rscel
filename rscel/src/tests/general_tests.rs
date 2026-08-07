@@ -864,3 +864,45 @@ fn test_match_captures_all() {
 
     assert_eq!(result, expected);
 }
+
+// Integer arithmetic must yield an error value on overflow rather than wrapping
+// (release) or panicking (debug), which is what the unchecked operators did.
+#[test_case("9223372036854775807 + 1"; "int add overflow")]
+#[test_case("-9223372036854775808 - 1"; "int sub overflow")]
+#[test_case("-9223372036854775808 + (-1)"; "int add negative overflow")]
+#[test_case("5000000000 * 5000000000"; "int mul overflow")]
+#[test_case("(-5000000000) * 5000000000"; "int mul negative overflow")]
+#[test_case("-(-9223372036854775808)"; "int negate overflow")]
+#[test_case("(-9223372036854775808) * -1"; "int negate via mul")]
+#[test_case("(-9223372036854775808) / -1"; "int negate via div")]
+#[test_case("18446744073709551615u + 1u"; "uint add overflow")]
+#[test_case("0u - 1u"; "uint sub overflow")]
+#[test_case("5000000000u * 5000000000u"; "uint mul overflow")]
+fn test_integer_overflow_is_error(prog: &str) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+
+    assert!(
+        matches!(ctx.exec("main", &exec_ctx), Err(CelError::Overflow)),
+        "expected overflow error from {prog}"
+    );
+}
+
+// Modulo by zero was entirely unguarded, unlike division.
+#[test_case("34 % 0"; "int mod zero")]
+#[test_case("34u % 0u"; "uint mod zero")]
+#[test_case("34 / 0"; "int div zero")]
+#[test_case("34u / 0u"; "uint div zero")]
+fn test_divide_by_zero_is_error(prog: &str) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+
+    assert!(
+        matches!(ctx.exec("main", &exec_ctx), Err(CelError::DivideByZero)),
+        "expected divide-by-zero error from {prog}"
+    );
+}

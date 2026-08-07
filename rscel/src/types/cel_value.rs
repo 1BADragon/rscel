@@ -1247,12 +1247,18 @@ impl Add for CelValue {
             match lhs {
                 CelValue::Int(val1) => {
                     if let CelValue::Int(val2) = rhs {
-                        return CelValue::from(val1 + val2);
+                        return match val1.checked_add(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::UInt(val1) => {
                     if let CelValue::UInt(val2) = rhs {
-                        return CelValue::from(val1 + val2);
+                        return match val1.checked_add(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::Float(val1) => {
@@ -1319,12 +1325,18 @@ impl Sub for CelValue {
             match lhs {
                 CelValue::Int(val1) => {
                     if let CelValue::Int(val2) = rhs {
-                        return CelValue::from(val1 - val2);
+                        return match val1.checked_sub(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::UInt(val1) => {
                     if let CelValue::UInt(val2) = rhs {
-                        return CelValue::from(val1 - val2);
+                        return match val1.checked_sub(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::Float(val1) => {
@@ -1370,12 +1382,18 @@ impl Mul for CelValue {
             match lhs {
                 CelValue::Int(val1) => {
                     if let CelValue::Int(val2) = rhs {
-                        return CelValue::from(val1 * val2);
+                        return match val1.checked_mul(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::UInt(val1) => {
                     if let CelValue::UInt(val2) = rhs {
-                        return CelValue::from(val1 * val2);
+                        return match val1.checked_mul(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::Float(val1) => {
@@ -1415,7 +1433,11 @@ impl Div for CelValue {
                             return CelValue::from_err(CelError::DivideByZero);
                         }
 
-                        return CelValue::from(val1 / val2);
+                        // i64::MIN / -1 has no int64 representation
+                        return match val1.checked_div(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::UInt(val1) => {
@@ -1460,11 +1482,23 @@ impl Rem for CelValue {
             match lhs {
                 CelValue::Int(val1) => {
                     if let CelValue::Int(val2) = rhs {
-                        return CelValue::from(val1 % val2);
+                        if val2 == 0 {
+                            return CelValue::from_err(CelError::DivideByZero);
+                        }
+
+                        // i64::MIN % -1 overflows the same way the division does
+                        return match val1.checked_rem(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::UInt(val1) => {
                     if let CelValue::UInt(val2) = rhs {
+                        if val2 == 0 {
+                            return CelValue::from_err(CelError::DivideByZero);
+                        }
+
                         return CelValue::from(val1 % val2);
                     }
                 }
@@ -1491,7 +1525,10 @@ impl Neg for CelValue {
 
         match self {
             CelValue::Int(val1) => {
-                return CelValue::from(-val1);
+                return match val1.checked_neg() {
+                    Some(v) => CelValue::from(v),
+                    None => CelValue::from_err(CelError::Overflow),
+                };
             }
             CelValue::Float(val1) => {
                 return CelValue::from(-val1);
