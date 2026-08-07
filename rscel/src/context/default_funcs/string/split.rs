@@ -20,6 +20,13 @@ mod split {
     fn split(this: String, needle: String) -> Vec<CelValue> {
         this.split(&needle).map(|s| s.into()).collect()
     }
+
+    fn split(this: String, needle: String, limit: i64) -> Vec<CelValue> {
+        if limit <= 0 {
+            return Vec::new();
+        }
+        this.splitn(limit as usize, &needle).map(|s| s.into()).collect()
+    }
 }
 
 #[dispatch]

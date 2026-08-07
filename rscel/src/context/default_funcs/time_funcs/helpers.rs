@@ -9,6 +9,9 @@ pub fn get_adjusted_datetime(this: DateTime<Utc>, timezone: String) -> CelResult
     if let Ok(tz) = Tz::from_str(&timezone) {
         Ok(this.with_timezone(&tz))
     } else {
-        Err(CelError::argument("Failed to parse timezone"))
+        Err(CelError::Argument(format!(
+            "Failed to parse timezone: '{}'",
+            timezone
+        )))
     }
 }

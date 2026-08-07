@@ -31,3 +31,4 @@ protobuf = { version = "3.7.2", optional = true }
 chrono-tz = "0.10.4"
 num-traits = "0.2.19"
 uom = "0.38.0"
+base64 = "0.22.1"

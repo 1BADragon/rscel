@@ -1,9 +1,12 @@
 use crate::{CelError, CelValue};
 
 pub(super) mod regex_cache;
+pub mod char_at;
 pub mod contains;
 pub mod ends_with;
 pub mod index_of;
+pub mod join;
+pub mod quote;
 pub mod match_captures;
 pub mod match_captures_all;
 pub mod match_replace;
@@ -16,6 +19,7 @@ pub mod replace_i;
 pub mod split;
 pub mod split_whitespace;
 pub mod starts_with;
+pub mod substring;
 pub mod trim_end_matches;
 pub mod trim_matches;
 pub mod trim_start_matches;

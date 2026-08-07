@@ -1,6 +1,7 @@
 use super::bind_context::RsCelFunction;
 use crate::{BindContext, CelError, CelValue};
 
+mod base64;
 mod format;
 mod list;
 mod math;
@@ -40,6 +41,8 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("replaceI", &string::replace_i::replace_i),
     ("toLower", &string::to_lower_impl),
     ("toUpper", &string::to_upper_impl),
+    ("lowerAscii", &string::to_lower_impl),
+    ("upperAscii", &string::to_upper_impl),
     ("trimMatches", &string::trim_matches::trim_matches),
     ("remove", &string::remove::remove),
     ("replace", &string::replace::replace),
@@ -61,6 +64,12 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
         "splitWhiteSpace",
         &string::split_whitespace::split_whitespace,
     ),
+    ("decode", &base64::decode),
+    ("encode", &base64::encode),
+    ("charAt", &string::char_at::char_at),
+    ("join", &string::join::join),
+    ("quote", &string::quote::quote),
+    ("substring", &string::substring::substring),
     ("abs", &math::abs::abs),
     ("cbrt", &math::cbrt::cbrt),
     ("ceil", &math::ceil::ceil),
@@ -70,6 +79,8 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("lg", &math::lg::lg),
     ("ln", &math::ln::ln),
     ("log", &math::log::log),
+    ("greatest", &max_impl),
+    ("least", &min_impl),
     ("max", &max_impl),
     ("min", &min_impl),
     ("pow", &math::pow::pow),
