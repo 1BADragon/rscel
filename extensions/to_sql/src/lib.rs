@@ -117,7 +117,9 @@ mod tests {
     #[test_case("!true", "(!TRUE)"; "negation true")]
     #[test_case("!false", "(!FALSE)"; "negation false")]
     #[test_case("!x", "(!x)"; "negation identifier")]
-    #[test_case("-5", "(-5)"; "arithmetic negation integer")]
+    // The compiler folds a minus directly preceding an int literal into a negative
+    // literal, so there is no unary-negation wrapper left for to_sql to parenthesize.
+    #[test_case("-5", "-5"; "arithmetic negation integer")]
     #[test_case("-x", "(-x)"; "arithmetic negation identifier")]
     #[test_case("!!true", "(!!TRUE)"; "double negation")]
     #[test_case("--5", "(--5)"; "double arithmetic negation")]
@@ -272,7 +274,7 @@ mod tests {
     // Array edge case tests
     #[test_case("[(1), (2), (3)]", "ARRAY[(1), (2), (3)]"; "array with parenthesized elements")]
     #[test_case("[x + (y * z), string((a + b))]", "ARRAY[(x) + (((y) * (z))), ((a) + (b))::text]"; "array with complex expressions")]
-    #[test_case("[!true, -5, !x]", "ARRAY[(!TRUE), (-5), (!x)]"; "array with unary expressions")]
+    #[test_case("[!true, -5, !x]", "ARRAY[(!TRUE), -5, (!x)]"; "array with unary expressions")]
     fn test_array_edge_cases(cel_expr: &str, expected: &str) {
         assert_eq!(cel_to_sql(cel_expr).unwrap(), expected);
     }

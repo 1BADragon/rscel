@@ -801,10 +801,111 @@ impl<'l> CelCompiler<'l> {
                 ))
             }
             Some(Token::Minus) => {
-                let (neg, neg_ast) = self.parse_neg_list()?;
+                // Consume the leading minus here rather than in parse_neg_list so we can
+                // look at the token behind it.
+                let minus_loc = match self.tokenizer.next()? {
+                    Some(TokenWithLoc { loc, .. }) => loc,
+                    None => {
+                        return Err(SyntaxError::from_location(self.tokenizer.location())
+                            .with_message("Expected '-' got NOTHING".to_string())
+                            .into())
+                    }
+                };
+
+                if let Some(&TokenWithLoc {
+                    token: Token::IntLit(val),
+                    loc: lit_loc,
+                }) = self.tokenizer.peek()?
+                {
+                    self.tokenizer.next()?;
+
+                    // A member prime after the literal means the minus applies to the whole
+                    // member expression, so `-5.foo()` keeps its `-(5.foo())` grouping and
+                    // must not be folded.
+                    let folds = !matches!(
+                        self.tokenizer.peek()?,
+                        Some(&TokenWithLoc {
+                            token: Token::Dot | Token::LParen | Token::LBracket,
+                            ..
+                        })
+                    );
+
+                    if folds {
+                        // Fold `-<int literal>` into one negative constant. Negating at
+                        // runtime cannot represent i64::MIN, so -9223372036854775808 — a
+                        // valid CEL int64 literal — would otherwise overflow.
+                        let negated = negate_int_literal(val).ok_or_else(|| {
+                            SyntaxError::from_location(lit_loc.start()).with_message(format!(
+                                "Integer literal -{} is out of range for int64",
+                                val
+                            ))
+                        })?;
+
+                        let range = minus_loc.surrounding(lit_loc);
+                        let member_ast = AstNode::new(
+                            Member {
+                                primary: AstNode::new(
+                                    Primary::Literal(LiteralsAndKeywords::IntegerLit(negated)),
+                                    range,
+                                ),
+                                member: Vec::new(),
+                            },
+                            range,
+                        );
+
+                        return Ok((
+                            CompiledProg::with_const(negated.into()),
+                            AstNode::new(Unary::Member(member_ast), range),
+                        ));
+                    }
+
+                    // Not folded: rebuild what parse_neg_list + parse_member would have
+                    // produced for a single minus applied to this literal.
+                    let lit = int_literal(val).ok_or_else(|| {
+                        SyntaxError::from_location(lit_loc.start()).with_message(format!(
+                            "Integer literal {} is out of range for int64",
+                            val
+                        ))
+                    })?;
+
+                    let (member, member_ast) = self.parse_member_tail(
+                        CompiledProg::with_const(lit.into()),
+                        AstNode::new(Primary::Literal(LiteralsAndKeywords::IntegerLit(lit)), lit_loc),
+                    )?;
+
+                    let neg_ast = AstNode::new(
+                        NegList::List {
+                            tail: Box::new(AstNode::new(NegList::EmptyList, minus_loc)),
+                        },
+                        minus_loc,
+                    );
+                    let neg = CompiledProg::with_code_points(vec![ByteCode::Neg.into()]);
+                    let range = member_ast.range().surrounding(minus_loc);
+
+                    return Ok((
+                        member.append_result(neg),
+                        AstNode::new(
+                            Unary::NegMember {
+                                negs: neg_ast,
+                                member: member_ast,
+                            },
+                            range,
+                        ),
+                    ));
+                }
+
+                // Any remaining minuses belong to the neg list; prepend the one consumed above.
+                let (rest, rest_ast) = self.parse_neg_list()?;
                 let (member, member_ast) = self.parse_member()?;
 
-                let range = member_ast.range().surrounding(neg_ast.range());
+                let neg_ast = AstNode::new(
+                    NegList::List {
+                        tail: Box::new(rest_ast),
+                    },
+                    minus_loc,
+                );
+                let neg = compile!([ByteCode::Neg.into()], rest, rest);
+                let range = member_ast.range().surrounding(minus_loc);
 
                 Ok((
                     member.append_result(neg),
@@ -889,7 +990,17 @@ impl<'l> CelCompiler<'l> {
 
     fn parse_member(&mut self) -> CelResult<(CompiledProg, AstNode<Member>)> {
         let (primary_node, primary_ast) = self.parse_primary()?;
+        self.parse_member_tail(primary_node, primary_ast)
+    }
 
+    /// Parse the member-prime chain (`.field`, `(args)`, `[index]`) that follows an
+    /// already-parsed primary. Split out of `parse_member` so a caller that has built a
+    /// primary itself — see the negative-literal fold in `parse_unary` — can reuse it.
+    fn parse_member_tail(
+        &mut self,
+        primary_node: CompiledProg,
+        primary_ast: AstNode<Primary>,
+    ) -> CelResult<(CompiledProg, AstNode<Member>)> {
         let mut member_prime_node = CompiledProg::from_node(primary_node);
         let mut member_prime_ast: Vec<AstNode<MemberPrime>> = Vec::new();
 
@@ -1352,13 +1463,19 @@ impl<'l> CelCompiler<'l> {
             Some(TokenWithLoc {
                 token: Token::IntLit(val),
                 loc,
-            }) => Ok((
-                CompiledProg::with_const((val as i64).into()),
-                AstNode::new(
-                    Primary::Literal(LiteralsAndKeywords::IntegerLit(val as i64)),
-                    loc,
-                ),
-            )),
+            }) => {
+                // A literal reaching here is not negated — parse_unary folds `-<int literal>`
+                // before it gets this far — so it must fit an int64 on its own.
+                let val = int_literal(val).ok_or_else(|| {
+                    SyntaxError::from_location(loc.start())
+                        .with_message(format!("Integer literal {} is out of range for int64", val))
+                })?;
+
+                Ok((
+                    CompiledProg::with_const(val.into()),
+                    AstNode::new(Primary::Literal(LiteralsAndKeywords::IntegerLit(val)), loc),
+                ))
+            }
             Some(TokenWithLoc {
                 token: Token::FloatLit(val),
                 loc,
@@ -1585,6 +1702,26 @@ impl<'l> CelCompiler<'l> {
     }
 }
 
+/// The tokenizer scans every signed int literal into a u64, so range checking is the
+/// compiler's job. Returns None when the digits do not fit an int64.
+fn int_literal(val: u64) -> Option<i64> {
+    if val <= i64::MAX as u64 {
+        Some(val as i64)
+    } else {
+        None
+    }
+}
+
+/// As `int_literal`, but for digits preceded by a unary minus. i64::MIN has no positive
+/// counterpart, so 9223372036854775808 is only in range with the minus applied.
+fn negate_int_literal(val: u64) -> Option<i64> {
+    if val == i64::MAX as u64 + 1 {
+        Some(i64::MIN)
+    } else {
+        int_literal(val).map(|v| -v)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use test_case::test_case;
@@ -1593,6 +1730,43 @@ mod test {
     use crate::{ByteCode, CelValue, Program};
 
     use super::CelCompiler;
+
+    // A minus directly preceding an int literal is folded into a negative constant, so
+    // int64::MIN is reachable as a literal even though negating it at runtime overflows.
+    #[test_case("-5", CelValue::Int(-5); "negative literal")]
+    #[test_case("-9223372036854775808", CelValue::Int(i64::MIN); "int64 min literal")]
+    #[test_case("9223372036854775807", CelValue::Int(i64::MAX); "int64 max literal")]
+    fn negative_int_literal_folds(input: &str, expected: CelValue) {
+        let prog = Program::from_source(input).unwrap();
+
+        assert_eq!(
+            prog.bytecode().as_slice(),
+            &[ByteCode::Push(expected)],
+            "expected a single folded Push, got:\n{}",
+            prog.dumps_bc()
+        );
+    }
+
+    // Digits that do not fit an int64 are a compile error rather than a silent wrap.
+    #[test_case("9223372036854775808"; "int64 max plus one")]
+    #[test_case("-9223372036854775809"; "int64 min minus one")]
+    fn out_of_range_int_literal_is_error(input: &str) {
+        assert!(Program::from_source(input).is_err());
+    }
+
+    // The fold must not change grouping: a second minus, or a member prime after the
+    // literal, both keep the runtime negation.
+    #[test_case("--5"; "double negation")]
+    #[test_case("-foo"; "negated ident")]
+    fn negation_not_folded(input: &str) {
+        let prog = Program::from_source(input).unwrap();
+
+        assert!(
+            prog.bytecode().iter().any(|op| matches!(op, ByteCode::Neg)),
+            "expected a runtime Neg, got:\n{}",
+            prog.dumps_bc()
+        );
+    }
 
     #[test_case("3+1"; "addition")]
     #[test_case("(1+foo) / 23"; "with literal")]
