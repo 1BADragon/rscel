@@ -362,12 +362,11 @@ impl CelValue {
     }
 
     pub fn neq(self, rhs: CelValue) -> CelValue {
-        self.error_prop_or(rhs, |lhs, rhs| {
-            if let CelValue::Bool(res) = CelValueDyn::eq(&lhs, &rhs) {
-                return CelValue::from_bool(!res);
-            }
-
-            unreachable!();
+        self.error_prop_or(rhs, |lhs, rhs| match CelValueDyn::eq(&lhs, &rhs) {
+            CelValue::Bool(res) => CelValue::from_bool(!res),
+            // eq() can return an Err (e.g. a Dyn type whose eq fails for the
+            // given rhs). Propagate it instead of panicking via unreachable!().
+            other => other,
         })
     }
 

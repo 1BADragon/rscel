@@ -864,3 +864,42 @@ fn test_match_captures_all() {
 
     assert_eq!(result, expected);
 }
+
+#[test]
+fn test_neq_propagates_dyn_eq_error() {
+    // Regression: neq() used to hit unreachable!() whenever eq() returned a
+    // non-Bool value (e.g. an Err from a Dyn type whose eq fails for the given
+    // rhs), which panicked the whole process. It must propagate the error
+    // instead. This is what surfaced as `pyobject != null` panicking in the
+    // python bindings.
+    #[derive(Debug)]
+    struct ErrOnEq;
+
+    impl std::fmt::Display for ErrOnEq {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "ErrOnEq")
+        }
+    }
+
+    impl crate::CelValueDyn for ErrOnEq {
+        fn as_type(&self) -> CelValue {
+            CelValue::from_type("ErrOnEq")
+        }
+        fn access(&self, _key: &str) -> CelValue {
+            CelValue::from_err(CelError::misc("no access"))
+        }
+        fn eq(&self, _rhs: &CelValue) -> CelValue {
+            CelValue::from_err(CelError::invalid_op("cannot compare ErrOnEq"))
+        }
+        fn is_truthy(&self) -> bool {
+            true
+        }
+        fn any_ref(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+
+    let obj = CelValue::Dyn(Arc::new(ErrOnEq));
+    // Must not panic; the eq() error propagates out through neq().
+    assert!(obj.neq(CelValue::from_null()).is_err());
+}
