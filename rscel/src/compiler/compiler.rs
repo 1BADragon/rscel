@@ -1639,17 +1639,27 @@ mod test {
         let prog = Program::from_source("bool([1,2,3].count(x, x > 0))").unwrap();
         let bc = prog.bytecode();
 
-        assert!(
-            !bc.iter().any(|op| matches!(op, ByteCode::CallMethod(_))),
-            "expected no CallMethod — count should be rolled up at compile time, got:\n{}",
-            prog.dumps_bc()
-        );
-        assert_eq!(
-            bc.as_slice(),
-            &[ByteCode::Push(CelValue::Bool(true))],
-            "expected single Push(Bool(true)), got:\n{}",
-            prog.dumps_bc()
-        );
+        if cfg!(feature = "type_prop") {
+            assert!(
+                !bc.iter().any(|op| matches!(op, ByteCode::CallMethod(_))),
+                "expected no CallMethod — count should be rolled up at compile time, got:\n{}",
+                prog.dumps_bc()
+            );
+            assert_eq!(
+                bc.as_slice(),
+                &[ByteCode::Push(CelValue::Bool(true))],
+                "expected single Push(Bool(true)), got:\n{}",
+                prog.dumps_bc()
+            );
+        } else {
+            // Without type_prop there is no bool(Int) overload, so check_for_const
+            // cannot evaluate the wrapper and the bool() call survives to runtime.
+            assert!(
+                bc.iter().any(|op| matches!(op, ByteCode::Call(_))),
+                "expected the bool() call to survive without type_prop, got:\n{}",
+                prog.dumps_bc()
+            );
+        }
     }
 
     #[test]
@@ -1659,17 +1669,27 @@ mod test {
         let prog = Program::from_source("bool([1,2,3].find(x, x > 1))").unwrap();
         let bc = prog.bytecode();
 
-        assert!(
-            !bc.iter().any(|op| matches!(op, ByteCode::CallMethod(_))),
-            "expected no CallMethod — find should be rolled up at compile time, got:\n{}",
-            prog.dumps_bc()
-        );
-        assert_eq!(
-            bc.as_slice(),
-            &[ByteCode::Push(CelValue::Bool(true))],
-            "expected single Push(Bool(true)), got:\n{}",
-            prog.dumps_bc()
-        );
+        if cfg!(feature = "type_prop") {
+            assert!(
+                !bc.iter().any(|op| matches!(op, ByteCode::CallMethod(_))),
+                "expected no CallMethod — find should be rolled up at compile time, got:\n{}",
+                prog.dumps_bc()
+            );
+            assert_eq!(
+                bc.as_slice(),
+                &[ByteCode::Push(CelValue::Bool(true))],
+                "expected single Push(Bool(true)), got:\n{}",
+                prog.dumps_bc()
+            );
+        } else {
+            // Without type_prop there is no bool(Int) overload, so check_for_const
+            // cannot evaluate the wrapper and the bool() call survives to runtime.
+            assert!(
+                bc.iter().any(|op| matches!(op, ByteCode::Call(_))),
+                "expected the bool() call to survive without type_prop, got:\n{}",
+                prog.dumps_bc()
+            );
+        }
     }
 
     #[test]
