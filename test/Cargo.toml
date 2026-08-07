@@ -1,0 +1,18 @@
+[package]
+name = "conformance"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "conformance"
+path = "src/main.rs"
+
+[build-dependencies]
+protobuf-codegen = { version = "3.7.1" }
+protoc-bin-vendored = { version = "3.1.0" }
+
+[dependencies]
+rscel = { path = "../rscel", features = ["protobuf"] }
+protobuf = { version = "3.7.2" }
+regex = "1"
