@@ -24,6 +24,48 @@ use crate::{interp::ByteCode, CelError, CelResult, CelValueDyn};
 use super::{cel_byte_code::CelByteCode, CelBytes};
 
 pub type CelTimeStamp = DateTime<Utc>;
+
+/// CEL timestamps are limited to [0001-01-01T00:00:00Z, 9999-12-31T23:59:59.999999999Z],
+/// as epoch seconds. Any nanos within the final second are still in range.
+const MIN_TIMESTAMP_SECS: i64 = -62135596800;
+const MAX_TIMESTAMP_SECS: i64 = 253402300799;
+
+/// Reject timestamps outside the range CEL allows, rather than returning a value the
+/// spec says cannot exist.
+pub(crate) fn check_timestamp_range(ts: CelTimeStamp) -> CelResult<CelTimeStamp> {
+    let secs = ts.timestamp();
+    if (MIN_TIMESTAMP_SECS..=MAX_TIMESTAMP_SECS).contains(&secs) {
+        Ok(ts)
+    } else {
+        Err(CelError::value("Timestamp out of range"))
+    }
+}
+
+/// CEL durations must be representable as int64 nanoseconds (roughly +/-292 years),
+/// which is narrower than what chrono's Duration can hold.
+pub(crate) fn check_duration_range(d: Duration) -> CelResult<Duration> {
+    if d.num_nanoseconds().is_some() {
+        Ok(d)
+    } else {
+        Err(CelError::value("Duration out of range"))
+    }
+}
+
+/// As `check_timestamp_range`/`check_duration_range`, but folded into the CelValue an
+/// operator has to return.
+fn timestamp_result(ts: Option<CelTimeStamp>) -> CelValue {
+    match ts.map(check_timestamp_range) {
+        Some(Ok(ts)) => CelValue::from_timestamp(ts),
+        _ => CelValue::from_err(CelError::value("Timestamp out of range")),
+    }
+}
+
+fn duration_result(d: Option<Duration>) -> CelValue {
+    match d.map(check_duration_range) {
+        Some(Ok(d)) => CelValue::from_duration(d),
+        _ => CelValue::from_err(CelError::value("Duration out of range")),
+    }
+}
 pub type CelValueVec = Vec<CelValue>;
 pub type CelValueMap = HashMap<String, CelValue>;
 
@@ -295,11 +337,13 @@ impl CelValue {
     }
 
     pub fn timestamp_type() -> CelValue {
-        CelValue::from_type("timestamp")
+        // CEL names these after their protobuf well-known types; the `timestamp` and
+        // `duration` identifiers still resolve here, they just carry the spec name.
+        CelValue::from_type("google.protobuf.Timestamp")
     }
 
     pub fn duration_type() -> CelValue {
-        CelValue::from_type("duration")
+        CelValue::from_type("google.protobuf.Duration")
     }
 
     pub fn bytecode_type() -> CelValue {
@@ -1289,12 +1333,12 @@ impl Add for CelValue {
                 }
                 CelValue::TimeStamp(v1) => {
                     if let CelValue::Duration(v2) = rhs {
-                        return CelValue::from_timestamp(v1 + v2);
+                        return timestamp_result(v1.checked_add_signed(v2));
                     }
                 }
                 CelValue::Duration(v1) => match rhs {
-                    CelValue::TimeStamp(v2) => return CelValue::from_timestamp(v2 + v1),
-                    CelValue::Duration(v2) => return CelValue::Duration(v1 + v2),
+                    CelValue::TimeStamp(v2) => return timestamp_result(v2.checked_add_signed(v1)),
+                    CelValue::Duration(v2) => return duration_result(v1.checked_add(&v2)),
                     _ => {}
                 },
                 _ => {}
@@ -1345,13 +1389,17 @@ impl Sub for CelValue {
                     }
                 }
                 CelValue::TimeStamp(v1) => match rhs {
-                    CelValue::Duration(v2) => return CelValue::from_timestamp(v1 - v2),
-                    CelValue::TimeStamp(v2) => return CelValue::from_duration(v1 - v2),
+                    CelValue::Duration(v2) => return timestamp_result(v1.checked_sub_signed(v2)),
+                    // signed_duration_since saturates rather than wrapping; anything
+                    // past int64 nanoseconds is caught by the range check.
+                    CelValue::TimeStamp(v2) => {
+                        return duration_result(Some(v1.signed_duration_since(v2)))
+                    }
                     _ => {}
                 },
                 CelValue::Duration(v1) => match rhs {
-                    CelValue::TimeStamp(v2) => return CelValue::from_timestamp(v2 - v1),
-                    CelValue::Duration(v2) => return CelValue::from_duration(v1 - v2),
+                    CelValue::TimeStamp(v2) => return timestamp_result(v2.checked_sub_signed(v1)),
+                    CelValue::Duration(v2) => return duration_result(v1.checked_sub(&v2)),
                     _ => {}
                 },
                 _ => {}

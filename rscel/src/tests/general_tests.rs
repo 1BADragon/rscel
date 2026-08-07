@@ -612,7 +612,9 @@ fn test_timestamp_functions() {
         ("time.getDayOfMonth()", 9),
         ("time.getDayOfMonth('US/Pacific')", 9),
         ("time.getDayOfWeek()", 3),
-        ("time.getDayOfWeek('US/Pacific')", 4),
+        // Same instant and same local day as getDayOfWeek() above, so it must agree:
+        // day-of-week is 0-based from Sunday.
+        ("time.getDayOfWeek('US/Pacific')", 3),
         ("time.getDayOfYear()", 9),
         ("time.getDayOfYear('US/Pacific')", 9),
         ("time.getFullYear()", 2024),
@@ -905,4 +907,74 @@ fn test_divide_by_zero_is_error(prog: &str) {
         matches!(ctx.exec("main", &exec_ctx), Err(CelError::DivideByZero)),
         "expected divide-by-zero error from {prog}"
     );
+}
+
+// Timezone arguments accept a fixed numeric offset, not just an IANA name.
+#[test_case("timestamp('2009-02-13T23:31:30Z').getDayOfMonth('+11:00')", 13.into(); "numeric tz positive")]
+#[test_case("timestamp('2009-02-13T02:00:00Z').getDayOfMonth('-02:30')", 11.into(); "numeric tz negative")]
+#[test_case("timestamp('2009-02-13T23:31:30Z').getHours('02:00')", 1.into(); "numeric tz unsigned")]
+#[test_case("timestamp('2009-02-13T23:31:30Z').getSeconds('-00:00')", 30.into(); "numeric tz zero")]
+// Named zones must still resolve DST rather than freezing one instant's offset.
+#[test_case("timestamp('2024-06-10T12:00:00Z').getHours('US/Pacific')", 5.into(); "named tz dst")]
+#[test_case("timestamp('2024-01-10T12:00:00Z').getHours('US/Pacific')", 4.into(); "named tz standard")]
+fn test_timezone_arguments(prog: &str, expected: CelValue) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+    assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), expected);
+}
+
+// CEL bounds timestamps to years 1..=9999 and durations to what fits in int64 nanos.
+#[test_case("timestamp('0000-01-01T00:00:00Z')"; "timestamp under range")]
+#[test_case("timestamp('9999-12-31T23:59:59Z') + duration('1s')"; "add over range")]
+#[test_case("timestamp('9999-12-31T23:59:59.999999999Z') + duration('1ns')"; "add nanos over range")]
+#[test_case("timestamp('9999-12-31T23:59:59Z') - timestamp('0001-01-01T00:00:00Z')"; "duration over range")]
+#[test_case("timestamp('0001-01-01T00:00:00Z') - timestamp('9999-12-31T23:59:59Z')"; "duration under range")]
+fn test_time_range_is_error(prog: &str) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+    assert!(
+        ctx.exec("main", &exec_ctx).is_err(),
+        "expected out-of-range error from {prog}"
+    );
+}
+
+#[test_case("string(timestamp('2009-02-13T23:31:30Z'))", "2009-02-13T23:31:30Z"; "rfc3339 uses Z")]
+#[test_case("string(timestamp('9999-12-31T23:59:59.999999999Z'))", "9999-12-31T23:59:59.999999999Z"; "rfc3339 keeps nanos")]
+fn test_timestamp_to_string(prog: &str, expected: &str) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+    assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), expected.into());
+}
+
+#[test_case("type(timestamp('2009-02-13T23:31:30Z'))", "google.protobuf.Timestamp"; "timestamp type name")]
+#[test_case("type(duration('1s'))", "google.protobuf.Duration"; "duration type name")]
+fn test_time_type_names(prog: &str, expected: &str) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+    assert_eq!(
+        ctx.exec("main", &exec_ctx).unwrap(),
+        CelValue::from_type(expected)
+    );
+}
+
+// Durations are signed; duration_str does not accept the leading minus itself.
+#[test]
+fn test_negative_duration() {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str(
+        "main",
+        "timestamp('0001-01-01T00:00:01.000000001Z') + duration('-999999999ns') == timestamp('0001-01-01T00:00:00.000000002Z')",
+    )
+    .unwrap();
+    assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), true.into());
 }

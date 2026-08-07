@@ -32,8 +32,12 @@ pub fn construct_type(type_name: &str, args: Vec<CelValue>) -> CelValue {
         "bytes" => bytes_impl(CelValue::from_null(), args),
         "string" => string_impl(CelValue::from_null(), args),
         "type" => type_impl(CelValue::from_null(), args),
-        "timestamp" => timestamp_impl(CelValue::from_null(), args),
-        "duration" => duration_impl(CelValue::from_null(), args),
+        // Both spellings resolve: `timestamp` is the CEL identifier, and the protobuf
+        // name is what the type value reports, which is what reaches this lookup.
+        "timestamp" | "google.protobuf.Timestamp" => {
+            timestamp_impl(CelValue::from_null(), args)
+        }
+        "duration" | "google.protobuf.Duration" => duration_impl(CelValue::from_null(), args),
         "dyn" => dyn_impl(CelValue::from_null(), args),
         _ => CelValue::from_err(CelError::runtime(&format!(
             "{} is not constructable",
