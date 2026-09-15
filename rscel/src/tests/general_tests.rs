@@ -853,8 +853,11 @@ fn test_match_captures_all() {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
 
-    ctx.add_program_str("main", r#"'one1two2three3'.matchCapturesAll('([a-z]+)([0-9])')"#)
-        .unwrap();
+    ctx.add_program_str(
+        "main",
+        r#"'one1two2three3'.matchCapturesAll('([a-z]+)([0-9])')"#,
+    )
+    .unwrap();
 
     let result = ctx.exec("main", &exec_ctx).unwrap();
 
