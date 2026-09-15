@@ -15,6 +15,7 @@ pub enum CelError {
     Binding { symbol: String },
     Attribute { parent: String, field: String },
     DivideByZero,
+    Overflow,
 
     Internal(String),
 }
@@ -75,6 +76,7 @@ impl CelError {
             Binding { .. } => "BINDING",
             Attribute { .. } => "ATTRIBUTE",
             DivideByZero => "DIVIDE BY ZERO",
+            Overflow => "OVERFLOW",
 
             Internal(..) => "INTERNAL",
         }
@@ -106,6 +108,7 @@ impl fmt::Display for CelError {
                 write!(f, "Field {} does not exist on {}", field, parent)
             }
             DivideByZero => write!(f, "Divide by zero error"),
+            Overflow => write!(f, "Integer overflow"),
         }
     }
 }

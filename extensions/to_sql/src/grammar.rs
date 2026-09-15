@@ -229,14 +229,13 @@ impl IntoSqlBuilder for Member {
         // Check if this is a single function call
         if self.member.len() == 1 {
             if let MemberPrime::Call { call } = self.member[0].node() {
-                // Get the function arguments (reversed to fix parser ordering)
+                // Get the function arguments, which the compiler emits in source order
                 let mut args = call
                     .node()
                     .exprs
                     .iter()
                     .map(|expr| expr.into_sql_builder())
                     .collect::<Result<Vec<_>, ToSqlError>>()?;
-                args.reverse();
 
                 // Check if this is a type casting operation
                 if let Primary::Ident(ident) = self.primary.node() {

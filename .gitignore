@@ -20,3 +20,8 @@ Cargo.lock
 
 __pycache__
 node_modules
+
+*.perf
+*.data
+*.svg
+*.old

@@ -11,18 +11,16 @@ mod methods {
     }
 
     mod internal {
-        use regex::{NoExpand, Regex};
+        use regex::NoExpand;
 
-        use crate::{CelError, CelValue};
+        use super::super::super::regex_cache::with_regex;
+
+        use crate::CelValue;
 
         pub fn replace_i(haystack: &str, needle: &str, to: &str) -> CelValue {
             let pattern = format!("(?i){}", regex::escape(needle));
-            match Regex::new(&pattern) {
-                Ok(re) => re.replace_all(haystack, NoExpand(to)).into_owned().into(),
-                Err(err) => {
-                    CelError::value(&format!("Invalid pattern: {}", err)).into()
-                }
-            }
+            with_regex(&pattern, |re| re.replace_all(haystack, NoExpand(to)).into_owned().into())
+                .unwrap_or_else(|e| e.into())
         }
     }
 }

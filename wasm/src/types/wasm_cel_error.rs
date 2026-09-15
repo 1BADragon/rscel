@@ -78,6 +78,9 @@ impl WasmCelError {
             CelError::DivideByZero => {
                 js_sys::Reflect::set(&val, &"type".into(), &"divide by zero".into()).unwrap();
             }
+            CelError::Overflow => {
+                js_sys::Reflect::set(&val, &"type".into(), &"overflow".into()).unwrap();
+            }
         };
 
         val.into()

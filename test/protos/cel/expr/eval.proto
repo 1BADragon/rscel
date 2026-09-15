@@ -1,0 +1,62 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package cel.expr;
+
+import "google/protobuf/any.proto";
+import "cel/expr/value.proto";
+
+option cc_enable_arenas = true;
+option go_package = "cel.dev/expr";
+option java_multiple_files = true;
+option java_outer_classname = "EvalProto";
+option java_package = "dev.cel.expr";
+
+// The state of an evaluation.
+message EvalState {
+  message Result {
+    int64 expr = 1;
+    int64 value = 2;
+  }
+  repeated ExprValue values = 1;
+  repeated Result results = 3;
+}
+
+// The value of an evaluated expression.
+message ExprValue {
+  oneof kind {
+    Value value = 1;
+    ErrorSet error = 2;
+    UnknownSet unknown = 3;
+  }
+}
+
+// A set of errors.
+message ErrorSet {
+  repeated Status errors = 1;
+}
+
+// Status, wire-compatible with google.rpc.Status.
+message Status {
+  int32 code = 1;
+  string message = 2;
+  repeated google.protobuf.Any details = 3;
+}
+
+// A set of expressions for which the value is unknown.
+message UnknownSet {
+  repeated int64 exprs = 1;
+}

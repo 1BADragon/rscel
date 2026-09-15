@@ -1,0 +1,127 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package cel.expr;
+
+import "cel/expr/syntax.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
+
+option cc_enable_arenas = true;
+option go_package = "cel.dev/expr";
+option java_multiple_files = true;
+option java_outer_classname = "DeclProto";
+option java_package = "dev.cel.expr";
+
+// A CEL expression which has been successfully type checked.
+message CheckedExpr {
+  map<int64, Reference> reference_map = 2;
+  map<int64, Type> type_map = 3;
+  SourceInfo source_info = 5;
+  string expr_version = 6;
+  Expr expr = 4;
+}
+
+// Represents a CEL type.
+message Type {
+  message ListType {
+    Type elem_type = 1;
+  }
+
+  message MapType {
+    Type key_type = 1;
+    Type value_type = 2;
+  }
+
+  message FunctionType {
+    Type result_type = 1;
+    repeated Type arg_types = 2;
+  }
+
+  message AbstractType {
+    string name = 1;
+    repeated Type parameter_types = 2;
+  }
+
+  enum PrimitiveType {
+    PRIMITIVE_TYPE_UNSPECIFIED = 0;
+    BOOL = 1;
+    INT64 = 2;
+    UINT64 = 3;
+    DOUBLE = 4;
+    STRING = 5;
+    BYTES = 6;
+  }
+
+  enum WellKnownType {
+    WELL_KNOWN_TYPE_UNSPECIFIED = 0;
+    ANY = 1;
+    TIMESTAMP = 2;
+    DURATION = 3;
+  }
+
+  oneof type_kind {
+    google.protobuf.Empty dyn = 1;
+    google.protobuf.NullValue null = 2;
+    PrimitiveType primitive = 3;
+    PrimitiveType wrapper = 4;
+    WellKnownType well_known = 5;
+    ListType list_type = 6;
+    MapType map_type = 7;
+    FunctionType function = 8;
+    string message_type = 9;
+    string type_param = 10;
+    Type type = 11;
+    google.protobuf.Empty error = 12;
+    AbstractType abstract_type = 14;
+  }
+}
+
+// Represents a declaration of a named value or function.
+message Decl {
+  message IdentDecl {
+    Type type = 1;
+    Constant value = 2;
+    string doc = 3;
+  }
+
+  message FunctionDecl {
+    message Overload {
+      string overload_id = 1;
+      repeated Type params = 2;
+      repeated string type_params = 3;
+      Type result_type = 4;
+      bool is_instance_function = 5;
+      string doc = 6;
+    }
+    repeated Overload overloads = 1;
+    string doc = 2;
+  }
+
+  string name = 1;
+
+  oneof decl_kind {
+    IdentDecl ident = 2;
+    FunctionDecl function = 3;
+  }
+}
+
+// Describes a resolved reference to a declaration.
+message Reference {
+  string name = 1;
+  repeated string overload_id = 3;
+  Constant value = 4;
+}

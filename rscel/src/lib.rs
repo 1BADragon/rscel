@@ -66,7 +66,7 @@ pub use compiler::{
 pub use context::{BindContext, CelContext, RsCelFunction, RsCelMacro};
 pub use interp::ByteCode;
 pub use program::{Program, ProgramDetails};
-pub use types::{CelError, CelResult, CelValue, CelValueDyn};
+pub use types::{CelError, CelResult, CelValue, CelValueDyn, MacroArg};
 
 // Some re-exports to allow a consistent use of serde
 pub use serde;

@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt};
 
 use crate::{
     context::construct_type, utils::ScopedCounter, BindContext, CelContext, CelError, CelResult,
-    CelValue, RsCelFunction, RsCelMacro,
+    CelValue, MacroArg, RsCelFunction, RsCelMacro,
 };
 
 struct InterpStack<'a, 'b> {
@@ -116,6 +116,10 @@ impl<'a> Interpreter<'a> {
 
     pub fn bindings_copy(&self) -> Option<BindContext<'_>> {
         self.bindings.cloned()
+    }
+
+    pub(crate) fn bindings_ref(&'a self) -> Option<&'a BindContext<'a>> {
+        self.bindings
     }
 
     pub fn run_program(&self, name: &str) -> CelResult<CelValue> {
@@ -491,12 +495,12 @@ impl<'a> Interpreter<'a> {
         args: &Vec<CelValue>,
         macro_: &RsCelMacro,
     ) -> Result<CelValue, CelError> {
-        let mut v = Vec::new();
+        let mut v: Vec<MacroArg> = Vec::new();
         for arg in args.iter() {
-            if let CelValue::ByteCode(bc) = arg {
-                v.push(bc);
-            } else {
-                return Err(CelError::internal("macro args must be bytecode"));
+            match arg {
+                CelValue::ByteCode(bc) => v.push(MacroArg::Expr(bc)),
+                CelValue::Binder(name) => v.push(MacroArg::Binder(name.clone())),
+                _ => return Err(CelError::internal("macro args must be bytecode or binder")),
             }
         }
         let res = macro_(self, this.clone(), &v);
@@ -506,10 +510,14 @@ impl<'a> Interpreter<'a> {
     fn resolve_args(&self, args: Vec<CelValue>) -> Result<Vec<CelValue>, CelError> {
         let mut arg_values = Vec::new();
         for arg in args.into_iter() {
-            if let CelValue::ByteCode(bc) = arg {
-                arg_values.push(self.run_raw(&bc, true)?);
-            } else {
-                arg_values.push(arg)
+            match arg {
+                CelValue::ByteCode(bc) => arg_values.push(self.run_raw(&bc, true)?),
+                CelValue::Binder(name) => {
+                    let bc =
+                        CelByteCode::from_code_point(ByteCode::Push(CelValue::from_ident(&name)));
+                    arg_values.push(self.run_raw(&bc, true)?);
+                }
+                other => arg_values.push(other),
             }
         }
         Ok(arg_values)
