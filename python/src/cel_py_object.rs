@@ -55,9 +55,6 @@ impl CelValueDyn for CelPyObject {
     }
 
     fn eq(&self, rhs: &CelValue) -> CelValue {
-        let lhs_type = self.as_type();
-        let rhs_type = self.as_type();
-
         if let CelValue::Dyn(rhs) = rhs {
             if let Some(rhs_obj) = rhs.any_ref().downcast_ref::<CelPyObject>() {
                 return Python::attach(|py| {
@@ -72,10 +69,11 @@ impl CelValueDyn for CelPyObject {
             }
         }
 
-        CelValue::from_err(CelError::invalid_op(&format!(
-            "Invalid op == between {} and {}",
-            lhs_type, rhs_type
-        )))
+        // A Python object is never equal to a non-Python-object value (e.g.
+        // null, an int, a string). Returning `false` rather than an error keeps
+        // `obj == null` / `obj != null` null-guards evaluating cleanly instead
+        // of surfacing a CelError (which previously panicked via neq()).
+        CelValue::from_bool(false)
     }
 
     fn is_truthy(&self) -> bool {

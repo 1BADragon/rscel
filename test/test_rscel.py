@@ -36,6 +36,16 @@ def test_nested_obj():
     assert rscel.eval("f.foo.a", {"f": NestedClass()}) == "foo"
 
 
+def test_obj_neq_null():
+    # Regression: a bound Python object compared to null used to panic
+    # (neq() hit unreachable!() because CelPyObject::eq returned an error for
+    # `obj == null`). A Python object is never equal to null.
+    assert rscel.eval("e == null", {"e": TestIntWrapper(3)}) == False
+    assert rscel.eval("e != null", {"e": TestIntWrapper(3)}) == True
+    # Null-guard chains used by filters must short-circuit cleanly.
+    assert rscel.eval("e != null && e._val == 3", {"e": TestIntWrapper(3)}) == True
+
+
 def test_callable_arg():
     called = False
 
