@@ -14,7 +14,7 @@ mod string;
 mod time_funcs;
 mod uom;
 
-const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
+const DEFAULT_FUNCS: &[(&str, &RsCelFunction)] = &[
     ("contains", &string::contains::contains),
     ("containsI", &string::contains::contains_i),
     ("size", &size::size),
@@ -131,6 +131,7 @@ const DEFAULT_FUNCS: &[(&str, &'static RsCelFunction)] = &[
     ("toRfc3339", &time_funcs::to_rfc3339::to_rfc3339),
     ("toTimestampString", &time_funcs::to_rfc3339::to_rfc3339),
     ("now", &now_impl),
+    ("clockNow", &clock_timestamp_impl),
     ("zip", &zip_impl),
     ("uomConvert", &uom::uom_convert),
     ("format", &format::format),
@@ -240,4 +241,17 @@ fn now_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     }
 
     runtime_start_time().into()
+}
+
+fn clock_timestamp_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
+    if !args.is_empty() {
+        return CelValue::from_err(CelError::argument("now() expects no arguments"));
+    }
+
+    // now() is evaluated at run time, never folded into a compile-time constant.
+    if in_const_eval() {
+        return CelValue::from_err(CelError::internal("now() cannot be const-evaluated"));
+    }
+
+    chrono::Utc::now().into()
 }

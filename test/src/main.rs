@@ -8,17 +8,19 @@ mod proto3_types {
     include!(concat!(env!("OUT_DIR"), "/cel_spec_protos_proto3/mod.rs"));
 }
 
+use protobuf::reflect::MessageDescriptor;
 use protos::eval::expr_value;
 use protos::simple::simple_test;
 use protos::{simple, value};
-use protobuf::reflect::MessageDescriptor;
 use regex::Regex;
 use rscel::{BindContext, CelContext, CelValue};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-const TEST_DATA_DIR: &str =
-    concat!(env!("CARGO_MANIFEST_DIR"), "/cel_spec_tests/simple-test-data");
+const TEST_DATA_DIR: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/cel_spec_tests/simple-test-data"
+);
 
 const SKIP_LIST_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/skip.txt");
 
@@ -103,11 +105,17 @@ fn main() {
 
         let bytes = match std::fs::read(&path) {
             Ok(b) => b,
-            Err(e) => { eprintln!("ERROR reading {filename}: {e}"); continue; }
+            Err(e) => {
+                eprintln!("ERROR reading {filename}: {e}");
+                continue;
+            }
         };
         let test_file: simple::SimpleTestFile = match protobuf::Message::parse_from_bytes(&bytes) {
             Ok(f) => f,
-            Err(e) => { eprintln!("PARSE ERROR {filename}: {e}"); continue; }
+            Err(e) => {
+                eprintln!("PARSE ERROR {filename}: {e}");
+                continue;
+            }
         };
 
         for section in &test_file.section {
@@ -127,16 +135,14 @@ fn main() {
                 }
 
                 let test = test.clone();
-                match std::panic::catch_unwind(|| run_test(&test))
-                    .unwrap_or_else(|e| {
-                        let msg = e
-                            .downcast_ref::<&str>()
-                            .map(|s| s.to_string())
-                            .or_else(|| e.downcast_ref::<String>().cloned())
-                            .unwrap_or_else(|| "unknown panic".into());
-                        Outcome::Fail(format!("panic: {msg}"))
-                    })
-                {
+                match std::panic::catch_unwind(|| run_test(&test)).unwrap_or_else(|e| {
+                    let msg = e
+                        .downcast_ref::<&str>()
+                        .map(|s| s.to_string())
+                        .or_else(|| e.downcast_ref::<String>().cloned())
+                        .unwrap_or_else(|| "unknown panic".into());
+                    Outcome::Fail(format!("panic: {msg}"))
+                }) {
                     Outcome::Pass => passed += 1,
                     Outcome::Fail(msg) => {
                         failed += 1;
@@ -256,8 +262,7 @@ fn proto_value_to_cel(v: &value::Value) -> Result<CelValue, String> {
         Some(value::value::Kind::StringValue(s)) => Ok(CelValue::from(s.as_str())),
         Some(value::value::Kind::BytesValue(b)) => Ok(CelValue::from(b.as_slice())),
         Some(value::value::Kind::ListValue(l)) => {
-            let items: Result<Vec<CelValue>, _> =
-                l.values.iter().map(proto_value_to_cel).collect();
+            let items: Result<Vec<CelValue>, _> = l.values.iter().map(proto_value_to_cel).collect();
             Ok(CelValue::from_list(items?))
         }
         Some(value::value::Kind::MapValue(m)) => {
