@@ -12,26 +12,22 @@ mod methods {
     };
 
     fn set_date(this: DateTime<Utc>, day: i64) -> CelResult<DateTime<Utc>> {
-        let day = u32::try_from(day)
-            .map_err(|_| CelError::argument("setDate() day out of range"))?;
+        let day =
+            u32::try_from(day).map_err(|_| CelError::argument("setDate() day out of range"))?;
         this.with_day(day)
             .ok_or_else(|| CelError::argument("setDate() day out of range"))
     }
 
     fn set_date(this: DateTime<Utc>, day: u64) -> CelResult<DateTime<Utc>> {
-        let day = u32::try_from(day)
-            .map_err(|_| CelError::argument("setDate() day out of range"))?;
+        let day =
+            u32::try_from(day).map_err(|_| CelError::argument("setDate() day out of range"))?;
         this.with_day(day)
             .ok_or_else(|| CelError::argument("setDate() day out of range"))
     }
 
-    fn set_date(
-        this: DateTime<Utc>,
-        day: i64,
-        timezone: String,
-    ) -> CelResult<DateTime<Utc>> {
-        let day = u32::try_from(day)
-            .map_err(|_| CelError::argument("setDate() day out of range"))?;
+    fn set_date(this: DateTime<Utc>, day: i64, timezone: String) -> CelResult<DateTime<Utc>> {
+        let day =
+            u32::try_from(day).map_err(|_| CelError::argument("setDate() day out of range"))?;
         let adjusted = get_adjusted_datetime(this, timezone)?;
         let updated = adjusted
             .with_day(day)
@@ -39,13 +35,9 @@ mod methods {
         Ok(updated.with_timezone(&Utc))
     }
 
-    fn set_date(
-        this: DateTime<Utc>,
-        day: u64,
-        timezone: String,
-    ) -> CelResult<DateTime<Utc>> {
-        let day = u32::try_from(day)
-            .map_err(|_| CelError::argument("setDate() day out of range"))?;
+    fn set_date(this: DateTime<Utc>, day: u64, timezone: String) -> CelResult<DateTime<Utc>> {
+        let day =
+            u32::try_from(day).map_err(|_| CelError::argument("setDate() day out of range"))?;
         let adjusted = get_adjusted_datetime(this, timezone)?;
         let updated = adjusted
             .with_day(day)

@@ -25,11 +25,7 @@ mod methods {
             .ok_or_else(|| CelError::argument("setMinutes() minute out of range"))
     }
 
-    fn set_minutes(
-        this: DateTime<Utc>,
-        minute: i64,
-        timezone: String,
-    ) -> CelResult<DateTime<Utc>> {
+    fn set_minutes(this: DateTime<Utc>, minute: i64, timezone: String) -> CelResult<DateTime<Utc>> {
         let minute = u32::try_from(minute)
             .map_err(|_| CelError::argument("setMinutes() minute out of range"))?;
         let adjusted = get_adjusted_datetime(this, timezone)?;
@@ -39,11 +35,7 @@ mod methods {
         Ok(updated.with_timezone(&Utc))
     }
 
-    fn set_minutes(
-        this: DateTime<Utc>,
-        minute: u64,
-        timezone: String,
-    ) -> CelResult<DateTime<Utc>> {
+    fn set_minutes(this: DateTime<Utc>, minute: u64, timezone: String) -> CelResult<DateTime<Utc>> {
         let minute = u32::try_from(minute)
             .map_err(|_| CelError::argument("setMinutes() minute out of range"))?;
         let adjusted = get_adjusted_datetime(this, timezone)?;

@@ -16,8 +16,10 @@ mod methods {
         use crate::CelValue;
 
         pub fn match_replace(haystack: &str, needle: &str, rep: &str) -> CelValue {
-            with_regex(needle, |re| re.replace_all(haystack, rep).into_owned().into())
-                .unwrap_or_else(|e| e.into())
+            with_regex(needle, |re| {
+                re.replace_all(haystack, rep).into_owned().into()
+            })
+            .unwrap_or_else(|e| e.into())
         }
     }
 }

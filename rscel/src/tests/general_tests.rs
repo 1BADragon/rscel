@@ -359,6 +359,7 @@ fn test_contains() {
 #[test_case("format(255, '10x')", "        ff"; "format int hex space padded width 10")]
 #[test_case("format(7, '08b')", "00000111"; "format int binary zero padded width 8")]
 #[test_case("format(7, '8b')", "     111"; "format int binary space padded width 8")]
+#[test_case("now() == now()", true; "now() returns same value whole execution")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
@@ -1019,4 +1020,53 @@ fn test_neq_propagates_dyn_eq_error() {
     let obj = CelValue::Dyn(Arc::new(ErrOnEq));
     // Must not panic; the eq() error propagates out through neq().
     assert!(obj.neq(CelValue::from_null()).is_err());
+}
+
+#[test]
+fn test_now_is_stable_across_execution() {
+    let mut ctx = CelContext::new();
+    let mut exec_ctx = BindContext::new();
+
+    let sleep = |_this: CelValue, _args: Vec<CelValue>| -> CelValue {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        CelValue::from_null()
+    };
+    exec_ctx.bind_func("sleep", &sleep);
+
+    ctx.add_program_str("main", "[now(), sleep(), now()]")
+        .unwrap();
+
+    let res = ctx.exec("main", &exec_ctx).unwrap();
+    let CelValue::List(items) = res else {
+        panic!("expected list, got {res:?}");
+    };
+    assert_eq!(items[0], items[2]);
+}
+
+#[test]
+fn test_now_nested_exec_does_not_panic() {
+    let mut inner_ctx = CelContext::new();
+    inner_ctx.add_program_str("inner", "now()").unwrap();
+    let inner_ctx = std::cell::RefCell::new(inner_ctx);
+
+    let inner = move |_this: CelValue, _args: Vec<CelValue>| -> CelValue {
+        inner_ctx
+            .borrow_mut()
+            .exec("inner", &BindContext::new())
+            .unwrap_or_else(CelValue::from_err)
+    };
+
+    let mut ctx = CelContext::new();
+    let mut exec_ctx = BindContext::new();
+    exec_ctx.bind_func("inner", &inner);
+
+    ctx.add_program_str("main", "now() == inner()").unwrap();
+    assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), true.into());
+
+    // Runtime is cleared after the outer run, so a later run gets a fresh time.
+    ctx.add_program_str("outside", "now()").unwrap();
+    let first = ctx.exec("outside", &exec_ctx).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    let second = ctx.exec("outside", &exec_ctx).unwrap();
+    assert_ne!(first, second);
 }

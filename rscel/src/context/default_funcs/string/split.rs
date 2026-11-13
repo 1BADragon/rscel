@@ -25,7 +25,9 @@ mod split {
         if limit <= 0 {
             return Vec::new();
         }
-        this.splitn(limit as usize, &needle).map(|s| s.into()).collect()
+        this.splitn(limit as usize, &needle)
+            .map(|s| s.into())
+            .collect()
     }
 }
 

@@ -870,7 +870,10 @@ impl<'l> CelCompiler<'l> {
 
                     let (member, member_ast) = self.parse_member_tail(
                         CompiledProg::with_const(lit.into()),
-                        AstNode::new(Primary::Literal(LiteralsAndKeywords::IntegerLit(lit)), lit_loc),
+                        AstNode::new(
+                            Primary::Literal(LiteralsAndKeywords::IntegerLit(lit)),
+                            lit_loc,
+                        ),
                     )?;
 
                     let neg_ast = AstNode::new(
@@ -1640,11 +1643,7 @@ impl<'l> CelCompiler<'l> {
     ///
     /// Only validates names that match built-in macros; unknown names are passed through
     /// unchanged so user-defined functions/macros with those names still compile.
-    fn validate_macro_args(
-        name: &str,
-        args: &[CelValue],
-        loc: SourceRange,
-    ) -> CelResult<()> {
+    fn validate_macro_args(name: &str, args: &[CelValue], loc: SourceRange) -> CelResult<()> {
         // (min_args, max_args, binder_positions)
         let (min_args, max_args, binder_positions): (usize, usize, &[usize]) = match name {
             "has" => (1, 1, &[]),
@@ -1693,7 +1692,10 @@ impl<'l> CelCompiler<'l> {
         let mut i = Interpreter::empty();
         i.add_bindings(&self.bindings);
         let bc = member_prime_node.into_unresolved_bytecode().resolve();
-        let r = i.run_raw(&bc, true);
+        let r = {
+            let _const_eval = crate::interp::start_const_eval();
+            i.run_raw(&bc, true)
+        };
 
         match r {
             Ok(v) => CompiledProg::with_const(v),

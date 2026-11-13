@@ -1,5 +1,5 @@
 pub use super::types::{ByteCode, JmpWhen};
-use crate::{types::CelByteCode, CelValueDyn};
+use crate::{interp::runtime::start_runtime, types::CelByteCode, CelValueDyn};
 use std::{collections::HashMap, fmt};
 
 use crate::{
@@ -123,10 +123,12 @@ impl<'a> Interpreter<'a> {
     }
 
     pub fn run_program(&self, name: &str) -> CelResult<CelValue> {
+        let _runtime = start_runtime(self);
+
         match self.cel {
             Some(cel) => match cel.get_program(name) {
                 Some(prog) => self.run_raw(prog.bytecode(), true),
-                None => Err(CelError::binding(&name)),
+                None => Err(CelError::binding(name)),
             },
             None => Err(CelError::internal("No CEL context bound to interpreter")),
         }

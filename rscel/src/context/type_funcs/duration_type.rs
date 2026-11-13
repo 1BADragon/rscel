@@ -31,7 +31,8 @@ mod methods {
     }
 
     fn duration(arg: i64) -> CelResult<Duration> {
-        let d = Duration::new(arg, 0).ok_or_else(|| CelError::value("Invalid argument for duration"))?;
+        let d = Duration::new(arg, 0)
+            .ok_or_else(|| CelError::value("Invalid argument for duration"))?;
         check_duration_range(d)
     }
 

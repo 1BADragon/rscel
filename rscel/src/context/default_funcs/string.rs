@@ -1,17 +1,17 @@
 use crate::{CelError, CelValue};
 
-pub(super) mod regex_cache;
 pub mod char_at;
 pub mod contains;
 pub mod ends_with;
 pub mod index_of;
 pub mod join;
-pub mod quote;
 pub mod match_captures;
 pub mod match_captures_all;
 pub mod match_replace;
 pub mod match_replace_once;
 pub mod matches;
+pub mod quote;
+pub(super) mod regex_cache;
 pub mod remove;
 pub mod repeat;
 pub mod replace;
@@ -53,9 +53,7 @@ string_func!(trimEnd, trim_end_impl, trim_end);
 pub fn pad_start_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let s = match this {
         CelValue::String(ref s) => s.clone(),
-        _ => {
-            return CelValue::from_err(CelError::value("padStart is only available on strings"))
-        }
+        _ => return CelValue::from_err(CelError::value("padStart is only available on strings")),
     };
 
     let width = match args.first() {
@@ -103,9 +101,7 @@ pub fn pad_start_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
 pub fn pad_end_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let s = match this {
         CelValue::String(ref s) => s.clone(),
-        _ => {
-            return CelValue::from_err(CelError::value("padEnd is only available on strings"))
-        }
+        _ => return CelValue::from_err(CelError::value("padEnd is only available on strings")),
     };
 
     let width = match args.first() {

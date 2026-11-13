@@ -9,18 +9,16 @@ pub fn join(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let separator = match args.first() {
         Some(CelValue::String(s)) => s.as_str(),
         None => "",
-        _ => {
-            return CelValue::from_err(CelError::argument(
-                "join() separator must be a string",
-            ))
-        }
+        _ => return CelValue::from_err(CelError::argument("join() separator must be a string")),
     };
 
     let parts: Result<Vec<&str>, _> = items
         .iter()
         .map(|v| match v {
             CelValue::String(s) => Ok(s.as_str()),
-            _ => Err(CelError::value("join() requires all list elements to be strings")),
+            _ => Err(CelError::value(
+                "join() requires all list elements to be strings",
+            )),
         })
         .collect();
 

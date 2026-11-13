@@ -6,7 +6,9 @@ pub fn quote(this: CelValue, args: Vec<CelValue>) -> CelValue {
         CelValue::String(s) if args.is_empty() => s,
         _ => match args.first() {
             Some(CelValue::String(s)) => s.clone(),
-            _ => return CelValue::from_err(CelError::argument("quote() requires a string argument")),
+            _ => {
+                return CelValue::from_err(CelError::argument("quote() requires a string argument"))
+            }
         },
     };
 

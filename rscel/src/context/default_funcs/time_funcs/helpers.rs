@@ -114,7 +114,11 @@ fn parse_fixed_offset(timezone: &str) -> Option<FixedOffset> {
     if hours.len() != 2 || minutes.len() != 2 {
         return None;
     }
-    if !hours.bytes().chain(minutes.bytes()).all(|b| b.is_ascii_digit()) {
+    if !hours
+        .bytes()
+        .chain(minutes.bytes())
+        .all(|b| b.is_ascii_digit())
+    {
         return None;
     }
 

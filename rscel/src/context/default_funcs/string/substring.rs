@@ -22,11 +22,7 @@ pub fn substring(this: CelValue, args: Vec<CelValue>) -> CelValue {
         Some(CelValue::Int(n)) => *n as usize,
         Some(CelValue::UInt(n)) => *n as usize,
         None => char_count,
-        _ => {
-            return CelValue::from_err(CelError::argument(
-                "substring() end must be numeric",
-            ))
-        }
+        _ => return CelValue::from_err(CelError::argument("substring() end must be numeric")),
     };
 
     if start > char_count || end > char_count || start > end {

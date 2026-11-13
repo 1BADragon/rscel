@@ -51,8 +51,7 @@ impl<'a> MacroArg<'a> {
     pub fn eval(&self, ctx: &crate::interp::Interpreter<'_>) -> CelResult<CelValue> {
         match self {
             MacroArg::Binder(name) => {
-                let bc =
-                    CelByteCode::from_code_point(ByteCode::Push(CelValue::from_ident(name)));
+                let bc = CelByteCode::from_code_point(ByteCode::Push(CelValue::from_ident(name)));
                 ctx.run_raw(&bc, true)
             }
             MacroArg::Expr(bc) => ctx.run_raw(bc, true),

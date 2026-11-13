@@ -19,8 +19,10 @@ mod methods {
 
         pub fn replace_i(haystack: &str, needle: &str, to: &str) -> CelValue {
             let pattern = format!("(?i){}", regex::escape(needle));
-            with_regex(&pattern, |re| re.replace_all(haystack, NoExpand(to)).into_owned().into())
-                .unwrap_or_else(|e| e.into())
+            with_regex(&pattern, |re| {
+                re.replace_all(haystack, NoExpand(to)).into_owned().into()
+            })
+            .unwrap_or_else(|e| e.into())
         }
     }
 }

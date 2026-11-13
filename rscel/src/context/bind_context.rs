@@ -187,9 +187,7 @@ impl<'a> BindContext<'a> {
 
     /// Get a type by name. Checks local types first, then walks up the parent chain.
     pub(crate) fn get_type(&self, name: &str) -> Option<&CelValue> {
-        self.types
-            .get(name)
-            .or_else(|| self.parent?.get_type(name))
+        self.types.get(name).or_else(|| self.parent?.get_type(name))
     }
 }
 
