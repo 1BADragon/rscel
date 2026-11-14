@@ -96,15 +96,15 @@ impl TryFrom<JsValue> for WasmCelValue {
             } else {
                 let obj: js_sys::Object = value.into();
 
-                if obj.has_own_property(&"cel_float".into()) {
+                if js_sys::Object::has_own(&obj, &"cel_float".into()) {
                     Ok(WasmCelValue::new(CelValue::from_float(
                         extract_number_value(&obj, "cel_float")?,
                     )))
-                } else if obj.has_own_property(&"cel_int".into()) {
+                } else if js_sys::Object::has_own(&obj, &"cel_int".into()) {
                     Ok(WasmCelValue::new(CelValue::from_int(extract_number_value(
                         &obj, "cel_int",
                     )?)))
-                } else if obj.has_own_property(&"cel_uint".into()) {
+                } else if js_sys::Object::has_own(&obj, &"cel_uint".into()) {
                     Ok(WasmCelValue::new(CelValue::from_uint(
                         extract_number_value(&obj, "cel_uint")?,
                     )))
@@ -128,7 +128,7 @@ impl TryFrom<JsValue> for WasmCelValue {
             }
         } else if let Some(numval) = value.dyn_ref::<js_sys::Number>() {
             if numval
-                .to_string(10)
+                .to_string_with_radix(10)
                 .is_ok_and(|x| x.as_string().is_some_and(|s| s.contains('.')))
             {
                 Ok(WasmCelValue::new(CelValue::from_float(numval.value_of())))

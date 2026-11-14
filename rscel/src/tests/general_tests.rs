@@ -956,8 +956,8 @@ fn test_timestamp_to_string(prog: &str, expected: &str) {
     assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), expected.into());
 }
 
-#[test_case("type(timestamp('2009-02-13T23:31:30Z'))", "google.protobuf.Timestamp"; "timestamp type name")]
-#[test_case("type(duration('1s'))", "google.protobuf.Duration"; "duration type name")]
+#[test_case("type(timestamp('2009-02-13T23:31:30Z'))", "timestamp"; "timestamp type name")]
+#[test_case("type(duration('1s'))", "duration"; "duration type name")]
 fn test_time_type_names(prog: &str, expected: &str) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

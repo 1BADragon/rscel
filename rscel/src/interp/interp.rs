@@ -1,5 +1,9 @@
 pub use super::types::{ByteCode, JmpWhen};
-use crate::{interp::runtime::start_runtime, types::CelByteCode, CelValueDyn};
+use crate::{
+    interp::runtime::{runtime_copy, start_runtime, start_runtime_prebuilt, InterpRuntime},
+    types::CelByteCode,
+    CelValueDyn,
+};
 use std::{collections::HashMap, fmt};
 
 use crate::{
@@ -122,9 +126,23 @@ impl<'a> Interpreter<'a> {
         self.bindings
     }
 
-    pub fn run_program(&self, name: &str) -> CelResult<CelValue> {
+    pub fn run_program(&self, name: &str) -> (CelResult<CelValue>, InterpRuntime) {
         let _runtime = start_runtime(self);
 
+        (self.run_program_inner(name), runtime_copy())
+    }
+
+    pub fn run_program_with_rt(
+        &self,
+        name: &str,
+        rt: InterpRuntime,
+    ) -> (CelResult<CelValue>, InterpRuntime) {
+        let _runtime = start_runtime_prebuilt(self, rt);
+
+        (self.run_program_inner(name), runtime_copy())
+    }
+
+    fn run_program_inner(&self, name: &str) -> CelResult<CelValue> {
         match self.cel {
             Some(cel) => match cel.get_program(name) {
                 Some(prog) => self.run_raw(prog.bytecode(), true),

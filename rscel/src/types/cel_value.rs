@@ -148,6 +148,11 @@ impl CelValue {
         CelValue::String(val)
     }
 
+    // Not implementing the trait because the trait expects to be able to parse the
+    // str into a target data type. To me, that implies "3" should be a CelValue::Int
+    // (or uint) not a CelValue::String with value "3". This from_str always creates
+    // a CelValue::String with value copied directly from the str.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(val: &str) -> CelValue {
         CelValue::String(val.to_owned())
     }
@@ -337,13 +342,11 @@ impl CelValue {
     }
 
     pub fn timestamp_type() -> CelValue {
-        // CEL names these after their protobuf well-known types; the `timestamp` and
-        // `duration` identifiers still resolve here, they just carry the spec name.
-        CelValue::from_type("google.protobuf.Timestamp")
+        CelValue::from_type("timestamp")
     }
 
     pub fn duration_type() -> CelValue {
-        CelValue::from_type("google.protobuf.Duration")
+        CelValue::from_type("duration")
     }
 
     pub fn bytecode_type() -> CelValue {
@@ -365,11 +368,7 @@ impl CelValue {
     }
 
     pub fn is_null(&self) -> bool {
-        if let CelValue::Null = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, CelValue::Null)
     }
 
     fn type_prop(lhs: CelValue, rhs: CelValue) -> (CelValue, CelValue) {

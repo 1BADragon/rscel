@@ -1,9 +1,13 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 
 use chrono::{DateTime, Utc};
 
 use crate::interp::Interpreter;
 
+// Thread local global context to allow the specific runtime information of a run to
+// be pulled from any point in the execution. This will also allow a user to "reply"
+// an old run with the fixed time.
+#[derive(Debug, Clone)]
 pub struct InterpRuntime {
     start_time: DateTime<Utc>,
 }
@@ -18,17 +22,33 @@ thread_local! {
     static INTERP_RUNTIME: RefCell<Option<InterpRuntime>> = const { RefCell::new(None) };
 }
 
-pub fn start_runtime(_interp: &Interpreter) -> InterpRuntimeGuard {
+pub fn start_runtime_prebuilt(_interp: &Interpreter, runtime: InterpRuntime) -> InterpRuntimeGuard {
     INTERP_RUNTIME.with(|rt| {
         let mut rt = rt.borrow_mut();
         if rt.is_some() {
             return InterpRuntimeGuard { owns: false };
         }
-        *rt = Some(InterpRuntime {
-            start_time: Utc::now(),
-        });
+        *rt = Some(runtime);
         InterpRuntimeGuard { owns: true }
     })
+}
+
+pub fn start_runtime(interp: &Interpreter) -> InterpRuntimeGuard {
+    let rt = InterpRuntime::from_interp(interp);
+
+    start_runtime_prebuilt(interp, rt)
+}
+
+impl InterpRuntime {
+    pub fn new(start_time: chrono::DateTime<Utc>) -> Self {
+        InterpRuntime { start_time }
+    }
+
+    fn from_interp(_interp: &Interpreter) -> Self {
+        InterpRuntime {
+            start_time: chrono::Utc::now(),
+        }
+    }
 }
 
 impl Drop for InterpRuntimeGuard {
@@ -47,28 +67,6 @@ pub fn runtime_start_time() -> DateTime<Utc> {
         .unwrap_or_else(Utc::now)
 }
 
-thread_local! {
-    static CONST_EVAL: Cell<bool> = const { Cell::new(false) };
-}
-
-/// Marks the current thread as doing compile-time constant folding. Impure
-/// functions (e.g. `now()`) check `in_const_eval()` and refuse to fold.
-pub struct ConstEvalGuard {
-    prev: bool,
-}
-
-pub fn start_const_eval() -> ConstEvalGuard {
-    ConstEvalGuard {
-        prev: CONST_EVAL.replace(true),
-    }
-}
-
-impl Drop for ConstEvalGuard {
-    fn drop(&mut self) {
-        CONST_EVAL.set(self.prev);
-    }
-}
-
-pub fn in_const_eval() -> bool {
-    CONST_EVAL.get()
+pub fn runtime_copy() -> InterpRuntime {
+    INTERP_RUNTIME.with(|rt| rt.borrow().as_ref().unwrap().clone())
 }

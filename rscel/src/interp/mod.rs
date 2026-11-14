@@ -5,7 +5,7 @@ mod types;
 pub use interp::Interpreter;
 pub use types::*;
 
-pub use runtime::{in_const_eval, runtime_start_time, start_const_eval};
+pub use runtime::{runtime_start_time, InterpRuntime};
 
 #[cfg(test)]
 mod test {

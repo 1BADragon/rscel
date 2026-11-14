@@ -6,11 +6,12 @@ mod default_macros;
 mod type_funcs;
 use crate::{
     compiler::{compiler::CelCompiler, string_tokenizer::StringTokenizer},
-    interp::Interpreter,
+    interp::{InterpRuntime, Interpreter},
     program::{Program, ProgramDetails},
     CelResult, CelValue,
 };
 pub use bind_context::{BindContext, RsCelFunction, RsCelMacro};
+pub(crate) use default_funcs::DEFAULT_FUNCS;
 pub use type_funcs::construct_type;
 
 /// The CelContext is the core context in RsCel. This context contains
@@ -64,7 +65,24 @@ impl CelContext {
     pub fn exec<'l>(&'l mut self, name: &str, bindings: &'l BindContext) -> CelResult<CelValue> {
         let interp = Interpreter::new(&self, bindings);
 
-        interp.run_program(name)
+        interp.run_program(name).0
+    }
+
+    // Same as exec but allows the user to optionally specify the runtime param as well
+    // as return one. If the user specifies a runtime, they will receive the same one
+    // in the return value
+    pub fn exec_with_rt<'l>(
+        &'l mut self,
+        name: &str,
+        bindings: &'l BindContext,
+        rt: Option<InterpRuntime>,
+    ) -> (CelResult<CelValue>, InterpRuntime) {
+        let interp = Interpreter::new(&self, bindings);
+
+        match rt {
+            Some(rt) => interp.run_program_with_rt(name, rt),
+            None => interp.run_program(name),
+        }
     }
 
     // pub(crate) fn eval_expr(

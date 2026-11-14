@@ -96,6 +96,10 @@ impl CompiledProg {
         &self.details
     }
 
+    pub fn details_mut(&mut self) -> &mut ProgramDetails {
+        &mut self.details
+    }
+
     pub fn into_parts(self) -> (NodeValue, ProgramDetails) {
         (self.inner, self.details)
     }

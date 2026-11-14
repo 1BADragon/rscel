@@ -64,7 +64,7 @@ pub use compiler::{
     source_range::SourceRange, string_tokenizer::StringTokenizer, tokenizer::Tokenizer,
 };
 pub use context::{BindContext, CelContext, RsCelFunction, RsCelMacro};
-pub use interp::ByteCode;
+pub use interp::{ByteCode, InterpRuntime};
 pub use program::{Program, ProgramDetails};
 pub use types::{CelError, CelResult, CelValue, CelValueDyn, MacroArg};
 
