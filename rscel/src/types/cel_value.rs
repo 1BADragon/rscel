@@ -269,19 +269,11 @@ impl CelValue {
     }
 
     pub fn is_err(&self) -> bool {
-        if let CelValue::Err(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, CelValue::Err(_))
     }
 
     pub fn is_obj(&self) -> bool {
-        match self {
-            CelValue::Map(_) => true,
-            CelValue::Dyn(_) => true,
-            _ => false,
-        }
+        matches!(self, CelValue::Map(_) | CelValue::Dyn(_))
     }
 
     pub fn is_zero(&self) -> bool {
@@ -603,7 +595,7 @@ impl CelValue {
                         return CelValue::from_err(CelError::value("List access out of bounds"));
                     }
 
-                    return list[index as usize].clone();
+                    list[index as usize].clone()
                 } else if let CelValue::Int(index) = index {
                     if index < 0 {
                         if cfg!(feature = "neg_index") {
@@ -627,9 +619,9 @@ impl CelValue {
 
                             list[adjusted_index as usize].clone()
                         } else {
-                            return CelValue::from_err(CelError::value(
+                            CelValue::from_err(CelError::value(
                                 "Negative index is not allowed",
-                            ));
+                            ))
                         }
                     } else {
                         if index as usize >= list.len() {
@@ -641,17 +633,17 @@ impl CelValue {
                         list[index as usize].clone()
                     }
                 } else {
-                    return CelValue::from_err(CelError::value(
+                    CelValue::from_err(CelError::value(
                         "List index can only be int or uint",
-                    ));
+                    ))
                 }
             }
             CelValue::Map(map) => {
                 if let CelValue::String(index) = index {
                     match map.get(index.as_str()) {
-                        Some(val) => return val.clone(),
+                        Some(val) => val.clone(),
                         None => {
-                            return CelValue::from_err(CelError::attribute("obj", &index));
+                            CelValue::from_err(CelError::attribute("obj", &index))
                         }
                     }
                 } else {
@@ -663,7 +655,7 @@ impl CelValue {
             }
             CelValue::Dyn(d) => {
                 if let CelValue::String(index) = index {
-                    return d.access(&index);
+                    d.access(&index)
                 } else {
                     CelValue::from_err(CelError::value(&format!(
                         "Dyn index operator mush be a string, found {:?}",
@@ -704,7 +696,7 @@ impl CelValueDyn for CelValue {
             CelValue::Enum {
                 descriptor,
                 value: _value,
-            } => CelValue::enum_type(&descriptor),
+            } => CelValue::enum_type(descriptor),
             CelValue::Dyn(obj) => obj.as_type(),
             CelValue::Err(_) => CelValue::err_type(),
         }
@@ -841,7 +833,7 @@ impl CelValueDyn for CelValue {
                         },
                         CelValue::String(strval),
                     ) => {
-                        if let Some(_) = l_desc.value_by_name(&strval) {
+                        if l_desc.value_by_name(&strval).is_some() {
                             CelValue::true_()
                         } else {
                             CelValue::false_()
@@ -863,10 +855,10 @@ impl CelValueDyn for CelValue {
             CelValue::UInt(u) => *u != 0,
             CelValue::Float(f) => *f != 0.0,
             CelValue::Bool(b) => *b,
-            CelValue::String(s) => s.len() != 0,
+            CelValue::String(s) => !s.is_empty(),
             CelValue::Bytes(b) => b.len() != 0,
-            CelValue::List(l) => l.len() != 0,
-            CelValue::Map(m) => m.len() != 0,
+            CelValue::List(l) => !l.is_empty(),
+            CelValue::Map(m) => !m.is_empty(),
             CelValue::Null => false,
             CelValue::Type(_) => true,
             CelValue::TimeStamp(_) => true,
@@ -884,7 +876,7 @@ impl CelValueDyn for CelValue {
         }
     }
 
-    fn any_ref<'a>(&'a self) -> &'a dyn Any {
+    fn any_ref(&self) -> &dyn Any {
         self
     }
 }
@@ -910,7 +902,7 @@ impl From<&Value> for CelValue {
             Value::String(val) => CelValue::from_string(val.clone()),
             Value::Bool(val) => CelValue::from_bool(*val),
             Value::Array(val) => {
-                let list: Vec<CelValue> = val.iter().map(|x| CelValue::from(x)).collect();
+                let list: Vec<CelValue> = val.iter().map(CelValue::from).collect();
                 CelValue::from_list(list)
             }
             Value::Null => CelValue::from_null(),
@@ -948,7 +940,7 @@ impl From<Value> for CelValue {
             Value::String(val) => CelValue::from_string(val),
             Value::Bool(val) => CelValue::from_bool(val),
             Value::Array(val) => {
-                let list: Vec<CelValue> = val.iter().map(|x| CelValue::from(x)).collect();
+                let list: Vec<CelValue> = val.iter().map(CelValue::from).collect();
                 CelValue::from_list(list)
             }
             Value::Null => CelValue::from_null(),

@@ -4,8 +4,8 @@ pub trait SqlBuilder {
     fn to_sql(self: Box<Self>) -> ToSqlResult<String>;
 }
 
-pub trait IntoSqlBuilder {
-    fn into_sql_builder(&self) -> ToSqlResult<Box<dyn SqlBuilder>>;
+pub trait ToSqlBuilder {
+    fn to_sql_builder(&self) -> ToSqlResult<Box<dyn SqlBuilder>>;
 }
 
 // Concrete SqlBuilder implementations

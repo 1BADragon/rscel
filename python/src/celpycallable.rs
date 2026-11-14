@@ -21,7 +21,7 @@ impl FnOnce<(CelValue, Vec<CelValue>)> for CelPyCallable {
                 py,
                 PyTuple::new(
                     py,
-                    &[args.0]
+                    [args.0]
                         .iter()
                         .filter(|x| !x.is_null())
                         .map(|x| PyCelValueRef::new(x).into_pyobject(py))
@@ -50,7 +50,7 @@ impl FnMut<(CelValue, Vec<CelValue>)> for CelPyCallable {
                 py,
                 PyTuple::new(
                     py,
-                    &[args.0]
+                    [args.0]
                         .iter()
                         .filter(|x| !x.is_null())
                         .map(|x| {
@@ -83,7 +83,7 @@ impl Fn<(CelValue, Vec<CelValue>)> for CelPyCallable {
                 py,
                 PyTuple::new(
                     py,
-                    &[args.0]
+                    [args.0]
                         .iter()
                         .filter(|x| !x.is_null())
                         .map(|x| {

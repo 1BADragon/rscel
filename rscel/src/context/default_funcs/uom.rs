@@ -29,7 +29,7 @@ pub mod methods {
     }
 
     fn uom_convert(base: f64, from: String, to: String) -> CelResult<f64> {
-        uom_convert_internal(base as f64, &from, &to)
+        uom_convert_internal(base, &from, &to)
     }
 }
 
@@ -42,19 +42,19 @@ fn uom_convert_internal(base: f64, from: &str, to: &str) -> CelResult<f64> {
     match (from_unit, to_unit) {
         (Unit::Mass(from_mass), Unit::Mass(to_mass)) => {
             let mass = from_mass.into_mass(base);
-            Ok(to_mass.from_mass(mass))
+            Ok(to_mass.value_of(mass))
         }
         (Unit::Volume(from_volume), Unit::Volume(to_volume)) => {
             let volume = from_volume.into_volume(base);
-            Ok(to_volume.from_volume(volume))
+            Ok(to_volume.value_of(volume))
         }
         (Unit::Speed(from_speed), Unit::Speed(to_speed)) => {
             let speed = from_speed.into_velocity(base);
-            Ok(to_speed.from_velocity(speed))
+            Ok(to_speed.value_of(speed))
         }
         (Unit::Temperature(from_temp), Unit::Temperature(to_temp)) => {
             let temp = from_temp.into_temperature(base);
-            Ok(to_temp.from_temperature(temp))
+            Ok(to_temp.value_of(temp))
         }
         _ => Err(CelError::argument(&format!(
             "Cannot convert units '{}' -> '{}'.",
@@ -159,7 +159,7 @@ impl MassUnit {
         }
     }
 
-    fn from_mass(self, mass: Mass) -> f64 {
+    fn value_of(self, mass: Mass) -> f64 {
         match self {
             MassUnit::Kilogram => mass.get::<kilogram>(),
             MassUnit::Gram => mass.get::<gram>(),
@@ -211,7 +211,7 @@ impl VolumeUnit {
         }
     }
 
-    fn from_volume(self, volume: Volume) -> f64 {
+    fn value_of(self, volume: Volume) -> f64 {
         match self {
             VolumeUnit::Liter => volume.get::<liter>(),
             VolumeUnit::Milliliter => volume.get::<milliliter>(),
@@ -251,7 +251,7 @@ impl SpeedUnit {
         }
     }
 
-    fn from_velocity(self, velocity: Velocity) -> f64 {
+    fn value_of(self, velocity: Velocity) -> f64 {
         match self {
             SpeedUnit::MeterPerSecond => velocity.get::<meter_per_second>(),
             SpeedUnit::KilometerPerHour => velocity.get::<kilometer_per_hour>(),
@@ -280,7 +280,7 @@ impl TemperatureUnit {
         }
     }
 
-    fn from_temperature(self, temp: ThermodynamicTemperature) -> f64 {
+    fn value_of(self, temp: ThermodynamicTemperature) -> f64 {
         match self {
             TemperatureUnit::Kelvin => temp.get::<kelvin>(),
             TemperatureUnit::Celsius => temp.get::<degree_celsius>(),

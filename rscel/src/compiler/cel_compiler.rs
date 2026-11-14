@@ -386,7 +386,7 @@ impl<'l> CelCompiler<'l> {
             AstNode::new(
                 MatchPattern::Cmp {
                     op: AstNode::new(prefix_pattern.as_ast(), op_range),
-                    or: or_ast,
+                    or: Box::new(or_ast),
                 },
                 SourceRange::new(start, self.tokenizer.location()),
             ),

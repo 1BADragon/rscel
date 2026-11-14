@@ -23,11 +23,11 @@ impl Program {
         CelCompiler::with_tokenizer(&mut StringTokenizer::with_input(source)).compile()
     }
 
-    pub fn params<'a>(&'a self) -> Vec<&'a str> {
+    pub fn params(&self) -> Vec<&str> {
         self.details.params()
     }
 
-    pub fn source<'a>(&'a self) -> Option<&'a str> {
+    pub fn source(&self) -> Option<&str> {
         self.details.source()
     }
 
@@ -35,15 +35,15 @@ impl Program {
         self.details
     }
 
-    pub fn details<'a>(&'a self) -> &'a ProgramDetails {
+    pub fn details(&self) -> &ProgramDetails {
         &self.details
     }
 
-    pub fn details_mut<'a>(&'a mut self) -> &'a mut ProgramDetails {
+    pub fn details_mut(&mut self) -> &mut ProgramDetails {
         &mut self.details
     }
 
-    pub fn bytecode<'a>(&'a self) -> &'a CelByteCode {
+    pub fn bytecode(&self) -> &CelByteCode {
         &self.bytecode
     }
 
@@ -57,7 +57,7 @@ impl Program {
         lines.join("\n")
     }
 
-    pub fn ast<'a>(&'a self) -> Option<&'a AstNode<Expr>> {
+    pub fn ast(&self) -> Option<&AstNode<Expr>> {
         self.details.ast()
     }
 }

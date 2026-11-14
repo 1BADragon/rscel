@@ -3,7 +3,7 @@ mod error;
 mod grammar;
 mod traits;
 
-pub use traits::IntoSqlBuilder;
+pub use traits::ToSqlBuilder;
 
 #[cfg(test)]
 mod tests {
@@ -15,7 +15,7 @@ mod tests {
     fn cel_to_sql(cel_expr: &str) -> Result<String, ToSqlError> {
         let program = Program::from_source(cel_expr)
             .map_err(|_| ToSqlError::unsupported("Failed to parse CEL expression"))?;
-        let builder = program.ast().unwrap().into_sql_builder()?;
+        let builder = program.ast().unwrap().to_sql_builder()?;
         builder.to_sql()
     }
 

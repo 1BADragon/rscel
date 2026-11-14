@@ -7,6 +7,12 @@ pub struct WasmCelProgram {
     program: Option<Program>,
 }
 
+impl Default for WasmCelProgram {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[wasm_bindgen(js_class = CelProgram)]
 impl WasmCelProgram {
     #[wasm_bindgen(constructor)]

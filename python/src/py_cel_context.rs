@@ -34,7 +34,10 @@ impl PyCelContext {
         prog: PyRefMut<PyCelProgram>,
     ) -> PyResult<()> {
         match prog.as_inner() {
-            Some(p) => Ok(slf.ctx.add_program(name, p.clone())),
+            Some(p) => {
+                slf.ctx.add_program(name, p.clone());
+                Ok(())
+            },
             None => Err(PyValueError::new_err("Program not populated")),
         }
     }
@@ -47,11 +50,11 @@ impl PyCelContext {
         let mut bindctx = BindContext::new();
 
         for (key, val) in bindings.bindings().iter() {
-            bindctx.bind_param(&key, val.clone());
+            bindctx.bind_param(key, val.clone());
         }
 
         for (key, val) in bindings.funcs().iter() {
-            bindctx.bind_func(&key, val);
+            bindctx.bind_func(key, val);
         }
 
         match slf.ctx.exec(name, &bindctx) {

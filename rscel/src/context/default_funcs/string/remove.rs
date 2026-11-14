@@ -1,9 +1,9 @@
 use crate::macros::dispatch;
 
-pub use remove::dispatch as remove;
+pub use remove_methods::dispatch as remove;
 
 #[dispatch]
-mod remove {
+mod remove_methods {
     use crate::CelValue;
 
     fn remove(mut this: String, pattern: String) -> String {

@@ -76,7 +76,7 @@ impl DispatchMod {
 
         mod_tokens.content = Some((brace, dispatch_items));
 
-        return mod_tokens.to_token_stream().into();
+        mod_tokens.to_token_stream().into()
     }
 
     fn build_dispatch_func_item<'a>(
@@ -228,7 +228,7 @@ impl DispatchMod {
                                         path: Ident::new("args", Span::call_site()).into(),
                                     })),
                                     dot_token: token::Dot::default(),
-                                    method: Ident::new("extend", Span::call_site()).into(),
+                                    method: Ident::new("extend", Span::call_site()),
                                     turbofish: None,
                                     paren_token: token::Paren::default(),
                                     args: [syn::Expr::MethodCall(syn::ExprMethodCall {
@@ -465,13 +465,13 @@ impl DispatchMod {
                                         path: Ident::new("args", Span::call_site()).into(),
                                     })),
                                     dot_token: token::Dot::default(),
-                                    method: Ident::new("try_into", Span::call_site()).into(),
+                                    method: Ident::new("try_into", Span::call_site()),
                                     turbofish: None,
                                     paren_token: token::Paren::default(),
                                     args: Punctuated::new(),
                                 })),
                                 dot_token: token::Dot::default(),
-                                method: Ident::new("unwrap", Span::call_site()).into(),
+                                method: Ident::new("unwrap", Span::call_site()),
                                 turbofish: None,
                                 paren_token: token::Paren::default(),
                                 args: Punctuated::new(),

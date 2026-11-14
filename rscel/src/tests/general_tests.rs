@@ -1,5 +1,5 @@
 use crate::{
-    compiler::{compiler::CelCompiler, string_tokenizer::StringTokenizer},
+    compiler::{cel_compiler::CelCompiler, string_tokenizer::StringTokenizer},
     BindContext, ByteCode, CelContext, CelError, CelValue, Program,
 };
 use chrono::{DateTime, Duration, TimeZone, Utc};
@@ -545,7 +545,7 @@ fn test_object_access_in_array() {
     let mut obj_map = HashMap::<String, CelValue>::new();
     obj_map.insert("foo".to_owned(), "value".into());
 
-    let obj = CelValue::from_val_slice(&vec![obj_map.into()]);
+    let obj = CelValue::from_val_slice(&[obj_map.into()]);
     exec.bind_param("my_list", obj);
 
     assert_eq!(ctx.exec("entry", &exec).unwrap(), "value".into());
@@ -590,7 +590,7 @@ fn test_has_in_reduce() {
         .unwrap()
         .into();
 
-    exec.bind_param("my_list", obj.into());
+    exec.bind_param("my_list", obj);
 
     assert_eq!(ctx.exec("entry", &exec).unwrap(), 2.into());
 }
@@ -602,7 +602,7 @@ fn test_timestamp_functions() {
     let mut exec = BindContext::new();
 
     let dt = Utc
-        .ymd(2024, 01, 10)
+        .ymd(2024, 1, 10)
         .and_hms_milli_opt(8, 57, 45, 123)
         .unwrap();
     exec.bind_param("time", CelValue::from_timestamp(dt));
@@ -648,7 +648,7 @@ fn test_timestamp_set_functions() {
     let mut exec = BindContext::new();
 
     let dt = Utc
-        .ymd(2024, 01, 10)
+        .ymd(2024, 1, 10)
         .and_hms_milli_opt(8, 57, 45, 123)
         .unwrap();
     exec.bind_param("time", CelValue::from_timestamp(dt));

@@ -24,7 +24,7 @@ use celpycallable::CelPyCallable;
 use py_bind_context::PyBindContext;
 use py_cel_context::PyCelContext;
 use py_cel_program::PyCelProgram;
-use rscel_to_sql::IntoSqlBuilder;
+use rscel_to_sql::ToSqlBuilder;
 
 /* Eval entry point */
 #[pyfunction]
@@ -78,7 +78,7 @@ fn to_sql(py: Python<'_>, prog_str: String) -> PyResult<Py<PyString>> {
     };
 
     let sql_str = if let Some(ast) = p.ast() {
-        match ast.into_sql_builder() {
+        match ast.to_sql_builder() {
             Ok(b) => b.to_sql(),
             Err(e) => return Err(PyException::new_err(e.to_string())),
         }

@@ -67,6 +67,12 @@ pub struct BindContext<'a> {
     parent: Option<&'a BindContext<'a>>,
 }
 
+impl Default for BindContext<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> BindContext<'a> {
     /// Create a new bind context contain default functions and macros.
     pub fn new() -> BindContext<'a> {
@@ -178,7 +184,7 @@ impl<'a> BindContext<'a> {
         self.params.contains_key(name)
             || self.funcs.contains_key(name)
             || self.macros.contains_key(name)
-            || self.parent.map_or(false, |p| p.is_bound(name))
+            || self.parent.is_some_and(|p| p.is_bound(name))
     }
 
     pub(crate) fn add_type(&mut self, name: &str, r#type: CelValue) {

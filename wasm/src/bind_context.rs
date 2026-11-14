@@ -13,6 +13,12 @@ pub struct WasmBindContext {
     funcs: HashMap<String, CelJsCallable>,
 }
 
+impl Default for WasmBindContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[wasm_bindgen(js_class = BindContext)]
 impl WasmBindContext {
     #[wasm_bindgen(constructor)]

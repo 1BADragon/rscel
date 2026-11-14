@@ -1,9 +1,9 @@
 use crate::macros::dispatch;
 
-pub use replace::dispatch as replace;
+pub use replace_methods::dispatch as replace;
 
 #[dispatch]
-mod replace {
+mod replace_methods {
     use crate::CelValue;
 
     fn replace(this: String, needle: String, to: String) -> String {

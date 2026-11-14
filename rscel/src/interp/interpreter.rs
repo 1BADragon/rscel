@@ -51,11 +51,11 @@ impl<'a, 'b> InterpStack<'a, 'b> {
                     if let Some(ctx) = self.ctx.cel {
                         // Allow for loaded programs to run as values
                         if let Some(prog) = ctx.get_program(&name) {
-                            return self.ctx.run_raw(prog.bytecode(), true).map(|x| x.into());
+                            return self.ctx.run_raw(prog.bytecode(), true);
                         }
                     }
 
-                    Ok(CelValue::from_err(CelError::binding(&name)).into())
+                    Ok(CelValue::from_err(CelError::binding(&name)))
                 } else {
                     Ok(stack_val)
                 }
@@ -351,8 +351,7 @@ impl<'a> Interpreter<'a> {
                                         CelValue::from_err(CelError::attribute(
                                             "obj",
                                             ident.as_str(),
-                                        ))
-                                        .into(),
+                                        )),
                                     );
                                 }
                             },
@@ -376,8 +375,7 @@ impl<'a> Interpreter<'a> {
                                 CelValue::from_err(CelError::value(&format!(
                                     "Access operator invalid between {:?} and IDENT",
                                     obj.as_type(),
-                                )))
-                                .into(),
+                                ))),
                             ),
                         }
                     } else {
@@ -387,8 +385,7 @@ impl<'a> Interpreter<'a> {
                                 "Access operator invalid between {:?} and {:?}",
                                 obj_type,
                                 index.as_type(),
-                            )))
-                            .into(),
+                            ))),
                         );
                     }
                 }
@@ -425,8 +422,7 @@ impl<'a> Interpreter<'a> {
                             CelValue::from_err(CelError::runtime(&format!(
                                 "{:?} cannot be called",
                                 other
-                            )))
-                            .into(),
+                            ))),
                         ),
                     };
                 }
@@ -472,8 +468,7 @@ impl<'a> Interpreter<'a> {
                             CelValue::from_err(CelError::runtime(&format!(
                                 "{:?} cannot be called",
                                 other
-                            )))
-                            .into(),
+                            ))),
                         ),
                     };
                 }
@@ -512,7 +507,7 @@ impl<'a> Interpreter<'a> {
     fn call_macro(
         &self,
         this: &CelValue,
-        args: &Vec<CelValue>,
+        args: &[CelValue],
         macro_: &RsCelMacro,
     ) -> Result<CelValue, CelError> {
         let mut v: Vec<MacroArg> = Vec::new();

@@ -24,7 +24,7 @@ impl DispatchFunc {
                 .collect(),
             return_type: DispatchArgType::from_type(match f.sig.output {
                 syn::ReturnType::Default => panic!("Dispatch functions must have return type"),
-                syn::ReturnType::Type(_rarrow, ref t) => &t,
+                syn::ReturnType::Type(_rarrow, ref t) => t,
             }),
         }
     }

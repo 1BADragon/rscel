@@ -2,9 +2,9 @@ use crate::from_jsvalue::WasmCelValue;
 use rscel::CelValue;
 use wasm_bindgen::JsValue;
 
-impl Into<JsValue> for WasmCelValue {
-    fn into(self) -> JsValue {
-        match self.into_inner() {
+impl From<WasmCelValue> for JsValue {
+    fn from(value: WasmCelValue) -> JsValue {
+        match value.into_inner() {
             CelValue::Int(i) => i.into(),
             CelValue::UInt(u) => u.into(),
             CelValue::Float(f) => f.into(),

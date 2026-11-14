@@ -41,7 +41,7 @@ pub struct MatchCase {
 pub enum MatchPattern {
     Cmp {
         op: AstNode<MatchCmpOp>,
-        or: AstNode<ConditionalOr>,
+        or: Box<AstNode<ConditionalOr>>,
     },
     Type(AstNode<MatchTypePattern>),
     Any(AstNode<MatchAnyPattern>),

@@ -95,7 +95,7 @@ fn main() {
     let mut entries: Vec<_> = std::fs::read_dir(TEST_DATA_DIR)
         .expect("test data dir not found")
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |x| x == "binpb"))
+        .filter(|e| e.path().extension().is_some_and(|x| x == "binpb"))
         .collect();
     entries.sort_by_key(|e| e.file_name());
 

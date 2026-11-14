@@ -60,7 +60,7 @@ mod types;
 // Export some public interface
 pub mod utils;
 pub use compiler::{
-    ast_node::AstNode, compiler::CelCompiler, grammar::*, source_location::SourceLocation,
+    ast_node::AstNode, cel_compiler::CelCompiler, grammar::*, source_location::SourceLocation,
     source_range::SourceRange, string_tokenizer::StringTokenizer, tokenizer::Tokenizer,
 };
 pub use context::{BindContext, CelContext, RsCelFunction, RsCelMacro};

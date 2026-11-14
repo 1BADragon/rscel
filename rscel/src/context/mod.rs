@@ -5,7 +5,7 @@ mod default_funcs;
 mod default_macros;
 mod type_funcs;
 use crate::{
-    compiler::{compiler::CelCompiler, string_tokenizer::StringTokenizer},
+    compiler::{cel_compiler::CelCompiler, string_tokenizer::StringTokenizer},
     interp::{InterpRuntime, Interpreter},
     program::{Program, ProgramDetails},
     CelResult, CelValue,
@@ -19,6 +19,12 @@ pub use type_funcs::construct_type;
 /// an expression.
 pub struct CelContext {
     progs: HashMap<String, Program>,
+}
+
+impl Default for CelContext {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CelContext {
@@ -63,7 +69,7 @@ impl CelContext {
     /// a Result with either a ValueCell representing the final solution of the Program or an Error
     /// that is discovered during execution, such as mismatch of types
     pub fn exec<'l>(&'l mut self, name: &str, bindings: &'l BindContext) -> CelResult<CelValue> {
-        let interp = Interpreter::new(&self, bindings);
+        let interp = Interpreter::new(self, bindings);
 
         interp.run_program(name).0
     }
@@ -77,7 +83,7 @@ impl CelContext {
         bindings: &'l BindContext,
         rt: Option<InterpRuntime>,
     ) -> (CelResult<CelValue>, InterpRuntime) {
-        let interp = Interpreter::new(&self, bindings);
+        let interp = Interpreter::new(self, bindings);
 
         match rt {
             Some(rt) => interp.run_program_with_rt(name, rt),

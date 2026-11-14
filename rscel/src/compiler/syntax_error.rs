@@ -20,7 +20,7 @@ impl SyntaxError {
         self
     }
 
-    pub fn message<'a>(&'a self) -> Option<&'a str> {
+    pub fn message(&self) -> Option<&str> {
         self.message.as_deref()
     }
 

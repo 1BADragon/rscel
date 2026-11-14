@@ -19,6 +19,6 @@ mod methods {
     }
 
     fn get_minutes(this: Duration) -> i64 {
-        this.num_minutes() as i64
+        this.num_minutes()
     }
 }

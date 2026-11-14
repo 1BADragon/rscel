@@ -9,6 +9,12 @@ pub struct WasmCelContext {
     ctx: CelContext,
 }
 
+impl Default for WasmCelContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[wasm_bindgen(js_class = CelContext)]
 impl WasmCelContext {
     #[wasm_bindgen(constructor)]

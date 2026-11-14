@@ -91,8 +91,7 @@ pub fn pad_start_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
         return this;
     }
     let pad_count = width - char_len;
-    let padded = std::iter::repeat(pad_char)
-        .take(pad_count)
+    let padded = std::iter::repeat_n(pad_char, pad_count)
         .chain(s.chars())
         .collect::<String>();
     padded.into()
@@ -141,7 +140,7 @@ pub fn pad_end_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let pad_count = width - char_len;
     let padded = s
         .chars()
-        .chain(std::iter::repeat(pad_char).take(pad_count))
+        .chain(std::iter::repeat_n(pad_char, pad_count))
         .collect::<String>();
     padded.into()
 }

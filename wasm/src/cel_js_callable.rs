@@ -22,7 +22,7 @@ impl CelJsCallable {
             other => collected_args.push(other),
         }
 
-        collected_args.extend(args.into_iter());
+        collected_args.extend(args);
 
         let js_args: Vec<JsValue> = collected_args
             .into_iter()
