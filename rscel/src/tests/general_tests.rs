@@ -1070,3 +1070,24 @@ fn test_now_nested_exec_does_not_panic() {
     let second = ctx.exec("outside", &exec_ctx).unwrap();
     assert_ne!(first, second);
 }
+
+#[test_case("now()", true; "now")]
+#[test_case("clockNow()", true; "clock now")]
+#[test_case("string(now())", true; "now nested in call arg")]
+#[test_case("timestamp(string(now()))", true; "now nested two calls deep")]
+#[test_case("[now()]", true; "now in list")]
+#[test_case("{'a': now()}", true; "now in map")]
+#[test_case("now() + duration('1s')", true; "now in binary op")]
+#[test_case("now().getFullYear()", true; "method on now")]
+#[test_case("size([1].map(x, now()))", true; "now in macro arg")]
+#[test_case("x ? now() : timestamp(0)", true; "now in ternary")]
+#[test_case("1 + 2", false; "arith literal")]
+#[test_case("string(x)", false; "pure call with param")]
+#[test_case("size([1, 2])", false; "folded pure call")]
+#[test_case("timestamp(0)", false; "timestamp literal")]
+fn test_program_details_impure(prog: &str, impure: bool) {
+    let mut ctx = CelContext::new();
+    ctx.add_program_str("main", prog).unwrap();
+
+    assert_eq!(ctx.program_details("main").unwrap().impure(), impure);
+}

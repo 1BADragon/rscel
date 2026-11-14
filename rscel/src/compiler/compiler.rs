@@ -16,7 +16,8 @@ use super::{
 use crate::{
     context::DEFAULT_FUNCS,
     interp::{Interpreter, JmpWhen},
-    BindContext, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, StringTokenizer,
+    BindContext, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, ProgramDetails,
+    StringTokenizer,
 };
 
 use crate::compile;
@@ -1070,13 +1071,21 @@ impl<'l> CelCompiler<'l> {
 
                         let mut args_ast = Vec::new();
                         let mut resolved_args: Vec<CelValue> = Vec::new();
+
+                        let mut details = ProgramDetails::new();
+
                         // Resolve each arg's bytecode and detect bare-identifier binders.
                         // A single-ident arg (e.g. `x` in `list.map(x, ...)`) is encoded as
                         // a Binder so macros can distinguish loop-variable names from
                         // expression arguments without running bytecode through an interpreter.
                         for (a, ast) in args.into_iter() {
                             args_ast.push(ast);
-                            let bc = a.into_unresolved_bytecode().resolve();
+
+                            let (c, d) = a.into_parts();
+                            details.union_from(d);
+
+                            let bc = c.into_bytecode().resolve();
+
                             let pushed_val = if bc.len() == 1 {
                                 if let ByteCode::Push(CelValue::Ident(name)) = &bc[0] {
                                     CelValue::Binder(name.clone())
@@ -1102,6 +1111,18 @@ impl<'l> CelCompiler<'l> {
                                     ByteCode::Push(pushed_val).into(),
                                 ]))
                         }
+
+                        // A direct call like `size(x)` compiles its callee through
+                        // parse_primary, which records the name as a param. It's a function,
+                        // not an input, so drop it. This runs before the args are merged so
+                        // `f(f)` still reports the argument, and keeps the impure flag.
+                        if last_ident.is_none() && member_prime_ast.is_empty() {
+                            if let Primary::Ident(Ident(callee)) = primary_ast.node() {
+                                member_prime_node.details_mut().remove_param(callee);
+                            }
+                        }
+
+                        member_prime_node.details_mut().union_from(details);
 
                         if let Some((last_ident, last_ident_ast)) = last_ident {
                             member_prime_node = args_node.consume_child(
@@ -1685,13 +1706,19 @@ impl<'l> CelCompiler<'l> {
 
         let mut i = Interpreter::empty();
         i.add_bindings(&self.bindings);
-        let bc = member_prime_node.into_unresolved_bytecode().resolve();
+
+        let (c, d) = member_prime_node.into_parts();
+
+        let bc = c.into_bytecode().resolve();
         let r = i.run_raw(&bc, true);
 
-        match r {
+        let mut prog = match r {
             Ok(v) => CompiledProg::with_const(v),
             Err(_) => CompiledProg::with_bytecode(bc),
-        }
+        };
+
+        prog.details_mut().union_from(d);
+        prog
     }
 }
 

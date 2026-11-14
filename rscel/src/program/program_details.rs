@@ -45,9 +45,9 @@ impl ProgramDetails {
     pub fn union_from(&mut self, other: ProgramDetails) {
         for param in other.params.iter() {
             self.params.insert(param.to_string());
-
-            self.impure |= other.impure;
         }
+
+        self.impure |= other.impure;
     }
 
     pub fn ast(&self) -> Option<&AstNode<Expr>> {
@@ -60,6 +60,10 @@ impl ProgramDetails {
 
     pub fn add_param(&mut self, name: &str) {
         self.params.insert(name.to_owned());
+    }
+
+    pub fn remove_param(&mut self, name: &str) {
+        self.params.remove(name);
     }
 
     pub fn params(&self) -> Vec<&str> {
