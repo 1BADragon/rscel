@@ -619,9 +619,7 @@ impl CelValue {
 
                             list[adjusted_index as usize].clone()
                         } else {
-                            CelValue::from_err(CelError::value(
-                                "Negative index is not allowed",
-                            ))
+                            CelValue::from_err(CelError::value("Negative index is not allowed"))
                         }
                     } else {
                         if index as usize >= list.len() {
@@ -633,18 +631,14 @@ impl CelValue {
                         list[index as usize].clone()
                     }
                 } else {
-                    CelValue::from_err(CelError::value(
-                        "List index can only be int or uint",
-                    ))
+                    CelValue::from_err(CelError::value("List index can only be int or uint"))
                 }
             }
             CelValue::Map(map) => {
                 if let CelValue::String(index) = index {
                     match map.get(index.as_str()) {
                         Some(val) => val.clone(),
-                        None => {
-                            CelValue::from_err(CelError::attribute("obj", &index))
-                        }
+                        None => CelValue::from_err(CelError::attribute("obj", &index)),
                     }
                 } else {
                     CelValue::from_err(CelError::value(&format!(

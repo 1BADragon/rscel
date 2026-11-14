@@ -1,8 +1,8 @@
 use crate::macros::dispatch;
 
 pub use rsplit_methods::dispatch as rsplit;
-pub use split_methods::dispatch as split;
 pub use split_at_methods::dispatch as split_at;
+pub use split_methods::dispatch as split;
 
 #[dispatch]
 mod rsplit_methods {

@@ -192,8 +192,7 @@ fn extract_celval_recurse<'a, 'source>(
             "datetime.datetime" | "datetime" => {
                 let py = ob.py();
 
-                let utc =
-                    PyTzInfo::utc(py).map_err(|e| WrappedError::new(e, current_path))?;
+                let utc = PyTzInfo::utc(py).map_err(|e| WrappedError::new(e, current_path))?;
                 let py_astimezone = match ob.getattr("astimezone") {
                     Ok(v) => v,
                     Err(e) => return Err(WrappedError::new(e, current_path)),

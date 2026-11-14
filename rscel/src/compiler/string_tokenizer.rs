@@ -222,7 +222,9 @@ impl<'l> StringTokenizer<'l> {
                                 Some(c) => oct.push(c),
                                 None => {
                                     return Err(SyntaxError::from_location(self.scanner.location())
-                                        .with_message("Octal number requires 3 digits".to_string()))
+                                        .with_message(
+                                            "Octal number requires 3 digits".to_string(),
+                                        ))
                                 }
                             }
                         }
@@ -298,7 +300,9 @@ impl<'l> StringTokenizer<'l> {
                                 Some(c) => oct.push(c),
                                 None => {
                                     return Err(SyntaxError::from_location(self.scanner.location())
-                                        .with_message("Octal number requires 3 digits".to_string()))
+                                        .with_message(
+                                            "Octal number requires 3 digits".to_string(),
+                                        ))
                                 }
                             }
                         }

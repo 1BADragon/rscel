@@ -347,12 +347,10 @@ impl<'a> Interpreter<'a> {
                             CelValue::Map(ref map) => match map.get(ident.as_str()) {
                                 Some(val) => stack.push(val.clone()),
                                 None => {
-                                    stack.push(
-                                        CelValue::from_err(CelError::attribute(
-                                            "obj",
-                                            ident.as_str(),
-                                        )),
-                                    );
+                                    stack.push(CelValue::from_err(CelError::attribute(
+                                        "obj",
+                                        ident.as_str(),
+                                    )));
                                 }
                             },
                             #[cfg(feature = "protobuf")]
@@ -371,22 +369,18 @@ impl<'a> Interpreter<'a> {
                                 stack.push(d.access(ident.as_str()));
                             }
                             CelValue::Err(e) => stack.push(CelValue::Err(e)),
-                            obj => stack.push(
-                                CelValue::from_err(CelError::value(&format!(
-                                    "Access operator invalid between {:?} and IDENT",
-                                    obj.as_type(),
-                                ))),
-                            ),
+                            obj => stack.push(CelValue::from_err(CelError::value(&format!(
+                                "Access operator invalid between {:?} and IDENT",
+                                obj.as_type(),
+                            )))),
                         }
                     } else {
                         let obj_type = stack.pop()?.as_type();
-                        stack.push(
-                            CelValue::from_err(CelError::value(&format!(
-                                "Access operator invalid between {:?} and {:?}",
-                                obj_type,
-                                index.as_type(),
-                            ))),
-                        );
+                        stack.push(CelValue::from_err(CelError::value(&format!(
+                            "Access operator invalid between {:?} and {:?}",
+                            obj_type,
+                            index.as_type(),
+                        ))));
                     }
                 }
                 ByteCode::CallMethod(n_args) => {
@@ -418,12 +412,10 @@ impl<'a> Interpreter<'a> {
                             let arg_values = self.resolve_args(args)?;
                             stack.push(construct_type(&type_name, arg_values));
                         }
-                        other => stack.push(
-                            CelValue::from_err(CelError::runtime(&format!(
-                                "{:?} cannot be called",
-                                other
-                            ))),
-                        ),
+                        other => stack.push(CelValue::from_err(CelError::runtime(&format!(
+                            "{:?} cannot be called",
+                            other
+                        )))),
                     };
                 }
                 ByteCode::Call(n_args) => {
@@ -464,12 +456,10 @@ impl<'a> Interpreter<'a> {
                             let arg_values = self.resolve_args(args)?;
                             stack.push(construct_type(&type_name, arg_values));
                         }
-                        other => stack.push(
-                            CelValue::from_err(CelError::runtime(&format!(
-                                "{:?} cannot be called",
-                                other
-                            ))),
-                        ),
+                        other => stack.push(CelValue::from_err(CelError::runtime(&format!(
+                            "{:?} cannot be called",
+                            other
+                        )))),
                     };
                 }
                 ByteCode::FmtString(nsegments) => {

@@ -37,7 +37,7 @@ impl PyCelContext {
             Some(p) => {
                 slf.ctx.add_program(name, p.clone());
                 Ok(())
-            },
+            }
             None => Err(PyValueError::new_err("Program not populated")),
         }
     }

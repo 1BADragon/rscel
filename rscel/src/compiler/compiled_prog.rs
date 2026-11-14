@@ -227,7 +227,6 @@ impl CompiledProg {
     }
 
     pub fn consume_child(self, child: CompiledProg) -> CompiledProg {
-        
         self.append_result(child)
     }
 
