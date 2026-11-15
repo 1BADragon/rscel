@@ -4,6 +4,8 @@ import {
   CelContext,
   BindContext,
   CelProgram,
+  celEvalWithRuntime,
+  InterpRuntime,
 } from "rscel_wasm";
 import { describe, it, expect } from "vitest";
 
@@ -152,5 +154,88 @@ describe("Rscel Basic Tests", () => {
 
     const result = ctx.exec("triple", bindings);
     expect(result.result()).toEqual(6n);
+  });
+});
+
+describe("InterpRuntime", () => {
+  const FIXED_START = new Date(Date.UTC(2020, 4, 17, 12, 30, 0, 123));
+
+  it("round trips its start time as a Date", () => {
+    const rt = new InterpRuntime(FIXED_START);
+    expect(rt.startTime).toEqual(FIXED_START);
+  });
+
+  it("defaults to the current time", () => {
+    const before = Date.now();
+    const rt = new InterpRuntime();
+    const after = Date.now();
+    expect(rt.startTime.getTime()).toBeGreaterThanOrEqual(before);
+    expect(rt.startTime.getTime()).toBeLessThanOrEqual(after);
+  });
+
+  it("rejects an invalid Date", () => {
+    expect(() => new InterpRuntime(new Date("not a date"))).toThrow();
+  });
+
+  it("round trips nanoseconds through ISO strings", () => {
+    const iso = "2020-05-17T12:30:00.123456789Z";
+    const rt = InterpRuntime.fromIso(iso);
+    expect(rt.startTimeIso).toEqual(iso);
+    expect(InterpRuntime.fromIso(rt.startTimeIso).equals(rt)).toBe(true);
+  });
+
+  it("normalizes ISO offsets to UTC", () => {
+    const rt = InterpRuntime.fromIso("2020-05-17T08:30:00.123-04:00");
+    expect(rt.startTime).toEqual(FIXED_START);
+    expect(rt.startTimeIso).toEqual("2020-05-17T12:30:00.123000000Z");
+  });
+
+  it("rejects an invalid ISO string", () => {
+    expect(() => InterpRuntime.fromIso("yesterday")).toThrow();
+  });
+
+  it("compares by start time", () => {
+    const a = new InterpRuntime(FIXED_START);
+    expect(a.equals(new InterpRuntime(FIXED_START))).toBe(true);
+    expect(a.equals(new InterpRuntime(new Date(0)))).toBe(false);
+  });
+
+  it("celEvalWithRuntime fixes now() and can be reused", () => {
+    const rt = new InterpRuntime(FIXED_START);
+    expect(celEvalWithRuntime("now()", {}, rt).result()).toEqual(FIXED_START);
+    // The runtime is not consumed, so it replays the same time.
+    expect(celEvalWithRuntime("now()", {}, rt).result()).toEqual(FIXED_START);
+    expect(rt.startTime).toEqual(FIXED_START);
+  });
+
+  it("celEval without a runtime uses the current time", () => {
+    const res = celEval("now()", {}).result();
+    expect(Math.abs(Date.now() - res.getTime())).toBeLessThan(5000);
+  });
+
+  it("clockNow() ignores the runtime", () => {
+    const rt = new InterpRuntime(FIXED_START);
+    const res = celEvalWithRuntime("clockNow()", {}, rt).result();
+    expect(res).not.toEqual(FIXED_START);
+  });
+
+  it("CelContext.execWithRuntime fixes now() and can be reused", () => {
+    const ctx = new CelContext();
+    ctx.addProgramStr("entry", "now()");
+    const bindings = new BindContext();
+    const rt = new InterpRuntime(FIXED_START);
+
+    expect(ctx.execWithRuntime("entry", bindings, rt).result()).toEqual(FIXED_START);
+    expect(ctx.execWithRuntime("entry", bindings, rt).result()).toEqual(FIXED_START);
+  });
+
+  it("a nested callback's runtime wins and the outer one is restored", () => {
+    const innerStart = new Date(Date.UTC(1999, 11, 31, 23, 59, 59));
+    const inner = () =>
+      celEvalWithRuntime("now()", {}, new InterpRuntime(innerStart)).result();
+
+    const rt = new InterpRuntime(FIXED_START);
+    const res = celEvalWithRuntime("[now(), inner(), now()]", { inner }, rt);
+    expect(res.result()).toEqual([FIXED_START, innerStart, FIXED_START]);
   });
 });

@@ -1,12 +1,12 @@
-use std::env;
-
 fn main() {
     println!("cargo::rustc-check-cfg=cfg(test_protos)");
-    println!("cargo:rerun-if-env-changed=RSCEL_TEST_PROTO");
+    println!("cargo::rerun-if-env-changed=RSCEL_TEST_PROTO");
 
-    if let Ok(_) = env::var("RSCEL_TEST_PROTO") {
-        println!("cargo:rustc-cfg=test_protos");
-        println!("cargo:rustc-cfg=protobuf");
+    // The proto tests need both the generated code and the protobuf runtime, so only
+    // generate them when the feature is enabled.
+    #[cfg(feature = "protobuf")]
+    if std::env::var_os("RSCEL_TEST_PROTO").is_some() {
+        println!("cargo::rustc-cfg=test_protos");
         protobuf_codegen::Codegen::new()
             .protoc()
             .include("test/protos")

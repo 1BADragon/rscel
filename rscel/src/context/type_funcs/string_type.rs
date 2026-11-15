@@ -6,7 +6,7 @@ pub use methods::dispatch as string_impl;
 mod methods {
     use crate::types::CelBytes;
     use crate::{CelError, CelResult, CelValue};
-    use chrono::{DateTime, Duration, Utc};
+    use chrono::{DateTime, Duration, SecondsFormat, Utc};
 
     fn string(arg: i64) -> String {
         arg.to_string()
@@ -29,7 +29,9 @@ mod methods {
     }
 
     fn string(arg: DateTime<Utc>) -> String {
-        arg.to_rfc3339()
+        // CEL renders UTC as a trailing Z, not +00:00, and emits only as many
+        // fractional digits as the value needs.
+        arg.to_rfc3339_opts(SecondsFormat::AutoSi, true)
     }
 
     fn string(arg: Duration) -> String {

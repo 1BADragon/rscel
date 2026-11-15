@@ -8,6 +8,12 @@ pub struct ScopedCounterRef<'a> {
     count: &'a RefCell<usize>,
 }
 
+impl Default for ScopedCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScopedCounter {
     pub fn new() -> ScopedCounter {
         ScopedCounter {

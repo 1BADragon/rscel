@@ -11,17 +11,13 @@ mod methods {
     }
 
     mod internal {
-        use regex::Regex;
+        use super::super::super::regex_cache::with_regex;
 
-        use crate::{CelError, CelValue};
+        use crate::CelValue;
 
         pub fn match_replace_once(haystack: &str, needle: &str, rep: &str) -> CelValue {
-            match Regex::new(needle) {
-                Ok(re) => re.replace(haystack, rep).into_owned().into(),
-                Err(err) => {
-                    return CelError::value(&format!("Invalid regular expression: {}", err)).into()
-                }
-            }
+            with_regex(needle, |re| re.replace(haystack, rep).into_owned().into())
+                .unwrap_or_else(|e| e.into())
         }
     }
 }

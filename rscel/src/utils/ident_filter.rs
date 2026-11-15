@@ -22,15 +22,13 @@ impl<'a> Iterator for IdentFilterIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            match self.iter.next() {
-                Some(val) => {
-                    if self.bindings.is_bound(val) {
-                        continue;
-                    }
-
-                    return Some(val.to_owned());
+            {
+                let val = self.iter.next()?;
+                if self.bindings.is_bound(val) {
+                    continue;
                 }
-                None => return None,
+
+                return Some(val.to_owned());
             }
         }
     }

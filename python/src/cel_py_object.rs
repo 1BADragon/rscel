@@ -80,14 +80,12 @@ impl CelValueDyn for CelPyObject {
         Python::attach(|py| {
             let inner = self.inner.bind(py);
 
-            match inner.is_truthy() {
-                Ok(res) => res,
-                Err(_) => false, // this is just going to have to work. Basically is the equiv of calling bool(obj) and it throwing
-            }
+            // If bool(obj) raises, treat the object as falsy.
+            inner.is_truthy().unwrap_or_default()
         })
     }
 
-    fn any_ref<'a>(&'a self) -> &'a dyn std::any::Any {
+    fn any_ref(&self) -> &dyn std::any::Any {
         self
     }
 }

@@ -11,14 +11,13 @@ mod methods {
     }
 
     mod internal {
-        use regex::Regex;
+        use super::super::super::regex_cache::with_regex;
 
-        use crate::{CelError, CelValue};
+        use crate::CelValue;
 
         pub fn match_captures_all(haystack: &str, needle: &str) -> CelValue {
-            match Regex::new(needle) {
-                Ok(re) => re
-                    .captures_iter(haystack)
+            with_regex(needle, |re| {
+                re.captures_iter(haystack)
                     .map(|caps| {
                         caps.iter()
                             .map(|s| match s {
@@ -29,11 +28,9 @@ mod methods {
                             .into()
                     })
                     .collect::<Vec<CelValue>>()
-                    .into(),
-                Err(err) => {
-                    CelError::value(&format!("Invalid regular expression: {}", err)).into()
-                }
-            }
+                    .into()
+            })
+            .unwrap_or_else(|e| e.into())
         }
     }
 }

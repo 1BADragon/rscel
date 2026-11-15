@@ -1,13 +1,17 @@
 use crate::{CelError, CelValue};
 
+pub mod char_at;
 pub mod contains;
 pub mod ends_with;
 pub mod index_of;
+pub mod join;
 pub mod match_captures;
 pub mod match_captures_all;
 pub mod match_replace;
 pub mod match_replace_once;
 pub mod matches;
+pub mod quote;
+pub(super) mod regex_cache;
 pub mod remove;
 pub mod repeat;
 pub mod replace;
@@ -15,6 +19,7 @@ pub mod replace_i;
 pub mod split;
 pub mod split_whitespace;
 pub mod starts_with;
+pub mod substring;
 pub mod trim_end_matches;
 pub mod trim_matches;
 pub mod trim_start_matches;
@@ -48,9 +53,7 @@ string_func!(trimEnd, trim_end_impl, trim_end);
 pub fn pad_start_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let s = match this {
         CelValue::String(ref s) => s.clone(),
-        _ => {
-            return CelValue::from_err(CelError::value("padStart is only available on strings"))
-        }
+        _ => return CelValue::from_err(CelError::value("padStart is only available on strings")),
     };
 
     let width = match args.first() {
@@ -88,8 +91,7 @@ pub fn pad_start_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
         return this;
     }
     let pad_count = width - char_len;
-    let padded = std::iter::repeat(pad_char)
-        .take(pad_count)
+    let padded = std::iter::repeat_n(pad_char, pad_count)
         .chain(s.chars())
         .collect::<String>();
     padded.into()
@@ -98,9 +100,7 @@ pub fn pad_start_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
 pub fn pad_end_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let s = match this {
         CelValue::String(ref s) => s.clone(),
-        _ => {
-            return CelValue::from_err(CelError::value("padEnd is only available on strings"))
-        }
+        _ => return CelValue::from_err(CelError::value("padEnd is only available on strings")),
     };
 
     let width = match args.first() {
@@ -140,7 +140,7 @@ pub fn pad_end_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
     let pad_count = width - char_len;
     let padded = s
         .chars()
-        .chain(std::iter::repeat(pad_char).take(pad_count))
+        .chain(std::iter::repeat_n(pad_char, pad_count))
         .collect::<String>();
     padded.into()
 }

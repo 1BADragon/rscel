@@ -15,7 +15,7 @@ pub trait Tokenizer {
     fn peek(&mut self) -> Result<Option<&TokenWithLoc>, SyntaxError>;
     fn next(&mut self) -> Result<Option<TokenWithLoc>, SyntaxError>;
 
-    fn source<'a>(&'a self) -> &'a str;
+    fn source(&self) -> &str;
     fn location(&self) -> SourceLocation;
 }
 
@@ -56,10 +56,7 @@ impl AsToken for Option<TokenWithLoc> {
 
 impl IntoToken for Option<TokenWithLoc> {
     fn into_token(self) -> Option<Token> {
-        match self {
-            Some(t) => Some(t.into_token()),
-            None => None,
-        }
+        self.map(|t| t.into_token())
     }
 }
 

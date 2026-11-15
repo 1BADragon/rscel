@@ -26,7 +26,7 @@ impl CelBytes {
     where
         T: IntoIterator<Item = u8>,
     {
-        self.inner.extend(bytes.into_iter());
+        self.inner.extend(bytes);
     }
 
     pub fn as_slice(&self) -> &[u8] {
@@ -40,9 +40,9 @@ impl From<Vec<u8>> for CelBytes {
     }
 }
 
-impl Into<Vec<u8>> for CelBytes {
-    fn into(self) -> Vec<u8> {
-        self.inner
+impl From<CelBytes> for Vec<u8> {
+    fn from(val: CelBytes) -> Self {
+        val.inner
     }
 }
 

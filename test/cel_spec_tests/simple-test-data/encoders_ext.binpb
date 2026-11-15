@@ -1,0 +1,11 @@
+
+encoders_ext)Tests for the encoders extension library.6
+encode,
+hellobase64.encode(b'hello')B
+2aGVsbG8=q
+decode+
+hellobase64.decode('aGVsbG8=')B:hello:
+hello_without_paddingbase64.decode('aGVsbG8')B:helloT
+
+round_tripF
+hello-base64.decode(base64.encode(b'Hello World!'))B:Hello World!

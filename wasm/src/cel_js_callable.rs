@@ -5,6 +5,7 @@ use rscel::{CelError, CelValue};
 
 use crate::from_jsvalue::WasmCelValue;
 
+#[derive(Clone)]
 pub struct CelJsCallable {
     func: Function,
 }
@@ -14,7 +15,9 @@ impl CelJsCallable {
         CelJsCallable { func }
     }
 
-    fn invoke(&self, this: CelValue, args: Vec<CelValue>) -> CelValue {
+    /// Calls the JS function. A non-null `this` (from method-call syntax) is passed
+    /// as the first argument, followed by `args`.
+    pub fn call(&self, this: CelValue, args: Vec<CelValue>) -> CelValue {
         let mut collected_args: Vec<CelValue> = Vec::with_capacity(1 + args.len());
 
         match this {
@@ -22,7 +25,7 @@ impl CelJsCallable {
             other => collected_args.push(other),
         }
 
-        collected_args.extend(args.into_iter());
+        collected_args.extend(args);
 
         let js_args: Vec<JsValue> = collected_args
             .into_iter()
@@ -42,6 +45,11 @@ impl CelJsCallable {
             Err(err) => CelValue::from_err(CelError::runtime(&stringify_js_error(err))),
         }
     }
+
+    /// An owning closure for `BindContext::bind_func`, which needs a `'static` function.
+    pub fn into_fn(self) -> impl Fn(CelValue, Vec<CelValue>) -> CelValue {
+        move |this, args| self.call(this, args)
+    }
 }
 
 fn stringify_js_error(err: JsValue) -> String {
@@ -56,24 +64,4 @@ fn stringify_js_error(err: JsValue) -> String {
     }
 
     format!("{err:?}")
-}
-
-impl FnOnce<(CelValue, Vec<CelValue>)> for CelJsCallable {
-    type Output = CelValue;
-
-    extern "rust-call" fn call_once(self, args: (CelValue, Vec<CelValue>)) -> Self::Output {
-        self.invoke(args.0, args.1)
-    }
-}
-
-impl FnMut<(CelValue, Vec<CelValue>)> for CelJsCallable {
-    extern "rust-call" fn call_mut(&mut self, args: (CelValue, Vec<CelValue>)) -> Self::Output {
-        self.invoke(args.0, args.1)
-    }
-}
-
-impl Fn<(CelValue, Vec<CelValue>)> for CelJsCallable {
-    extern "rust-call" fn call(&self, args: (CelValue, Vec<CelValue>)) -> Self::Output {
-        self.invoke(args.0, args.1)
-    }
 }

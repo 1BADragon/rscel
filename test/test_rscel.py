@@ -120,3 +120,92 @@ def test_program_bincode_serialize():
     c.add_program('entry', p2)
 
     assert c.exec('entry', b) == 6
+
+
+FIXED_START = dt.datetime(2020, 5, 17, 12, 30, 0, tzinfo=dt.timezone.utc)
+
+
+def test_runtime_start_time_roundtrip():
+    rt = rscel.InterpRuntime(FIXED_START)
+    assert rt.start_time == FIXED_START
+    assert rt.start_time.tzinfo is not None
+
+
+def test_runtime_converts_other_timezones_to_utc():
+    eastern = FIXED_START.astimezone(ZoneInfo("America/New_York"))
+    rt = rscel.InterpRuntime(eastern)
+    assert rt.start_time == FIXED_START
+    assert rt.start_time.utcoffset() == dt.timedelta(0)
+
+
+def test_runtime_default_is_now():
+    before = dt.datetime.now(dt.timezone.utc)
+    rt = rscel.InterpRuntime()
+    after = dt.datetime.now(dt.timezone.utc)
+    assert before - dt.timedelta(milliseconds=1) <= rt.start_time <= after + dt.timedelta(milliseconds=1)
+
+
+def test_runtime_rejects_non_datetime():
+    with pytest.raises(ValueError):
+        rscel.InterpRuntime("2020-05-17")
+
+
+def test_runtime_ns_roundtrip_keeps_full_precision():
+    ns = 1_589_718_600_123_456_789
+    rt = rscel.InterpRuntime.from_ns(ns)
+    assert rt.start_time_ns == ns
+    assert rscel.InterpRuntime.from_ns(rt.start_time_ns) == rt
+
+
+def test_runtime_equality():
+    assert rscel.InterpRuntime(FIXED_START) == rscel.InterpRuntime(FIXED_START)
+    assert rscel.InterpRuntime(FIXED_START) != rscel.InterpRuntime(
+        FIXED_START + dt.timedelta(seconds=1)
+    )
+
+
+def test_eval_with_runtime_fixes_now():
+    rt = rscel.InterpRuntime(FIXED_START)
+    assert rscel.eval("now()", {}, runtime=rt) == FIXED_START
+    # The same runtime replays the same time.
+    assert rscel.eval("now()", {}, runtime=rt) == FIXED_START
+
+
+def test_eval_without_runtime_uses_current_time():
+    res = rscel.eval("now()", {})
+    assert abs(dt.datetime.now(dt.timezone.utc) - res) < dt.timedelta(seconds=5)
+
+
+def test_eval_clock_now_ignores_runtime():
+    rt = rscel.InterpRuntime(FIXED_START)
+    assert rscel.eval("clockNow()", {}, runtime=rt) != FIXED_START
+
+
+def test_exec_with_runtime_fixes_now():
+    c = rscel.CelContext()
+    b = rscel.BindContext()
+    c.add_program_str("entry", "now()")
+
+    rt = rscel.InterpRuntime(FIXED_START)
+    assert c.exec("entry", b, runtime=rt) == FIXED_START
+    assert c.exec("entry", b, runtime=rt) == FIXED_START
+
+
+def test_exec_runtime_is_keyword_only():
+    c = rscel.CelContext()
+    b = rscel.BindContext()
+    c.add_program_str("entry", "now()")
+
+    with pytest.raises(TypeError):
+        c.exec("entry", b, rscel.InterpRuntime(FIXED_START))
+
+
+def test_runtime_nested_callback_uses_its_own_runtime():
+    inner_start = dt.datetime(1999, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
+
+    def inner():
+        return rscel.eval("now()", {}, runtime=rscel.InterpRuntime(inner_start))
+
+    rt = rscel.InterpRuntime(FIXED_START)
+    res = rscel.eval("[now(), inner(), now()]", {"inner": inner}, runtime=rt)
+    assert res == [FIXED_START, inner_start, FIXED_START]

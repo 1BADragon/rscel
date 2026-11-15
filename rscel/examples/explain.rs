@@ -1,13 +1,16 @@
+use std::collections::HashSet;
+
 use rscel::{
     Addition, AstNode, BindContext, CelContext, CelResult, CelValue, ConditionalAnd, ConditionalOr,
     Expr, ExprList, Ident, Member, MemberPrime, Multiplication, NegList, NotList, ObjInit,
     ObjInits, Primary, Relation, SourceRange, Unary,
 };
 
+#[derive(Debug)]
 struct RangeNode {
     pub range: SourceRange,
 
-    pub children: Vec<Box<RangeNode>>,
+    pub children: Vec<RangeNode>,
 }
 
 impl RangeNode {
@@ -21,7 +24,7 @@ impl RangeNode {
     fn with_children(range: SourceRange, children: impl Iterator<Item = Box<RangeNode>>) -> Self {
         RangeNode {
             range,
-            children: children.collect(),
+            children: children.map(|c| *c).collect(),
         }
     }
 
@@ -29,7 +32,7 @@ impl RangeNode {
         self.range
     }
 
-    fn into_children(self) -> Vec<Box<RangeNode>> {
+    fn into_children(self) -> Vec<RangeNode> {
         self.children
     }
 }
@@ -55,29 +58,29 @@ fn main() {
     let tree = dumper.dump_expr_node(ast);
 
     let mut queue = Vec::new();
-    queue.push((tree, 0));
+    queue.push((*tree, 0));
 
-    while !queue.is_empty() {
-        let (curr_node, depth) = queue.pop().expect("wut");
+    let mut ranges = HashSet::new();
 
+    while let Some((curr_node, depth)) = queue.pop() {
         // for now only handle one line
         let range = curr_node.range();
 
-        let start = range.start().col();
-        let end = range.end().col();
+        if !ranges.contains(&range) {
+            let start = range.start().col();
+            let end = range.end().col();
 
-        let src = &args[1][start..end];
+            let src = &args[1][start..end];
 
-        print!("{}{} => ", " ".to_owned().repeat(depth), src);
-        match eval(src, &bindings) {
-            Ok(val) => println!("{}", val),
-            Err(err) => println!("err: {}", err),
+            if let Ok(val) = eval(src, &bindings) {
+                println!("{}{} => {}", " ".to_owned().repeat(depth), src, val);
+            }
         }
 
+        ranges.insert(range);
+
         for node in curr_node.into_children().into_iter().rev() {
-            if node.range() != range {
-                queue.push((node, depth + 1));
-            }
+            queue.push((node, depth + 1));
         }
     }
 }
@@ -90,7 +93,7 @@ fn eval(source: &str, bindings: &serde_json::Value) -> CelResult<CelValue> {
     let mut bind = BindContext::new();
     bind.bind_params_from_json_obj(bindings.clone())?;
 
-    Ok(ctx.exec("main", &bind)?)
+    ctx.exec("main", &bind)
 }
 
 struct AstDumper;
@@ -225,7 +228,7 @@ impl AstDumper {
 
     fn dump_member_prime(&self, node: &AstNode<MemberPrime>) -> Box<RangeNode> {
         match node.node() {
-            MemberPrime::MemberAccess { ident } => self.dump_ident(&ident),
+            MemberPrime::MemberAccess { ident } => self.dump_ident(ident),
             MemberPrime::Call { call } => self.dump_expr_list(call),
             MemberPrime::ArrayAccess { access } => self.dump_expr_node(access),
             MemberPrime::Empty => Box::new(RangeNode::empty(node.range())),

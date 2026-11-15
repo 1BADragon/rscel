@@ -25,11 +25,7 @@ mod methods {
             .ok_or_else(|| CelError::argument("setMonth() month out of range"))
     }
 
-    fn set_month(
-        this: DateTime<Utc>,
-        month: i64,
-        timezone: String,
-    ) -> CelResult<DateTime<Utc>> {
+    fn set_month(this: DateTime<Utc>, month: i64, timezone: String) -> CelResult<DateTime<Utc>> {
         let month = u32::try_from(month)
             .map_err(|_| CelError::argument("setMonth() month out of range"))?;
         let adjusted = get_adjusted_datetime(this, timezone)?;
@@ -39,11 +35,7 @@ mod methods {
         Ok(updated.with_timezone(&Utc))
     }
 
-    fn set_month(
-        this: DateTime<Utc>,
-        month: u64,
-        timezone: String,
-    ) -> CelResult<DateTime<Utc>> {
+    fn set_month(this: DateTime<Utc>, month: u64, timezone: String) -> CelResult<DateTime<Utc>> {
         let month = u32::try_from(month)
             .map_err(|_| CelError::argument("setMonth() month out of range"))?;
         let adjusted = get_adjusted_datetime(this, timezone)?;

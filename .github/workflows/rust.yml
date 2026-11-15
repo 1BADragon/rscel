@@ -18,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+
       - uses: actions/checkout@v3
 
       - uses: Swatinem/rust-cache@v2

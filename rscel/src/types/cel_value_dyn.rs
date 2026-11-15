@@ -10,5 +10,5 @@ pub trait CelValueDyn: fmt::Debug + fmt::Display + Send + Sync {
     fn access(&self, key: &str) -> CelValue;
     fn eq(&self, rhs: &CelValue) -> CelValue;
     fn is_truthy(&self) -> bool;
-    fn any_ref<'a>(&'a self) -> &'a dyn Any;
+    fn any_ref(&self) -> &dyn Any;
 }

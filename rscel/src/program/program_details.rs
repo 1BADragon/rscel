@@ -14,14 +14,18 @@ pub struct ProgramDetails {
     params: HashSet<String>,
     #[serde(skip_serializing, skip_deserializing)]
     ast: Option<AstNode<Expr>>,
+    #[serde(skip_serializing, skip_deserializing)]
+    impure: bool,
 }
 
 impl ProgramDetails {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> ProgramDetails {
         ProgramDetails {
             source: None,
             params: HashSet::new(),
             ast: None,
+            impure: false,
         }
     }
 
@@ -42,13 +46,15 @@ impl ProgramDetails {
         for param in other.params.iter() {
             self.params.insert(param.to_string());
         }
+
+        self.impure |= other.impure;
     }
 
-    pub fn ast<'a>(&'a self) -> Option<&'a AstNode<Expr>> {
+    pub fn ast(&self) -> Option<&AstNode<Expr>> {
         self.ast.as_ref()
     }
 
-    pub fn source<'a>(&'a self) -> Option<&'a str> {
+    pub fn source(&self) -> Option<&str> {
         self.source.as_deref()
     }
 
@@ -56,12 +62,24 @@ impl ProgramDetails {
         self.params.insert(name.to_owned());
     }
 
-    pub fn params<'a>(&'a self) -> Vec<&'a str> {
+    pub fn remove_param(&mut self, name: &str) {
+        self.params.remove(name);
+    }
+
+    pub fn params(&self) -> Vec<&str> {
         self.params.iter().map(|x| x.as_str()).collect()
     }
 
     pub fn filter_from_bindings(&mut self, bindings: &BindContext) {
         self.params =
             IdentFilterIter::new(bindings, &mut self.params.iter().map(|x| x.as_str())).collect();
+    }
+
+    pub fn impure(&self) -> bool {
+        self.impure
+    }
+
+    pub fn mark_impure(&mut self) {
+        self.impure = true;
     }
 }

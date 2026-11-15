@@ -11,20 +11,12 @@ mod methods {
     }
 
     mod internal {
-        use regex::Regex;
+        use super::super::super::regex_cache::with_regex;
 
-        use crate::{CelError, CelResult};
+        use crate::CelResult;
 
         pub fn matches(haystack: &str, needle: &str) -> CelResult<bool> {
-            match Regex::new(needle) {
-                Ok(re) => return Ok(re.is_match(haystack)),
-                Err(err) => {
-                    return Err(CelError::value(&format!(
-                        "Invalid regular expression: {}",
-                        err
-                    )))
-                }
-            }
+            with_regex(needle, |re| re.is_match(haystack))
         }
     }
 }

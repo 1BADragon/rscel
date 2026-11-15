@@ -25,11 +25,7 @@ mod methods {
             .ok_or_else(|| CelError::argument("setFullYear() year out of range"))
     }
 
-    fn set_full_year(
-        this: DateTime<Utc>,
-        year: i64,
-        timezone: String,
-    ) -> CelResult<DateTime<Utc>> {
+    fn set_full_year(this: DateTime<Utc>, year: i64, timezone: String) -> CelResult<DateTime<Utc>> {
         let year = i32::try_from(year)
             .map_err(|_| CelError::argument("setFullYear() year out of range"))?;
         let adjusted = get_adjusted_datetime(this, timezone)?;
@@ -39,11 +35,7 @@ mod methods {
         Ok(updated.with_timezone(&Utc))
     }
 
-    fn set_full_year(
-        this: DateTime<Utc>,
-        year: u64,
-        timezone: String,
-    ) -> CelResult<DateTime<Utc>> {
+    fn set_full_year(this: DateTime<Utc>, year: u64, timezone: String) -> CelResult<DateTime<Utc>> {
         let year = i32::try_from(year)
             .map_err(|_| CelError::argument("setFullYear() year out of range"))?;
         let adjusted = get_adjusted_datetime(this, timezone)?;

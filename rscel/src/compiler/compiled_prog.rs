@@ -19,8 +19,8 @@ pub struct CompiledProg {
 macro_rules! compile {
     ($bytecode:expr, $const_expr:expr, $( $child : ident),+) => {
         {
-            use crate::compiler::compiled_prog::{NodeValue, PreResolvedByteCode};
-            use crate::program::ProgramDetails;
+            use $crate::compiler::compiled_prog::{NodeValue, PreResolvedByteCode};
+            use $crate::program::ProgramDetails;
 
             let mut new_details = ProgramDetails::new();
 
@@ -96,6 +96,10 @@ impl CompiledProg {
         &self.details
     }
 
+    pub fn details_mut(&mut self) -> &mut ProgramDetails {
+        &mut self.details
+    }
+
     pub fn into_parts(self) -> (NodeValue, ProgramDetails) {
         (self.inner, self.details)
     }
@@ -140,8 +144,7 @@ impl CompiledProg {
             NodeValue::Bytecode(
                 children
                     .into_iter()
-                    .map(|c| c.inner.into_bytecode().into_iter())
-                    .flatten()
+                    .flat_map(|c| c.inner.into_bytecode().into_iter())
                     .chain(bytecode.into_iter().map(|b| b.into()))
                     .collect(),
             )
@@ -224,8 +227,7 @@ impl CompiledProg {
     }
 
     pub fn consume_child(self, child: CompiledProg) -> CompiledProg {
-        let r = self.append_result(child);
-        r
+        self.append_result(child)
     }
 
     #[inline]
@@ -318,7 +320,7 @@ mod test {
         let node = NodeValue::ConstExpr(0.into());
 
         fn is_empty(prog: CompiledProg) -> bool {
-            return prog.is_const() || prog.bytecode_len() == 0;
+            prog.is_const() || prog.bytecode_len() == 0
         }
 
         // test the basic contructors
@@ -339,11 +341,10 @@ mod test {
 
         let (node, details) = const_prog.into_parts();
 
-        if let NodeValue::ConstExpr(inner) = node {
-            assert_eq!(inner, 42.into());
-        } else {
-            assert!(false);
-        }
+        let NodeValue::ConstExpr(inner) = node else {
+            panic!("expected const expr, got {node:?}");
+        };
+        assert_eq!(inner, 42.into());
 
         assert!(details.params().is_empty());
 

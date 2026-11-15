@@ -14,8 +14,10 @@ use super::{
     tokens::{AsToken, FStringSegment, IntoToken, Token},
 };
 use crate::{
+    context::DEFAULT_FUNCS,
     interp::{Interpreter, JmpWhen},
-    BindContext, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, StringTokenizer,
+    BindContext, ByteCode, CelError, CelResult, CelValue, CelValueDyn, Program, ProgramDetails,
+    StringTokenizer,
 };
 
 use crate::compile;
@@ -39,7 +41,7 @@ impl<'l> CelCompiler<'l> {
     pub fn compile(mut self) -> CelResult<Program> {
         let (cprog, ast) = self.parse_expression()?;
 
-        if !self.tokenizer.peek()?.is_none() {
+        if self.tokenizer.peek()?.is_some() {
             return Err(SyntaxError::from_location(self.tokenizer.location())
                 .with_message(format!("Unexpected token: {:?}", self.tokenizer.peek()?))
                 .into());
@@ -111,40 +113,37 @@ impl<'l> CelCompiler<'l> {
                     inner: NodeValue::ConstExpr(i),
                     details,
                 }
-            } else {
-                if cfg!(feature = "type_prop") {
-                    if i.is_truthy() {
-                        CompiledProg {
-                            inner: true_clause_node,
-                            details,
-                        }
-                    } else {
-                        CompiledProg {
-                            inner: false_clause_node,
-                            details,
-                        }
+            } else if cfg!(feature = "type_prop") {
+                if i.is_truthy() {
+                    CompiledProg {
+                        inner: true_clause_node,
+                        details,
                     }
                 } else {
-                    if let CelValue::Bool(b) = i {
-                        if b {
-                            CompiledProg {
-                                inner: true_clause_node,
-                                details,
-                            }
-                        } else {
-                            CompiledProg {
-                                inner: false_clause_node,
-                                details,
-                            }
-                        }
-                    } else {
-                        CompiledProg {
-                            inner: NodeValue::ConstExpr(CelValue::from_err(CelError::Value(
-                                format!("{} cannot be converted to bool", i.as_type()),
-                            ))),
-                            details,
-                        }
+                    CompiledProg {
+                        inner: false_clause_node,
+                        details,
                     }
+                }
+            } else if let CelValue::Bool(b) = i {
+                if b {
+                    CompiledProg {
+                        inner: true_clause_node,
+                        details,
+                    }
+                } else {
+                    CompiledProg {
+                        inner: false_clause_node,
+                        details,
+                    }
+                }
+            } else {
+                CompiledProg {
+                    inner: NodeValue::ConstExpr(CelValue::from_err(CelError::Value(format!(
+                        "{} cannot be converted to bool",
+                        i.as_type()
+                    )))),
+                    details,
                 }
             }
         } else {
@@ -159,23 +158,17 @@ impl<'l> CelCompiler<'l> {
                     expr_node
                         .into_bytecode()
                         .into_iter()
-                        .chain(
-                            [PreResolvedCodePoint::JmpCond {
-                                when: JmpWhen::False,
-                                label: after_true_clause,
-                            }]
-                            .into_iter(),
-                        )
+                        .chain([PreResolvedCodePoint::JmpCond {
+                            when: JmpWhen::False,
+                            label: after_true_clause,
+                        }])
                         .chain(true_clause_bytecode.into_iter())
-                        .chain(
-                            [
-                                PreResolvedCodePoint::Jmp { label: end_label },
-                                PreResolvedCodePoint::Label(after_true_clause),
-                            ]
-                            .into_iter(),
-                        )
+                        .chain([
+                            PreResolvedCodePoint::Jmp { label: end_label },
+                            PreResolvedCodePoint::Label(after_true_clause),
+                        ])
                         .chain(false_clause_bytecode.into_iter())
-                        .chain([PreResolvedCodePoint::Label(end_label)].into_iter())
+                        .chain([PreResolvedCodePoint::Label(end_label)])
                         .collect(),
                 ),
                 details,
@@ -226,7 +219,7 @@ impl<'l> CelCompiler<'l> {
 
             if !comma_seen {
                 return Err(SyntaxError::from_location(self.tokenizer.location())
-                    .with_message(format!("Expected COMMA"))
+                    .with_message("Expected COMMA".to_string())
                     .into());
             }
             comma_seen = false;
@@ -393,7 +386,7 @@ impl<'l> CelCompiler<'l> {
             AstNode::new(
                 MatchPattern::Cmp {
                     op: AstNode::new(prefix_pattern.as_ast(), op_range),
-                    or: or_ast,
+                    or: Box::new(or_ast),
                 },
                 SourceRange::new(start, self.tokenizer.location()),
             ),
@@ -405,39 +398,35 @@ impl<'l> CelCompiler<'l> {
 
         let label = self.new_label();
 
-        loop {
-            if let Some(Token::OrOr) = self.tokenizer.peek()?.as_token() {
-                self.tokenizer.next()?;
-                let (rhs_node, rhs_ast) = self.parse_conditional_and()?;
+        while let Some(Token::OrOr) = self.tokenizer.peek()?.as_token() {
+            self.tokenizer.next()?;
+            let (rhs_node, rhs_ast) = self.parse_conditional_and()?;
 
-                let jmp_node = CompiledProg::with_code_points(vec![
-                    PreResolvedCodePoint::Bytecode(ByteCode::Test),
-                    PreResolvedCodePoint::Bytecode(ByteCode::Dup),
-                    PreResolvedCodePoint::JmpCond {
-                        when: JmpWhen::True,
-                        label,
-                    },
-                ]);
+            let jmp_node = CompiledProg::with_code_points(vec![
+                PreResolvedCodePoint::Bytecode(ByteCode::Test),
+                PreResolvedCodePoint::Bytecode(ByteCode::Dup),
+                PreResolvedCodePoint::JmpCond {
+                    when: JmpWhen::True,
+                    label,
+                },
+            ]);
 
-                let range = current_ast.range().surrounding(rhs_ast.range());
+            let range = current_ast.range().surrounding(rhs_ast.range());
 
-                current_ast = AstNode::new(
-                    ConditionalOr::Binary {
-                        lhs: Box::new(current_ast),
-                        rhs: rhs_ast,
-                    },
-                    range,
-                );
-                current_node = compile!(
-                    [ByteCode::Or.into()],
-                    current_node.or(&rhs_node),
-                    current_node,
-                    jmp_node,
-                    rhs_node
-                );
-            } else {
-                break;
-            }
+            current_ast = AstNode::new(
+                ConditionalOr::Binary {
+                    lhs: Box::new(current_ast),
+                    rhs: rhs_ast,
+                },
+                range,
+            );
+            current_node = compile!(
+                [ByteCode::Or.into()],
+                current_node.or(&rhs_node),
+                current_node,
+                jmp_node,
+                rhs_node
+            );
         }
 
         current_node.append_if_bytecode([PreResolvedCodePoint::Label(label)]);
@@ -450,39 +439,35 @@ impl<'l> CelCompiler<'l> {
 
         let label = self.new_label();
 
-        loop {
-            if let Some(Token::AndAnd) = self.tokenizer.peek()?.as_token() {
-                self.tokenizer.next()?;
-                let (rhs_node, rhs_ast) = self.parse_relation()?;
+        while let Some(Token::AndAnd) = self.tokenizer.peek()?.as_token() {
+            self.tokenizer.next()?;
+            let (rhs_node, rhs_ast) = self.parse_relation()?;
 
-                let jmp_node = CompiledProg::with_code_points(vec![
-                    PreResolvedCodePoint::Bytecode(ByteCode::Test),
-                    PreResolvedCodePoint::Bytecode(ByteCode::Dup),
-                    PreResolvedCodePoint::JmpCond {
-                        when: JmpWhen::False,
-                        label: label,
-                    },
-                ]);
+            let jmp_node = CompiledProg::with_code_points(vec![
+                PreResolvedCodePoint::Bytecode(ByteCode::Test),
+                PreResolvedCodePoint::Bytecode(ByteCode::Dup),
+                PreResolvedCodePoint::JmpCond {
+                    when: JmpWhen::False,
+                    label,
+                },
+            ]);
 
-                let range = current_ast.range().surrounding(rhs_ast.range());
+            let range = current_ast.range().surrounding(rhs_ast.range());
 
-                current_ast = AstNode::new(
-                    ConditionalAnd::Binary {
-                        lhs: Box::new(current_ast),
-                        rhs: rhs_ast,
-                    },
-                    range,
-                );
-                current_node = compile!(
-                    [ByteCode::And.into()],
-                    current_node.and(rhs_node),
-                    current_node,
-                    jmp_node,
-                    rhs_node
-                );
-            } else {
-                break;
-            }
+            current_ast = AstNode::new(
+                ConditionalAnd::Binary {
+                    lhs: Box::new(current_ast),
+                    rhs: rhs_ast,
+                },
+                range,
+            );
+            current_node = compile!(
+                [ByteCode::And.into()],
+                current_node.and(rhs_node),
+                current_node,
+                jmp_node,
+                rhs_node
+            );
         }
         current_node.append_if_bytecode([PreResolvedCodePoint::Label(label)]);
 
@@ -801,10 +786,114 @@ impl<'l> CelCompiler<'l> {
                 ))
             }
             Some(Token::Minus) => {
-                let (neg, neg_ast) = self.parse_neg_list()?;
+                // Consume the leading minus here rather than in parse_neg_list so we can
+                // look at the token behind it.
+                let minus_loc = match self.tokenizer.next()? {
+                    Some(TokenWithLoc { loc, .. }) => loc,
+                    None => {
+                        return Err(SyntaxError::from_location(self.tokenizer.location())
+                            .with_message("Expected '-' got NOTHING".to_string())
+                            .into())
+                    }
+                };
+
+                if let Some(&TokenWithLoc {
+                    token: Token::IntLit(val),
+                    loc: lit_loc,
+                }) = self.tokenizer.peek()?
+                {
+                    self.tokenizer.next()?;
+
+                    // A member prime after the literal means the minus applies to the whole
+                    // member expression, so `-5.foo()` keeps its `-(5.foo())` grouping and
+                    // must not be folded.
+                    let folds = !matches!(
+                        self.tokenizer.peek()?,
+                        Some(&TokenWithLoc {
+                            token: Token::Dot | Token::LParen | Token::LBracket,
+                            ..
+                        })
+                    );
+
+                    if folds {
+                        // Fold `-<int literal>` into one negative constant. Negating at
+                        // runtime cannot represent i64::MIN, so -9223372036854775808 — a
+                        // valid CEL int64 literal — would otherwise overflow.
+                        let negated = negate_int_literal(val).ok_or_else(|| {
+                            SyntaxError::from_location(lit_loc.start()).with_message(format!(
+                                "Integer literal -{} is out of range for int64",
+                                val
+                            ))
+                        })?;
+
+                        let range = minus_loc.surrounding(lit_loc);
+                        let member_ast = AstNode::new(
+                            Member {
+                                primary: AstNode::new(
+                                    Primary::Literal(LiteralsAndKeywords::IntegerLit(negated)),
+                                    range,
+                                ),
+                                member: Vec::new(),
+                            },
+                            range,
+                        );
+
+                        return Ok((
+                            CompiledProg::with_const(negated.into()),
+                            AstNode::new(Unary::Member(member_ast), range),
+                        ));
+                    }
+
+                    // Not folded: rebuild what parse_neg_list + parse_member would have
+                    // produced for a single minus applied to this literal.
+                    let lit = int_literal(val).ok_or_else(|| {
+                        SyntaxError::from_location(lit_loc.start()).with_message(format!(
+                            "Integer literal {} is out of range for int64",
+                            val
+                        ))
+                    })?;
+
+                    let (member, member_ast) = self.parse_member_tail(
+                        CompiledProg::with_const(lit.into()),
+                        AstNode::new(
+                            Primary::Literal(LiteralsAndKeywords::IntegerLit(lit)),
+                            lit_loc,
+                        ),
+                    )?;
+
+                    let neg_ast = AstNode::new(
+                        NegList::List {
+                            tail: Box::new(AstNode::new(NegList::EmptyList, minus_loc)),
+                        },
+                        minus_loc,
+                    );
+                    let neg = CompiledProg::with_code_points(vec![ByteCode::Neg.into()]);
+                    let range = member_ast.range().surrounding(minus_loc);
+
+                    return Ok((
+                        member.append_result(neg),
+                        AstNode::new(
+                            Unary::NegMember {
+                                negs: neg_ast,
+                                member: member_ast,
+                            },
+                            range,
+                        ),
+                    ));
+                }
+
+                // Any remaining minuses belong to the neg list; prepend the one consumed above.
+                let (rest, rest_ast) = self.parse_neg_list()?;
                 let (member, member_ast) = self.parse_member()?;
 
-                let range = member_ast.range().surrounding(neg_ast.range());
+                let neg_ast = AstNode::new(
+                    NegList::List {
+                        tail: Box::new(rest_ast),
+                    },
+                    minus_loc,
+                );
+                let neg = compile!([ByteCode::Neg.into()], rest, rest);
+                let range = member_ast.range().surrounding(minus_loc);
 
                 Ok((
                     member.append_result(neg),
@@ -889,7 +978,17 @@ impl<'l> CelCompiler<'l> {
 
     fn parse_member(&mut self) -> CelResult<(CompiledProg, AstNode<Member>)> {
         let (primary_node, primary_ast) = self.parse_primary()?;
+        self.parse_member_tail(primary_node, primary_ast)
+    }
 
+    /// Parse the member-prime chain (`.field`, `(args)`, `[index]`) that follows an
+    /// already-parsed primary. Split out of `parse_member` so a caller that has built a
+    /// primary itself — see the negative-literal fold in `parse_unary` — can reuse it.
+    fn parse_member_tail(
+        &mut self,
+        primary_node: CompiledProg,
+        primary_ast: AstNode<Primary>,
+    ) -> CelResult<(CompiledProg, AstNode<Member>)> {
         let mut member_prime_node = CompiledProg::from_node(primary_node);
         let mut member_prime_ast: Vec<AstNode<MemberPrime>> = Vec::new();
 
@@ -924,7 +1023,7 @@ impl<'l> CelCompiler<'l> {
             let last_ident = ident_access_chain.pop();
 
             for (ident, ident_ast) in ident_access_chain {
-                let r = ident_ast.range().clone();
+                let r = ident_ast.range();
                 member_prime_ast.push(AstNode::new(
                     MemberPrime::MemberAccess { ident: ident_ast },
                     r,
@@ -937,7 +1036,7 @@ impl<'l> CelCompiler<'l> {
                     |o, c| {
                         if let CelValue::Ident(s) = c {
                             if o.is_obj() {
-                                match o.access(&s) {
+                                match o.access(s) {
                                     CelValue::Err(_) => None,
                                     o => Some(o),
                                 }
@@ -971,18 +1070,64 @@ impl<'l> CelCompiler<'l> {
                         let args_len = args.len();
 
                         let mut args_ast = Vec::new();
-                        let mut args_node = CompiledProg::empty();
-                        // Arguments are evaluated backwards so they get popped off the stack in order
-                        for (a, ast) in args.into_iter().rev() {
+                        let mut resolved_args: Vec<CelValue> = Vec::new();
+
+                        let mut details = ProgramDetails::new();
+
+                        // Resolve each arg's bytecode and detect bare-identifier binders.
+                        // A single-ident arg (e.g. `x` in `list.map(x, ...)`) is encoded as
+                        // a Binder so macros can distinguish loop-variable names from
+                        // expression arguments without running bytecode through an interpreter.
+                        for (a, ast) in args.into_iter() {
                             args_ast.push(ast);
+
+                            let (c, d) = a.into_parts();
+                            details.union_from(d);
+
+                            let bc = c.into_bytecode().resolve();
+
+                            let pushed_val = if bc.len() == 1 {
+                                if let ByteCode::Push(CelValue::Ident(name)) = &bc[0] {
+                                    CelValue::Binder(name.clone())
+                                } else {
+                                    bc.into()
+                                }
+                            } else {
+                                bc.into()
+                            };
+                            resolved_args.push(pushed_val);
+                        }
+
+                        // Validate argument shapes for known default macros at compile time.
+                        if let Some((ref ident, _)) = last_ident {
+                            Self::validate_macro_args(ident, &resolved_args, loc)?;
+                        }
+
+                        // Arguments are pushed in reverse so they are popped off the stack in order.
+                        let mut args_node = CompiledProg::empty();
+                        for pushed_val in resolved_args.into_iter().rev() {
                             args_node =
                                 args_node.append_result(CompiledProg::with_code_points(vec![
-                                    ByteCode::Push(a.into_unresolved_bytecode().resolve().into())
-                                        .into(),
+                                    ByteCode::Push(pushed_val).into(),
                                 ]))
                         }
 
+                        // A direct call like `size(x)` compiles its callee through
+                        // parse_primary, which records the name as a param. It's a function,
+                        // not an input, so drop it. This runs before the args are merged so
+                        // `f(f)` still reports the argument, and keeps the impure flag.
+                        if last_ident.is_none() && member_prime_ast.is_empty() {
+                            if let Primary::Ident(Ident(callee)) = primary_ast.node() {
+                                member_prime_node.details_mut().remove_param(callee);
+                            }
+                        }
+
+                        member_prime_node.details_mut().union_from(details);
                         if let Some((last_ident, last_ident_ast)) = last_ident {
+                            if DEFAULT_FUNCS.iter().any(|f| f.0 == last_ident && !f.2) {
+                                member_prime_node.details_mut().mark_impure();
+                            }
+
                             member_prime_node = args_node.consume_child(
                                 CompiledProg::from_children2_w_bytecode_cannone(
                                     member_prime_node,
@@ -992,7 +1137,7 @@ impl<'l> CelCompiler<'l> {
                                 ),
                             );
 
-                            let r = last_ident_ast.range().clone();
+                            let r = last_ident_ast.range();
 
                             member_prime_ast.push(AstNode::new(
                                 MemberPrime::MemberAccess {
@@ -1023,7 +1168,7 @@ impl<'l> CelCompiler<'l> {
                         return Err(SyntaxError::from_location(self.tokenizer.location())
                             .with_message(format!(
                                 "Unexpected token {}, expected RPARAN",
-                                &token.map_or("NOTHING".to_string(), |x| format!("{:?}", x))
+                                token.map_or("NOTHING".to_string(), |x| format!("{:?}", x))
                             ))
                             .into());
                     }
@@ -1038,11 +1183,11 @@ impl<'l> CelCompiler<'l> {
                         member_prime_node = CompiledProg::from_children2_w_bytecode_cannone(
                             member_prime_node,
                             CompiledProg::with_const(CelValue::Ident(last_ident)),
-                            vec![ByteCode::Access.into()],
+                            vec![ByteCode::Access],
                             |o, c| {
                                 if let CelValue::Ident(s) = c {
                                     if o.is_obj() {
-                                        match o.access(&s) {
+                                        match o.access(s) {
                                             CelValue::Err(_) => None,
                                             o => Some(o),
                                         }
@@ -1057,7 +1202,7 @@ impl<'l> CelCompiler<'l> {
                             },
                         );
 
-                        let r = last_ident_ast.range().clone();
+                        let r = last_ident_ast.range();
 
                         member_prime_ast.push(AstNode::new(
                             MemberPrime::MemberAccess {
@@ -1090,7 +1235,7 @@ impl<'l> CelCompiler<'l> {
                             return Err(SyntaxError::from_location(self.tokenizer.location())
                                 .with_message(format!(
                                     "Unexpected token {}, expected RBRACKET",
-                                    &next_token
+                                    next_token
                                         .map_or("NOTHING".to_string(), |x| format!("{:?}", x))
                                 ))
                                 .into());
@@ -1102,11 +1247,11 @@ impl<'l> CelCompiler<'l> {
                         member_prime_node = CompiledProg::from_children2_w_bytecode_cannone(
                             member_prime_node,
                             CompiledProg::with_const(CelValue::Ident(last_ident)),
-                            vec![ByteCode::Access.into()],
+                            vec![ByteCode::Access],
                             |o, c| {
                                 if let CelValue::Ident(s) = c {
                                     if o.is_obj() {
-                                        match o.access(&s) {
+                                        match o.access(s) {
                                             CelValue::Err(_) => None,
                                             o => Some(o),
                                         }
@@ -1121,7 +1266,7 @@ impl<'l> CelCompiler<'l> {
                             },
                         );
 
-                        let r = last_ident_ast.range().clone();
+                        let r = last_ident_ast.range();
 
                         member_prime_ast.push(AstNode::new(
                             MemberPrime::MemberAccess {
@@ -1166,13 +1311,22 @@ impl<'l> CelCompiler<'l> {
             Some(TokenWithLoc {
                 token: Token::Ident(val),
                 loc,
-            }) => Ok((
-                CompiledProg::with_code_points(vec![
-                    ByteCode::Push(CelValue::from_ident(&val)).into()
-                ])
-                .add_ident(&val),
-                AstNode::new(Primary::Ident(Ident(val.clone())), loc),
-            )),
+            }) => {
+                let impure = DEFAULT_FUNCS.iter().any(|f| f.0 == val && !f.2);
+
+                let mut p = CompiledProg::with_code_points(vec![ByteCode::Push(
+                    CelValue::from_ident(&val),
+                )
+                .into()])
+                .add_ident(&val);
+                let ast = AstNode::new(Primary::Ident(Ident(val.clone())), loc);
+
+                if impure {
+                    p.details_mut().mark_impure();
+                }
+
+                Ok((p, ast))
+            }
             Some(TokenWithLoc {
                 token: Token::LParen,
                 loc,
@@ -1222,7 +1376,7 @@ impl<'l> CelCompiler<'l> {
                     loc.surrounding(*rbracket_loc)
                 } else {
                     return Err(SyntaxError::from_location(self.tokenizer.location())
-                        .with_message(format!("Unexpected token, expected RBRACKET",))
+                        .with_message("Unexpected token, expected RBRACKET".to_string())
                         .into());
                 };
 
@@ -1262,7 +1416,7 @@ impl<'l> CelCompiler<'l> {
                     loc.surrounding(rbrace_loc)
                 } else {
                     return Err(SyntaxError::from_location(self.tokenizer.location())
-                        .with_message(format!("Unexpected token, expected RBRACE",))
+                        .with_message("Unexpected token, expected RBRACE".to_string())
                         .into());
                 };
 
@@ -1329,13 +1483,19 @@ impl<'l> CelCompiler<'l> {
             Some(TokenWithLoc {
                 token: Token::IntLit(val),
                 loc,
-            }) => Ok((
-                CompiledProg::with_const((val as i64).into()),
-                AstNode::new(
-                    Primary::Literal(LiteralsAndKeywords::IntegerLit(val as i64)),
-                    loc,
-                ),
-            )),
+            }) => {
+                // A literal reaching here is not negated — parse_unary folds `-<int literal>`
+                // before it gets this far — so it must fit an int64 on its own.
+                let val = int_literal(val).ok_or_else(|| {
+                    SyntaxError::from_location(loc.start())
+                        .with_message(format!("Integer literal {} is out of range for int64", val))
+                })?;
+
+                Ok((
+                    CompiledProg::with_const(val.into()),
+                    AstNode::new(Primary::Literal(LiteralsAndKeywords::IntegerLit(val)), loc),
+                ))
+            }
             Some(TokenWithLoc {
                 token: Token::FloatLit(val),
                 loc,
@@ -1369,22 +1529,26 @@ impl<'l> CelCompiler<'l> {
             }) => {
                 let mut bytecode = Vec::<PreResolvedCodePoint>::new();
 
+                let mut details = ProgramDetails::new();
+
                 for segment in segments.iter() {
                     match segment {
                         FStringSegment::Lit(c) => {
                             bytecode.push(ByteCode::Push(CelValue::String(c.clone())).into())
                         }
                         FStringSegment::Expr(e) => {
-                            let mut tok = StringTokenizer::with_input(&e);
+                            let mut tok = StringTokenizer::with_input(e);
                             let mut comp = CelCompiler::with_tokenizer(&mut tok);
 
                             let (e, _) = comp.parse_expression()?;
 
+                            let (c, d) = e.into_parts();
+
+                            details.union_from(d);
+
                             bytecode.push(
-                                ByteCode::Push(CelValue::ByteCode(
-                                    e.into_unresolved_bytecode().resolve(),
-                                ))
-                                .into(),
+                                ByteCode::Push(CelValue::ByteCode(c.into_bytecode().resolve()))
+                                    .into(),
                             );
                         }
                     }
@@ -1395,8 +1559,11 @@ impl<'l> CelCompiler<'l> {
                 // Reverse it so its evaluated in order on the stack
                 bytecode.push(ByteCode::FmtString(segments.len() as u32).into());
 
+                let mut prog = CompiledProg::with_code_points(bytecode);
+                prog.details_mut().union_from(details);
+
                 Ok((
-                    CompiledProg::with_code_points(bytecode),
+                    prog,
                     AstNode::new(
                         Primary::Literal(LiteralsAndKeywords::FStringList(segments.clone())),
                         loc,
@@ -1433,13 +1600,10 @@ impl<'l> CelCompiler<'l> {
         let mut exprs = Vec::new();
 
         'outer: loop {
-            match self.tokenizer.peek()?.as_token() {
-                Some(val) => {
-                    if *val == ending {
-                        break 'outer;
-                    }
+            if let Some(val) = self.tokenizer.peek()?.as_token() {
+                if *val == ending {
+                    break 'outer;
                 }
-                None => {}
             }
 
             let compiled = self.parse_expression()?;
@@ -1492,16 +1656,99 @@ impl<'l> CelCompiler<'l> {
     }
 
     #[inline]
+    /// Validate argument shapes for known default macros at compile time.
+    ///
+    /// Checks arity and that positional binder arguments (loop-variable names like `x` in
+    /// `list.map(x, x + 1)`) were encoded as [`CelValue::Binder`] rather than expressions.
+    /// Returns a [`SyntaxError`] if the call does not match the expected shape.
+    ///
+    /// Only validates names that match built-in macros; unknown names are passed through
+    /// unchanged so user-defined functions/macros with those names still compile.
+    fn validate_macro_args(name: &str, args: &[CelValue], loc: SourceRange) -> CelResult<()> {
+        // (min_args, max_args, binder_positions)
+        let (min_args, max_args, binder_positions): (usize, usize, &[usize]) = match name {
+            "has" => (1, 1, &[]),
+            "all" | "count" | "exists" | "exists_one" | "filter" | "find" | "flatMap" => {
+                (2, 2, &[0])
+            }
+            "map" => (2, 3, &[0]),
+            "reduce" => (4, 4, &[0, 1]),
+            "coalesce" => (1, usize::MAX, &[]),
+            _ => return Ok(()),
+        };
+
+        if args.len() < min_args || args.len() > max_args {
+            let arity_desc = if min_args == max_args {
+                format!("exactly {}", min_args)
+            } else if max_args == usize::MAX {
+                format!("at least {}", min_args)
+            } else {
+                format!("{} to {}", min_args, max_args)
+            };
+            return Err(SyntaxError::from_location(loc.start())
+                .with_message(format!(
+                    "macro `{}` expects {} argument(s), got {}",
+                    name,
+                    arity_desc,
+                    args.len()
+                ))
+                .into());
+        }
+
+        for &pos in binder_positions {
+            if pos < args.len() && !matches!(args[pos], CelValue::Binder(_)) {
+                return Err(SyntaxError::from_location(loc.start())
+                    .with_message(format!(
+                        "macro `{}` argument {} must be a bare identifier (e.g. `x`), not an expression",
+                        name, pos
+                    ))
+                    .into());
+            }
+        }
+
+        Ok(())
+    }
+
     fn check_for_const(&self, member_prime_node: CompiledProg) -> CompiledProg {
+        if member_prime_node.details().impure() {
+            return member_prime_node;
+        }
+
         let mut i = Interpreter::empty();
         i.add_bindings(&self.bindings);
-        let bc = member_prime_node.into_unresolved_bytecode().resolve();
+
+        let (c, d) = member_prime_node.into_parts();
+
+        let bc = c.into_bytecode().resolve();
         let r = i.run_raw(&bc, true);
 
-        match r {
+        let mut prog = match r {
             Ok(v) => CompiledProg::with_const(v),
             Err(_) => CompiledProg::with_bytecode(bc),
-        }
+        };
+
+        prog.details_mut().union_from(d);
+        prog
+    }
+}
+
+/// The tokenizer scans every signed int literal into a u64, so range checking is the
+/// compiler's job. Returns None when the digits do not fit an int64.
+fn int_literal(val: u64) -> Option<i64> {
+    if val <= i64::MAX as u64 {
+        Some(val as i64)
+    } else {
+        None
+    }
+}
+
+/// As `int_literal`, but for digits preceded by a unary minus. i64::MIN has no positive
+/// counterpart, so 9223372036854775808 is only in range with the minus applied.
+fn negate_int_literal(val: u64) -> Option<i64> {
+    if val == i64::MAX as u64 + 1 {
+        Some(i64::MIN)
+    } else {
+        int_literal(val).map(|v| -v)
     }
 }
 
@@ -1510,8 +1757,46 @@ mod test {
     use test_case::test_case;
 
     use crate::compiler::string_tokenizer::StringTokenizer;
+    use crate::{ByteCode, CelValue, Program};
 
     use super::CelCompiler;
+
+    // A minus directly preceding an int literal is folded into a negative constant, so
+    // int64::MIN is reachable as a literal even though negating it at runtime overflows.
+    #[test_case("-5", CelValue::Int(-5); "negative literal")]
+    #[test_case("-9223372036854775808", CelValue::Int(i64::MIN); "int64 min literal")]
+    #[test_case("9223372036854775807", CelValue::Int(i64::MAX); "int64 max literal")]
+    fn negative_int_literal_folds(input: &str, expected: CelValue) {
+        let prog = Program::from_source(input).unwrap();
+
+        assert_eq!(
+            prog.bytecode().as_slice(),
+            &[ByteCode::Push(expected)],
+            "expected a single folded Push, got:\n{}",
+            prog.dumps_bc()
+        );
+    }
+
+    // Digits that do not fit an int64 are a compile error rather than a silent wrap.
+    #[test_case("9223372036854775808"; "int64 max plus one")]
+    #[test_case("-9223372036854775809"; "int64 min minus one")]
+    fn out_of_range_int_literal_is_error(input: &str) {
+        assert!(Program::from_source(input).is_err());
+    }
+
+    // The fold must not change grouping: a second minus, or a member prime after the
+    // literal, both keep the runtime negation.
+    #[test_case("--5"; "double negation")]
+    #[test_case("-foo"; "negated ident")]
+    fn negation_not_folded(input: &str) {
+        let prog = Program::from_source(input).unwrap();
+
+        assert!(
+            prog.bytecode().iter().any(|op| matches!(op, ByteCode::Neg)),
+            "expected a runtime Neg, got:\n{}",
+            prog.dumps_bc()
+        );
+    }
 
     #[test_case("3+1"; "addition")]
     #[test_case("(1+foo) / 23"; "with literal")]
@@ -1544,5 +1829,179 @@ mod test {
 
         assert!(e.is_err());
         let _ = format!("{}", e.unwrap_err());
+    }
+
+    // Wrapping a method-style macro in a standalone function call triggers check_for_const,
+    // which runs the full bytecode through the compile interpreter. For this to succeed, the
+    // macro must be registered in COMPILE_MACROS. These tests verify that count, find, and
+    // flatMap are correctly rolled up to constants at compile time.
+
+    #[test]
+    fn count_macro_compile_rollup() {
+        // bool() accepts Int, allowing check_for_const to evaluate the whole expression.
+        // count([1,2,3], x > 0) == 3, bool(3) == true.
+        let prog = Program::from_source("bool([1,2,3].count(x, x > 0))").unwrap();
+        let bc = prog.bytecode();
+
+        if cfg!(feature = "type_prop") {
+            assert!(
+                !bc.iter().any(|op| matches!(op, ByteCode::CallMethod(_))),
+                "expected no CallMethod — count should be rolled up at compile time, got:\n{}",
+                prog.dumps_bc()
+            );
+            assert_eq!(
+                bc.as_slice(),
+                &[ByteCode::Push(CelValue::Bool(true))],
+                "expected single Push(Bool(true)), got:\n{}",
+                prog.dumps_bc()
+            );
+        } else {
+            // Without type_prop there is no bool(Int) overload, so check_for_const
+            // cannot evaluate the wrapper and the bool() call survives to runtime.
+            assert!(
+                bc.iter().any(|op| matches!(op, ByteCode::Call(_))),
+                "expected the bool() call to survive without type_prop, got:\n{}",
+                prog.dumps_bc()
+            );
+        }
+    }
+
+    #[test]
+    fn find_macro_compile_rollup() {
+        // bool() accepts any value, allowing check_for_const to evaluate the whole expression.
+        // find([1,2,3], x > 1) == 2, bool(2) == true.
+        let prog = Program::from_source("bool([1,2,3].find(x, x > 1))").unwrap();
+        let bc = prog.bytecode();
+
+        if cfg!(feature = "type_prop") {
+            assert!(
+                !bc.iter().any(|op| matches!(op, ByteCode::CallMethod(_))),
+                "expected no CallMethod — find should be rolled up at compile time, got:\n{}",
+                prog.dumps_bc()
+            );
+            assert_eq!(
+                bc.as_slice(),
+                &[ByteCode::Push(CelValue::Bool(true))],
+                "expected single Push(Bool(true)), got:\n{}",
+                prog.dumps_bc()
+            );
+        } else {
+            // Without type_prop there is no bool(Int) overload, so check_for_const
+            // cannot evaluate the wrapper and the bool() call survives to runtime.
+            assert!(
+                bc.iter().any(|op| matches!(op, ByteCode::Call(_))),
+                "expected the bool() call to survive without type_prop, got:\n{}",
+                prog.dumps_bc()
+            );
+        }
+    }
+
+    #[test]
+    fn flat_map_macro_compile_rollup() {
+        // size() accepts a list, allowing check_for_const to evaluate the whole expression.
+        // flatMap([1,2,3], x, [x, x*10]) == [1,10,2,20,3,30], size(...) == 6.
+        let prog = Program::from_source("size([1,2,3].flatMap(x, [x, x*10]))").unwrap();
+        let bc = prog.bytecode();
+
+        assert!(
+            !bc.iter().any(|op| matches!(op, ByteCode::CallMethod(_))),
+            "expected no CallMethod — flatMap should be rolled up at compile time, got:\n{}",
+            prog.dumps_bc()
+        );
+        assert_eq!(
+            bc.as_slice(),
+            &[ByteCode::Push(CelValue::UInt(6))],
+            "expected single Push(UInt(6)), got:\n{}",
+            prog.dumps_bc()
+        );
+    }
+
+    // Compile-time macro argument shape validation tests.
+    // These verify that misuse of built-in macros is caught at parse/compile time
+    // rather than silently failing at runtime.
+
+    #[test]
+    fn filter_macro_rejects_expression_in_binder_position() {
+        // First arg to filter() must be a bare ident, not `x + 1`
+        let err = Program::from_source("[1,2,3].filter(x + 1, x > 0)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("argument 0") && msg.contains("bare identifier"),
+            "expected binder-position error, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn map_macro_rejects_expression_in_binder_position() {
+        let err = Program::from_source("[1,2,3].map(x * 2, x + 1)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("argument 0") && msg.contains("bare identifier"),
+            "expected binder-position error, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn reduce_macro_rejects_expression_in_second_binder_position() {
+        // Second arg of reduce() must be a bare ident too
+        let err = Program::from_source("[1,2,3].reduce(acc, n + 1, acc + n, 0)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("argument 1") && msg.contains("bare identifier"),
+            "expected binder-position error for arg 1, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn filter_macro_rejects_wrong_arity() {
+        let err = Program::from_source("[1,2,3].filter(x)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("filter") && msg.contains("exactly 2"),
+            "expected arity error for filter, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn has_macro_rejects_wrong_arity() {
+        let err = Program::from_source("foo.has(a, b)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("has") && msg.contains("exactly 1"),
+            "expected arity error for has, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn reduce_macro_rejects_wrong_arity() {
+        let err = Program::from_source("[1,2,3].reduce(a, b, a + b)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("reduce") && msg.contains("exactly 4"),
+            "expected arity error for reduce, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn map_macro_accepts_two_args() {
+        // Sanity: valid 2-arg map still compiles
+        Program::from_source("[1,2,3].map(x, x + 1)").unwrap();
+    }
+
+    #[test]
+    fn map_macro_accepts_three_args() {
+        // Sanity: valid 3-arg map (filter+map) still compiles
+        Program::from_source("[1,2,3].map(x, x > 1, x * 10)").unwrap();
+    }
+
+    #[test]
+    fn reduce_macro_accepts_four_args() {
+        Program::from_source("[1,2,3].reduce(acc, n, acc + n, 0)").unwrap();
     }
 }

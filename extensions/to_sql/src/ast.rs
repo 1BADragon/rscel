@@ -1,10 +1,10 @@
 use rscel::AstNode;
 
 use crate::error::ToSqlError;
-use crate::traits::{IntoSqlBuilder, SqlBuilder};
+use crate::traits::{SqlBuilder, ToSqlBuilder};
 
-impl<T: IntoSqlBuilder> IntoSqlBuilder for AstNode<T> {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
-        self.node().into_sql_builder()
+impl<T: ToSqlBuilder> ToSqlBuilder for AstNode<T> {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+        self.node().to_sql_builder()
     }
 }

@@ -1,0 +1,113 @@
+
+
+proto2_ext&Tests for the proto extension library.è
+has_extÙ
+package_scoped_int32;proto.hasExt(msg, google.api.expr.test.v1.proto2.int32_ext)26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypesß
+package_scoped_nested_ext<proto.hasExt(msg, google.api.expr.test.v1.proto2.nested_ext)26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypesï
+!package_scoped_test_all_types_extDproto.hasExt(msg, google.api.expr.test.v1.proto2.test_all_types_ext)26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypesø
+-package_scoped_test_all_types_nested_enum_extAproto.hasExt(msg, google.api.expr.test.v1.proto2.nested_enum_ext)26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypesù
+&package_scoped_repeated_test_all_typesIproto.hasExt(msg, google.api.expr.test.v1.proto2.repeated_test_all_types)26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypesö
+message_scoped_int64Xproto.hasExt(msg, google.api.expr.test.v1.proto2.Proto2ExtensionScopedMessage.int64_ext)26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypes‹
+message_scoped_nested_exthproto.hasExt(msg, google.api.expr.test.v1.proto2.Proto2ExtensionScopedMessage.message_scoped_nested_ext)26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypes†
+message_scoped_nested_enum_ext^proto.hasExt(msg, google.api.expr.test.v1.proto2.Proto2ExtensionScopedMessage.nested_enum_ext)26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypes¥
+&message_scoped_repeated_test_all_typesuproto.hasExt(msg, google.api.expr.test.v1.proto2.Proto2ExtensionScopedMessage.message_scoped_repeated_test_all_types)26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypes‹
+get_extß
+package_scoped_int32Aproto.getExt(msg, google.api.expr.test.v1.proto2.int32_ext) == 4226
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypes
+package_scoped_nested_extmproto.getExt(msg, google.api.expr.test.v1.proto2.nested_ext) == google.api.expr.test.v1.proto2.TestAllTypes{}26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypes 
+!package_scoped_test_all_types_extuproto.getExt(msg, google.api.expr.test.v1.proto2.test_all_types_ext) == google.api.expr.test.v1.proto2.TestAllTypes{}26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypes¶
+-package_scoped_test_all_types_nested_enum_extproto.getExt(msg, google.api.expr.test.v1.proto2.nested_enum_ext) == google.api.expr.test.v1.proto2.TestAllTypes.NestedEnum.BAR26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypesü
+&package_scoped_repeated_test_all_typesËproto.getExt(msg, google.api.expr.test.v1.proto2.repeated_test_all_types) == [google.api.expr.test.v1.proto2.TestAllTypes{single_int64: 1}, google.api.expr.test.v1.proto2.TestAllTypes{single_bool: true}]26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypesü
+message_scoped_int64^proto.getExt(msg, google.api.expr.test.v1.proto2.Proto2ExtensionScopedMessage.int64_ext) == 4226
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypes½
+message_scoped_nested_ext™proto.getExt(msg, google.api.expr.test.v1.proto2.Proto2ExtensionScopedMessage.message_scoped_nested_ext) == google.api.expr.test.v1.proto2.TestAllTypes{}26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypesÅ
+message_scoped_nested_enum_extœproto.getExt(msg, google.api.expr.test.v1.proto2.Proto2ExtensionScopedMessage.nested_enum_ext) == google.api.expr.test.v1.proto2.TestAllTypes.NestedEnum.BAR26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypes¨
+&message_scoped_repeated_test_all_types÷proto.getExt(msg, google.api.expr.test.v1.proto2.Proto2ExtensionScopedMessage.message_scoped_repeated_test_all_types) == [google.api.expr.test.v1.proto2.TestAllTypes{single_int64: 1}, google.api.expr.test.v1.proto2.TestAllTypes{single_bool: true}]26
+msg/
+-J+google.api.expr.test.v1.proto2.TestAllTypes:L
+msgE
+CRA
+?type.googleapis.com/google.api.expr.test.v1.proto2.TestAllTypes

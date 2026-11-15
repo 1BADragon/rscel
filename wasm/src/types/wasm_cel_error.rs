@@ -18,11 +18,17 @@ impl WasmCelError {
     }
 }
 
+impl std::fmt::Display for WasmCelError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.inner)
+    }
+}
+
 #[wasm_bindgen(js_class=CelError)]
 impl WasmCelError {
     #[wasm_bindgen(js_name=toString)]
-    pub fn to_string(&self) -> String {
-        format!("{}", self.inner)
+    pub fn js_to_string(&self) -> String {
+        self.to_string()
     }
 
     #[wasm_bindgen(js_name=errorData)]
@@ -77,6 +83,9 @@ impl WasmCelError {
             }
             CelError::DivideByZero => {
                 js_sys::Reflect::set(&val, &"type".into(), &"divide by zero".into()).unwrap();
+            }
+            CelError::Overflow => {
+                js_sys::Reflect::set(&val, &"type".into(), &"overflow".into()).unwrap();
             }
         };
 

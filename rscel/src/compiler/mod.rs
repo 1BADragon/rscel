@@ -1,6 +1,6 @@
 pub mod ast_node;
+pub mod cel_compiler;
 pub mod compiled_prog;
-pub mod compiler;
 pub mod grammar;
 pub mod source_location;
 pub mod source_range;

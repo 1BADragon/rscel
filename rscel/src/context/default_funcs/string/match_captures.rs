@@ -11,27 +11,23 @@ mod methods {
     }
 
     mod internal {
-        use regex::Regex;
+        use super::super::super::regex_cache::with_regex;
 
-        use crate::{CelError, CelValue};
+        use crate::CelValue;
 
         pub fn matches(haystack: &str, needle: &str) -> CelValue {
-            match Regex::new(needle) {
-                Ok(re) => match re.captures(haystack) {
-                    Some(c) => c
-                        .iter()
-                        .map(|s| match s {
-                            Some(s) => s.as_str().into(),
-                            None => CelValue::Null,
-                        })
-                        .collect::<Vec<_>>()
-                        .into(),
-                    None => CelValue::Null,
-                },
-                Err(err) => {
-                    return CelError::value(&format!("Invalid regular expression: {}", err)).into()
-                }
-            }
+            with_regex(needle, |re| match re.captures(haystack) {
+                Some(c) => c
+                    .iter()
+                    .map(|s| match s {
+                        Some(s) => s.as_str().into(),
+                        None => CelValue::Null,
+                    })
+                    .collect::<Vec<_>>()
+                    .into(),
+                None => CelValue::Null,
+            })
+            .unwrap_or_else(|e| e.into())
         }
     }
 }

@@ -14,8 +14,10 @@ mod methods {
     }
 
     fn get_day_of_week(this: DateTime<Utc>, timezone: String) -> CelResult<i64> {
+        // Sunday is 0, matching the no-timezone overload above. number_from_sunday()
+        // is 1-based and made this overload disagree with it.
         Ok(get_adjusted_datetime(this, timezone)?
             .weekday()
-            .number_from_sunday() as i64)
+            .num_days_from_sunday() as i64)
     }
 }

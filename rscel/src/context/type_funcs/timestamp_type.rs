@@ -4,6 +4,7 @@ pub use methods::dispatch as timestamp_impl;
 
 #[dispatch]
 mod methods {
+    use crate::types::cel_value::check_timestamp_range;
     use crate::{CelError, CelResult, CelValue};
     use chrono::{DateTime, TimeZone, Utc};
 
@@ -12,21 +13,23 @@ mod methods {
     }
 
     fn timestamp(arg: String) -> CelResult<DateTime<Utc>> {
-        if let Ok(val) = arg.parse::<DateTime<Utc>>() {
-            Ok(val)
+        let parsed = if let Ok(val) = arg.parse::<DateTime<Utc>>() {
+            val
         } else if let Ok(val) = DateTime::parse_from_rfc2822(&arg) {
-            Ok(val.to_utc())
+            val.to_utc()
         } else if let Ok(val) = DateTime::parse_from_rfc3339(&arg) {
-            Ok(val.to_utc())
+            val.to_utc()
         } else {
-            Err(CelError::value("Invalid timestamp format"))
-        }
+            return Err(CelError::value("Invalid timestamp format"));
+        };
+
+        check_timestamp_range(parsed)
     }
 
     fn timestamp(arg: i64) -> CelResult<DateTime<Utc>> {
         use chrono::MappedLocalTime;
         match Utc.timestamp_opt(arg, 0) {
-            MappedLocalTime::Single(s) => Ok(s),
+            MappedLocalTime::Single(s) => check_timestamp_range(s),
             _ => Err(CelError::value("Invalid timestamp value")),
         }
     }
@@ -34,7 +37,7 @@ mod methods {
     fn timestamp(arg: u64) -> CelResult<DateTime<Utc>> {
         use chrono::MappedLocalTime;
         match Utc.timestamp_opt(arg as i64, 0) {
-            MappedLocalTime::Single(s) => Ok(s),
+            MappedLocalTime::Single(s) => check_timestamp_range(s),
             _ => Err(CelError::value("Invalid timestamp value")),
         }
     }

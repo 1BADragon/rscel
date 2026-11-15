@@ -8,17 +8,17 @@ use rscel::{
     Primary, Relation, Unary,
 };
 
-impl IntoSqlBuilder for Expr {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for Expr {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         match self {
             Expr::Ternary {
                 condition,
                 true_clause,
                 false_clause,
             } => {
-                let condition_builder = condition.into_sql_builder()?;
-                let true_builder = true_clause.into_sql_builder()?;
-                let false_builder = false_clause.into_sql_builder()?;
+                let condition_builder = condition.to_sql_builder()?;
+                let true_builder = true_clause.to_sql_builder()?;
+                let false_builder = false_clause.to_sql_builder()?;
 
                 Ok(Box::new(TurnaryExpressionBuilder {
                     condition: condition_builder,
@@ -32,33 +32,33 @@ impl IntoSqlBuilder for Expr {
             } => Ok(Box::new(UnsupportedBuilder {
                 message: "Match expressions not supported currently".to_string(),
             })),
-            Expr::Unary(ast_node) => ast_node.into_sql_builder(),
+            Expr::Unary(ast_node) => ast_node.to_sql_builder(),
         }
     }
 }
 
-impl IntoSqlBuilder for MatchCase {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for MatchCase {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         Ok(Box::new(UnsupportedBuilder {
             message: "MatchCase not implemented yet".to_string(),
         }))
     }
 }
 
-impl IntoSqlBuilder for MatchPattern {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for MatchPattern {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         Ok(Box::new(UnsupportedBuilder {
             message: "MatchPattern not implemented yet".to_string(),
         }))
     }
 }
 
-impl IntoSqlBuilder for ConditionalOr {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for ConditionalOr {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         match self {
             ConditionalOr::Binary { lhs, rhs } => {
-                let lhs_builder = lhs.into_sql_builder()?;
-                let rhs_builder = rhs.into_sql_builder()?;
+                let lhs_builder = lhs.to_sql_builder()?;
+                let rhs_builder = rhs.to_sql_builder()?;
 
                 Ok(Box::new(BinaryOperationBuilder {
                     lhs: lhs_builder,
@@ -66,17 +66,17 @@ impl IntoSqlBuilder for ConditionalOr {
                     rhs: rhs_builder,
                 }))
             }
-            ConditionalOr::Unary(ast_node) => ast_node.into_sql_builder(),
+            ConditionalOr::Unary(ast_node) => ast_node.to_sql_builder(),
         }
     }
 }
 
-impl IntoSqlBuilder for ConditionalAnd {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for ConditionalAnd {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         match self {
             ConditionalAnd::Binary { lhs, rhs } => {
-                let lhs_builder = lhs.into_sql_builder()?;
-                let rhs_builder = rhs.into_sql_builder()?;
+                let lhs_builder = lhs.to_sql_builder()?;
+                let rhs_builder = rhs.to_sql_builder()?;
 
                 Ok(Box::new(BinaryOperationBuilder {
                     lhs: lhs_builder,
@@ -84,13 +84,13 @@ impl IntoSqlBuilder for ConditionalAnd {
                     rhs: rhs_builder,
                 }))
             }
-            ConditionalAnd::Unary(ast_node) => ast_node.into_sql_builder(),
+            ConditionalAnd::Unary(ast_node) => ast_node.to_sql_builder(),
         }
     }
 }
 
-impl IntoSqlBuilder for Relation {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for Relation {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         match self {
             Relation::Binary { lhs, op, rhs } => {
                 let op_str = match op {
@@ -103,8 +103,8 @@ impl IntoSqlBuilder for Relation {
                     rscel::Relop::In => "in",
                 };
 
-                let lhs_builder = lhs.into_sql_builder()?;
-                let rhs_builder = rhs.into_sql_builder()?;
+                let lhs_builder = lhs.to_sql_builder()?;
+                let rhs_builder = rhs.to_sql_builder()?;
 
                 Ok(Box::new(BinaryOperationBuilder {
                     lhs: lhs_builder,
@@ -112,13 +112,13 @@ impl IntoSqlBuilder for Relation {
                     rhs: rhs_builder,
                 }))
             }
-            Relation::Unary(ast_node) => ast_node.into_sql_builder(),
+            Relation::Unary(ast_node) => ast_node.to_sql_builder(),
         }
     }
 }
 
-impl IntoSqlBuilder for Addition {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for Addition {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         match self {
             Addition::Binary { lhs, op, rhs } => {
                 let op_str = match op {
@@ -126,8 +126,8 @@ impl IntoSqlBuilder for Addition {
                     rscel::AddOp::Sub => "-",
                 };
 
-                let lhs_builder = lhs.into_sql_builder()?;
-                let rhs_builder = rhs.into_sql_builder()?;
+                let lhs_builder = lhs.to_sql_builder()?;
+                let rhs_builder = rhs.to_sql_builder()?;
 
                 Ok(Box::new(BinaryOperationBuilder {
                     lhs: lhs_builder,
@@ -135,13 +135,13 @@ impl IntoSqlBuilder for Addition {
                     rhs: rhs_builder,
                 }))
             }
-            Addition::Unary(ast_node) => ast_node.into_sql_builder(),
+            Addition::Unary(ast_node) => ast_node.to_sql_builder(),
         }
     }
 }
 
-impl IntoSqlBuilder for Multiplication {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for Multiplication {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         match self {
             Multiplication::Binary { lhs, op, rhs } => {
                 let op_str = match op {
@@ -150,8 +150,8 @@ impl IntoSqlBuilder for Multiplication {
                     rscel::MultOp::Mod => "%",
                 };
 
-                let lhs_builder = lhs.into_sql_builder()?;
-                let rhs_builder = rhs.into_sql_builder()?;
+                let lhs_builder = lhs.to_sql_builder()?;
+                let rhs_builder = rhs.to_sql_builder()?;
 
                 Ok(Box::new(BinaryOperationBuilder {
                     lhs: lhs_builder,
@@ -159,18 +159,18 @@ impl IntoSqlBuilder for Multiplication {
                     rhs: rhs_builder,
                 }))
             }
-            Multiplication::Unary(ast_node) => ast_node.into_sql_builder(),
+            Multiplication::Unary(ast_node) => ast_node.to_sql_builder(),
         }
     }
 }
 
-impl IntoSqlBuilder for Unary {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for Unary {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         match self {
-            Unary::Member(ast_node) => ast_node.into_sql_builder(),
+            Unary::Member(ast_node) => ast_node.to_sql_builder(),
             Unary::NotMember { nots, member } => {
-                let nots_builder = nots.into_sql_builder()?;
-                let member_builder = member.into_sql_builder()?;
+                let nots_builder = nots.to_sql_builder()?;
+                let member_builder = member.to_sql_builder()?;
 
                 Ok(Box::new(UnaryOperationBuilder {
                     operator: nots_builder,
@@ -178,8 +178,8 @@ impl IntoSqlBuilder for Unary {
                 }))
             }
             Unary::NegMember { negs, member } => {
-                let negs_builder = negs.into_sql_builder()?;
-                let member_builder = member.into_sql_builder()?;
+                let negs_builder = negs.to_sql_builder()?;
+                let member_builder = member.to_sql_builder()?;
 
                 Ok(Box::new(UnaryOperationBuilder {
                     operator: negs_builder,
@@ -190,11 +190,11 @@ impl IntoSqlBuilder for Unary {
     }
 }
 
-impl IntoSqlBuilder for NotList {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for NotList {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         match self {
             NotList::List { tail } => {
-                let tail_builder = tail.into_sql_builder()?;
+                let tail_builder = tail.to_sql_builder()?;
                 Ok(Box::new(LiteralBuilder {
                     value: format!("!{}", tail_builder.to_sql()?),
                 }))
@@ -206,11 +206,11 @@ impl IntoSqlBuilder for NotList {
     }
 }
 
-impl IntoSqlBuilder for NegList {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for NegList {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         match self {
             NegList::List { tail } => {
-                let tail_builder = tail.into_sql_builder()?;
+                let tail_builder = tail.to_sql_builder()?;
                 Ok(Box::new(LiteralBuilder {
                     value: format!("-{}", tail_builder.to_sql()?),
                 }))
@@ -222,21 +222,20 @@ impl IntoSqlBuilder for NegList {
     }
 }
 
-impl IntoSqlBuilder for Member {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
-        let primary_builder = self.primary.into_sql_builder()?;
+impl ToSqlBuilder for Member {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+        let primary_builder = self.primary.to_sql_builder()?;
 
         // Check if this is a single function call
         if self.member.len() == 1 {
             if let MemberPrime::Call { call } = self.member[0].node() {
-                // Get the function arguments (reversed to fix parser ordering)
+                // Get the function arguments, which the compiler emits in source order
                 let mut args = call
                     .node()
                     .exprs
                     .iter()
-                    .map(|expr| expr.into_sql_builder())
+                    .map(|expr| expr.to_sql_builder())
                     .collect::<Result<Vec<_>, ToSqlError>>()?;
-                args.reverse();
 
                 // Check if this is a type casting operation
                 if let Primary::Ident(ident) = self.primary.node() {
@@ -274,7 +273,7 @@ impl IntoSqlBuilder for Member {
                 // Not a type cast, this is a regular function call
                 return Ok(Box::new(FunctionCallBuilder {
                     primary: primary_builder,
-                    args: args,
+                    args,
                 }));
             }
         }
@@ -286,7 +285,7 @@ impl IntoSqlBuilder for Member {
                 MemberPrime::MemberAccess { ident } => {
                     builder = Box::new(JsonMemberAccessBuilder {
                         object: builder,
-                        field: ident.node().into_sql_builder()?,
+                        field: ident.node().to_sql_builder()?,
                         extract_text: i == (self.member.len() - 1),
                     })
                 }
@@ -297,33 +296,33 @@ impl IntoSqlBuilder for Member {
                             .node()
                             .exprs
                             .iter()
-                            .map(|a| a.node().into_sql_builder())
+                            .map(|a| a.node().to_sql_builder())
                             .collect::<ToSqlResult<Vec<_>>>()?,
                     });
                 }
                 MemberPrime::ArrayAccess { access } => {
                     builder = Box::new(ArrayAccessBuilder {
                         array: builder,
-                        member: access.node().into_sql_builder()?,
+                        member: access.node().to_sql_builder()?,
                     })
                 }
                 MemberPrime::Empty => break,
             }
         }
 
-        return Ok(builder);
+        Ok(builder)
 
         // Handle as member access chain - check if this is JSON member access
     }
 }
 
-impl IntoSqlBuilder for MemberPrime {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for MemberPrime {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         match self {
             MemberPrime::MemberAccess { ident } => {
                 // For JSON member access, we'll return a JSON field access pattern
                 // This will be handled specially in the Member implementation
-                let field_name = ident.into_sql_builder()?.to_sql()?;
+                let field_name = ident.to_sql_builder()?.to_sql()?;
                 Ok(Box::new(LiteralBuilder {
                     value: format!("->'{}'", field_name),
                 }))
@@ -336,7 +335,7 @@ impl IntoSqlBuilder for MemberPrime {
                     .exprs
                     .iter()
                     .map(|expr| {
-                        let builder = expr.into_sql_builder()?;
+                        let builder = expr.to_sql_builder()?;
                         builder.to_sql()
                     })
                     .collect::<Result<Vec<String>, ToSqlError>>()?;
@@ -346,7 +345,7 @@ impl IntoSqlBuilder for MemberPrime {
                 }))
             }
             MemberPrime::ArrayAccess { access } => {
-                let access_builder = access.into_sql_builder()?;
+                let access_builder = access.to_sql_builder()?;
                 Ok(Box::new(LiteralBuilder {
                     value: format!("[{}]", access_builder.to_sql()?),
                 }))
@@ -358,23 +357,23 @@ impl IntoSqlBuilder for MemberPrime {
     }
 }
 
-impl IntoSqlBuilder for Ident {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for Ident {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         Ok(Box::new(IdentifierBuilder {
             name: self.0.clone(),
         }))
     }
 }
 
-impl IntoSqlBuilder for Primary {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for Primary {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         match self {
             Primary::Type => Ok(Box::new(UnsupportedBuilder {
                 message: "Type primary not implemented yet".to_string(),
             })),
-            Primary::Ident(ident) => ident.into_sql_builder(),
+            Primary::Ident(ident) => ident.to_sql_builder(),
             Primary::Parens(ast_node) => {
-                let inner_builder = ast_node.into_sql_builder()?;
+                let inner_builder = ast_node.to_sql_builder()?;
                 Ok(Box::new(ParensBuilder {
                     inner: inner_builder,
                 }))
@@ -384,19 +383,19 @@ impl IntoSqlBuilder for Primary {
                 let elements = expr_list
                     .exprs
                     .iter()
-                    .map(|expr| expr.into_sql_builder())
+                    .map(|expr| expr.to_sql_builder())
                     .collect::<ToSqlResult<Vec<_>>>()?;
 
-                Ok(Box::new(ArrayBuilder { elements: elements }))
+                Ok(Box::new(ArrayBuilder { elements }))
             }
-            Primary::ObjectInit(ast_node) => ast_node.node().into_sql_builder(),
-            Primary::Literal(literals_and_keywords) => literals_and_keywords.into_sql_builder(),
+            Primary::ObjectInit(ast_node) => ast_node.node().to_sql_builder(),
+            Primary::Literal(literals_and_keywords) => literals_and_keywords.to_sql_builder(),
         }
     }
 }
 
-impl IntoSqlBuilder for LiteralsAndKeywords {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for LiteralsAndKeywords {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         let value = match self {
             LiteralsAndKeywords::Type => {
                 return Ok(Box::new(UnsupportedBuilder {
@@ -473,13 +472,13 @@ impl IntoSqlBuilder for LiteralsAndKeywords {
     }
 }
 
-impl IntoSqlBuilder for ExprList {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for ExprList {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         let args: Result<Vec<String>, ToSqlError> = self
             .exprs
             .iter()
             .map(|expr| {
-                let builder = expr.into_sql_builder()?;
+                let builder = expr.to_sql_builder()?;
                 builder.to_sql()
             })
             .collect();
@@ -490,12 +489,12 @@ impl IntoSqlBuilder for ExprList {
     }
 }
 
-impl IntoSqlBuilder for ObjInit {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for ObjInit {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         // This is handled at the ObjInits level, but we need this for completeness
-        let key_builder = self.key.into_sql_builder()?;
+        let key_builder = self.key.to_sql_builder()?;
         let key_sql = key_builder.to_sql()?;
-        let value_builder = self.value.into_sql_builder()?;
+        let value_builder = self.value.to_sql_builder()?;
         let value_sql = value_builder.to_sql()?;
 
         Ok(Box::new(LiteralBuilder {
@@ -504,14 +503,14 @@ impl IntoSqlBuilder for ObjInit {
     }
 }
 
-impl IntoSqlBuilder for ObjInits {
-    fn into_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
+impl ToSqlBuilder for ObjInits {
+    fn to_sql_builder(&self) -> Result<Box<dyn SqlBuilder>, ToSqlError> {
         let fields = self
             .inits
             .iter()
             .map(|init| {
-                let key_builder = init.node().key.into_sql_builder()?;
-                let value_builder = init.node().value.into_sql_builder()?;
+                let key_builder = init.node().key.to_sql_builder()?;
+                let value_builder = init.node().value.to_sql_builder()?;
                 Ok((key_builder, value_builder))
             })
             .collect::<ToSqlResult<Vec<_>>>()?;

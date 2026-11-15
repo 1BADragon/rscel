@@ -58,9 +58,9 @@ impl From<Vec<ByteCode>> for CelByteCode {
     }
 }
 
-impl Into<Vec<ByteCode>> for CelByteCode {
-    fn into(self) -> Vec<ByteCode> {
-        self.inner
+impl From<CelByteCode> for Vec<ByteCode> {
+    fn from(val: CelByteCode) -> Self {
+        val.inner
     }
 }
 

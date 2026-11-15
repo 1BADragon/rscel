@@ -1,4 +1,3 @@
-#![feature(string_remove_matches)]
 //! RsCel is a CEL evaluator written in Rust. CEL is a google project that
 //! describes a turing-incomplete language that can be used to evaluate
 //! a user provdided expression. The language specification can be found
@@ -60,13 +59,13 @@ mod types;
 // Export some public interface
 pub mod utils;
 pub use compiler::{
-    ast_node::AstNode, compiler::CelCompiler, grammar::*, source_location::SourceLocation,
+    ast_node::AstNode, cel_compiler::CelCompiler, grammar::*, source_location::SourceLocation,
     source_range::SourceRange, string_tokenizer::StringTokenizer, tokenizer::Tokenizer,
 };
 pub use context::{BindContext, CelContext, RsCelFunction, RsCelMacro};
-pub use interp::ByteCode;
+pub use interp::{ByteCode, InterpRuntime};
 pub use program::{Program, ProgramDetails};
-pub use types::{CelError, CelResult, CelValue, CelValueDyn};
+pub use types::{CelError, CelResult, CelValue, CelValueDyn, MacroArg};
 
 // Some re-exports to allow a consistent use of serde
 pub use serde;

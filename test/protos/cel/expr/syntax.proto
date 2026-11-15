@@ -1,0 +1,149 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package cel.expr;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option cc_enable_arenas = true;
+option go_package = "cel.dev/expr";
+option java_multiple_files = true;
+option java_outer_classname = "SyntaxProto";
+option java_package = "dev.cel.expr";
+
+// A representation of the abstract syntax of the Common Expression Language.
+
+// An expression together with source information as returned by the parser.
+message ParsedExpr {
+  // The parsed expression.
+  Expr expr = 2;
+
+  // The source info derived from input that generated the parsed `expr`.
+  SourceInfo source_info = 3;
+}
+
+// An abstract representation of a common expression.
+message Expr {
+  // An identifier expression. e.g. `request`.
+  message Ident {
+    string name = 1;
+  }
+
+  // A field selection expression. e.g. `request.auth`.
+  message Select {
+    Expr operand = 1;
+    string field = 2;
+    bool test_only = 3;
+  }
+
+  // A call expression, including calls to predefined functions and operators.
+  message Call {
+    Expr target = 1;
+    string function = 2;
+    repeated Expr args = 3;
+  }
+
+  // A list creation expression.
+  message CreateList {
+    repeated Expr elements = 1;
+    repeated int32 optional_indices = 2;
+  }
+
+  // A map or message creation expression.
+  message CreateStruct {
+    message Entry {
+      int64 id = 1;
+      oneof key_kind {
+        string field_key = 2;
+        Expr map_key = 3;
+      }
+      Expr value = 4;
+      bool optional_entry = 5;
+    }
+    string message_name = 1;
+    repeated Entry entries = 2;
+  }
+
+  // A comprehension expression applied to a list or map.
+  message Comprehension {
+    string iter_var = 1;
+    string iter_var2 = 8;
+    Expr iter_range = 2;
+    string accu_var = 3;
+    Expr accu_init = 4;
+    Expr loop_condition = 5;
+    Expr loop_step = 6;
+    Expr result = 7;
+  }
+
+  int64 id = 2;
+
+  oneof expr_kind {
+    Constant const_expr = 3;
+    Ident ident_expr = 4;
+    Select select_expr = 5;
+    Call call_expr = 6;
+    CreateList list_expr = 7;
+    CreateStruct struct_expr = 8;
+    Comprehension comprehension_expr = 9;
+  }
+}
+
+// Represents a primitive literal.
+message Constant {
+  oneof constant_kind {
+    google.protobuf.NullValue null_value = 1;
+    bool bool_value = 2;
+    int64 int64_value = 3;
+    uint64 uint64_value = 4;
+    double double_value = 5;
+    string string_value = 6;
+    bytes bytes_value = 7;
+    google.protobuf.Duration duration_value = 8 [deprecated = true];
+    google.protobuf.Timestamp timestamp_value = 9 [deprecated = true];
+  }
+}
+
+// Source information collected at parse time.
+message SourceInfo {
+  string syntax_version = 1;
+  string location = 2;
+  repeated int32 line_offsets = 3;
+  map<int64, int32> positions = 4;
+  map<int64, Expr> macro_calls = 5;
+
+  repeated Extension extensions = 6;
+
+  message Extension {
+    message Version {
+      int64 major = 1;
+      int64 minor = 2;
+    }
+
+    enum Component {
+      COMPONENT_UNSPECIFIED = 0;
+      COMPONENT_PARSER = 1;
+      COMPONENT_TYPE_CHECKER = 2;
+      COMPONENT_RUNTIME = 3;
+    }
+
+    string id = 1;
+    repeated Component affected_components = 2;
+    Version version = 3;
+  }
+}

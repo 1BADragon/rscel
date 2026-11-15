@@ -36,16 +36,15 @@ impl DispatchArgType {
                         "String" => DispatchArgType::String,
                         "Vec" => match &t.arguments {
                             PathArguments::AngleBracketed(angle) => match angle.args.last() {
-                                Some(GenericArgument::Type(t)) => match t {
-                                    Type::Path(path) => match path.path.segments.last() {
+                                Some(GenericArgument::Type(Type::Path(path))) => {
+                                    match path.path.segments.last() {
                                         Some(t) => match t.ident.to_string().as_str() {
                                             "CelValue" => DispatchArgType::Vec,
                                             _ => panic!("Vec arg must be either CelValue"),
                                         },
                                         _ => panic!("Empty Vec args"),
-                                    },
-                                    _ => panic!("Vec arg must be path"),
-                                },
+                                    }
+                                }
                                 _ => panic!("Vec arg must be path"),
                             },
                             _ => panic!("Vec arg must be either CelValue or u8"),

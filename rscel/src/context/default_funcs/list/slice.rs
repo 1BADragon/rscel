@@ -45,7 +45,11 @@ mod methods {
                 ));
             }
 
-            this.into_iter().skip(start).take(end - start).collect::<Vec<_>>().into()
+            this.into_iter()
+                .skip(start)
+                .take(end - start)
+                .collect::<Vec<_>>()
+                .into()
         }
     }
 }

@@ -1,5 +1,3 @@
-#![feature(fn_traits)]
-#![feature(unboxed_closures)]
 use py_cel_error::PyCelError;
 use py_cel_value::PyCelValue;
 use rscel::{BindContext, CelContext, CelValue, Program};
@@ -19,16 +17,24 @@ mod py_cel_context;
 mod py_cel_error;
 mod py_cel_program;
 mod py_cel_value;
+mod py_interp_runtime;
 
 use celpycallable::CelPyCallable;
 use py_bind_context::PyBindContext;
 use py_cel_context::PyCelContext;
 use py_cel_program::PyCelProgram;
-use rscel_to_sql::IntoSqlBuilder;
+use py_interp_runtime::PyInterpRuntime;
+use rscel_to_sql::ToSqlBuilder;
 
 /* Eval entry point */
 #[pyfunction]
-fn eval(py: Python<'_>, prog_str: String, bindings: &Bound<PyDict>) -> PyResult<Py<PyAny>> {
+#[pyo3(signature = (prog_str, bindings, *, runtime=None))]
+fn eval(
+    py: Python<'_>,
+    prog_str: String,
+    bindings: &Bound<PyDict>,
+    runtime: Option<PyRef<'_, PyInterpRuntime>>,
+) -> PyResult<Py<PyAny>> {
     let callables = {
         let mut callables = Vec::new();
         for keyobj in bindings.keys() {
@@ -58,11 +64,18 @@ fn eval(py: Python<'_>, prog_str: String, bindings: &Bound<PyDict>) -> PyResult<
         }
     }
 
-    for callable in callables.iter() {
-        exec_ctx.bind_func(&callable.0, &callable.1);
+    // bind_func borrows, so the closures must outlive exec_ctx's use below.
+    let mut funcs = Vec::with_capacity(callables.len());
+    for (name, callable) in callables {
+        funcs.push((name, callable.into_fn()));
+    }
+    for (name, func) in funcs.iter() {
+        exec_ctx.bind_func(name, func);
     }
 
-    let res = ctx.exec("entry", &exec_ctx);
+    let res = ctx
+        .exec_with_rt("entry", &exec_ctx, runtime.map(|rt| rt.inner().clone()))
+        .0;
 
     match res {
         Ok(res) => Ok(PyCelValue::new(res).into_pyobject_or_pyerr(py)?.unbind()),
@@ -78,7 +91,7 @@ fn to_sql(py: Python<'_>, prog_str: String) -> PyResult<Py<PyString>> {
     };
 
     let sql_str = if let Some(ast) = p.ast() {
-        match ast.into_sql_builder() {
+        match ast.to_sql_builder() {
             Ok(b) => b.to_sql(),
             Err(e) => return Err(PyException::new_err(e.to_string())),
         }
@@ -101,5 +114,6 @@ fn rscel_module(_py: Python<'_>, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<PyCelContext>()?;
     m.add_class::<PyBindContext>()?;
     m.add_class::<PyCelProgram>()?;
+    m.add_class::<PyInterpRuntime>()?;
     Ok(())
 }

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::source_location::SourceLocation;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct SourceRange {
     start: SourceLocation,
     end: SourceLocation,

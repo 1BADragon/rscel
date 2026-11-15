@@ -61,7 +61,7 @@ impl<'l> StringTokenizer<'l> {
                 },
                 '.' => {
                     if let Some(v) = self.scanner.peek() {
-                        if v >= '0' && v <= '9' {
+                        if v.is_ascii_digit() {
                             self.parse_number_or_token(input_char.encode_utf8(&mut tmp))
                         } else {
                             Ok(Some(Token::Dot))
@@ -206,15 +206,15 @@ impl<'l> StringTokenizer<'l> {
                     'a' => working.push(0x07u8),
                     'b' => working.push(0x08u8),
                     'f' => working.push(0x0cu8),
-                    'n' => working.push('\n' as u8),
-                    'r' => working.push('\r' as u8),
-                    't' => working.push('\t' as u8),
+                    'n' => working.push(b'\n'),
+                    'r' => working.push(b'\r'),
+                    't' => working.push(b'\t'),
                     'v' => working.push(0x0bu8),
                     'x' => working.push(self.extract_hex_val(2)? as u8),
                     'X' => working.push(self.extract_hex_val(2)? as u8),
-                    '\\' => working.push('\\' as u8),
-                    '\'' => working.push('\'' as u8),
-                    '"' => working.push('"' as u8),
+                    '\\' => working.push(b'\\'),
+                    '\'' => working.push(b'\''),
+                    '"' => working.push(b'"'),
                     '0'..='9' => {
                         let mut oct: String = [escaped].into_iter().collect();
                         for _ in 0..2 {
@@ -222,7 +222,9 @@ impl<'l> StringTokenizer<'l> {
                                 Some(c) => oct.push(c),
                                 None => {
                                     return Err(SyntaxError::from_location(self.scanner.location())
-                                        .with_message(format!("Octal number requires 3 digits")))
+                                        .with_message(
+                                            "Octal number requires 3 digits".to_string(),
+                                        ))
                                 }
                             }
                         }
@@ -298,7 +300,9 @@ impl<'l> StringTokenizer<'l> {
                                 Some(c) => oct.push(c),
                                 None => {
                                     return Err(SyntaxError::from_location(self.scanner.location())
-                                        .with_message(format!("Octal number requires 3 digits")))
+                                        .with_message(
+                                            "Octal number requires 3 digits".to_string(),
+                                        ))
                                 }
                             }
                         }
@@ -421,9 +425,9 @@ impl<'l> StringTokenizer<'l> {
         }
 
         if let Some(ident) = options.iter().find(|x| x.0 == working) {
-            return Ok(Some(ident.1.clone()));
+            Ok(Some(ident.1.clone()))
         } else {
-            return Ok(Some(Token::Ident(working)));
+            Ok(Some(Token::Ident(working)))
         }
     }
 
@@ -437,18 +441,12 @@ impl<'l> StringTokenizer<'l> {
         'outer: loop {
             if let Some(next) = self.scanner.peek() {
                 match next {
-                    '0' => {
-                        working.push(next);
-                        self.scanner.next();
-                    }
-                    '1'..='9' => {
+                    '0'..='9' => {
                         working.push(next);
                         self.scanner.next();
                     }
                     'e' | 'E' | '.' => {
-                        if next == '.' && is_float {
-                            break 'outer;
-                        } else if is_exp {
+                        if (next == '.' && is_float) || is_exp {
                             break 'outer;
                         }
 
@@ -531,7 +529,7 @@ impl<'l> StringTokenizer<'l> {
         for _ in 0..len {
             code_str.push(match self.scanner.next() {
                 Some(c) => {
-                    if c.is_digit(16) {
+                    if c.is_ascii_hexdigit() {
                         c
                     } else {
                         return Err(SyntaxError::from_location(self.scanner.location())
@@ -565,9 +563,9 @@ impl<'l> StringTokenizer<'l> {
 impl Tokenizer for StringTokenizer<'_> {
     fn peek(&mut self) -> Result<Option<&TokenWithLoc>, SyntaxError> {
         if self.current.is_none() {
-            match self.collect_next_token() {
-                Ok(token) => self.current = token,
-                Err(err) => return Err(err),
+            {
+                let token = self.collect_next_token()?;
+                self.current = token
             };
         }
         Ok(self.current.as_ref())
@@ -577,12 +575,12 @@ impl Tokenizer for StringTokenizer<'_> {
         if self.current.is_none() {
             self.collect_next_token()
         } else {
-            let tmp = std::mem::replace(&mut self.current, None);
+            let tmp = self.current.take();
             Ok(tmp)
         }
     }
 
-    fn source<'a>(&'a self) -> &'a str {
+    fn source(&self) -> &str {
         self.scanner.input()
     }
 

@@ -24,6 +24,48 @@ use crate::{interp::ByteCode, CelError, CelResult, CelValueDyn};
 use super::{cel_byte_code::CelByteCode, CelBytes};
 
 pub type CelTimeStamp = DateTime<Utc>;
+
+/// CEL timestamps are limited to [0001-01-01T00:00:00Z, 9999-12-31T23:59:59.999999999Z],
+/// as epoch seconds. Any nanos within the final second are still in range.
+const MIN_TIMESTAMP_SECS: i64 = -62135596800;
+const MAX_TIMESTAMP_SECS: i64 = 253402300799;
+
+/// Reject timestamps outside the range CEL allows, rather than returning a value the
+/// spec says cannot exist.
+pub(crate) fn check_timestamp_range(ts: CelTimeStamp) -> CelResult<CelTimeStamp> {
+    let secs = ts.timestamp();
+    if (MIN_TIMESTAMP_SECS..=MAX_TIMESTAMP_SECS).contains(&secs) {
+        Ok(ts)
+    } else {
+        Err(CelError::value("Timestamp out of range"))
+    }
+}
+
+/// CEL durations must be representable as int64 nanoseconds (roughly +/-292 years),
+/// which is narrower than what chrono's Duration can hold.
+pub(crate) fn check_duration_range(d: Duration) -> CelResult<Duration> {
+    if d.num_nanoseconds().is_some() {
+        Ok(d)
+    } else {
+        Err(CelError::value("Duration out of range"))
+    }
+}
+
+/// As `check_timestamp_range`/`check_duration_range`, but folded into the CelValue an
+/// operator has to return.
+fn timestamp_result(ts: Option<CelTimeStamp>) -> CelValue {
+    match ts.map(check_timestamp_range) {
+        Some(Ok(ts)) => CelValue::from_timestamp(ts),
+        _ => CelValue::from_err(CelError::value("Timestamp out of range")),
+    }
+}
+
+fn duration_result(d: Option<Duration>) -> CelValue {
+    match d.map(check_duration_range) {
+        Some(Ok(d)) => CelValue::from_duration(d),
+        _ => CelValue::from_err(CelError::value("Duration out of range")),
+    }
+}
 pub type CelValueVec = Vec<CelValue>;
 pub type CelValueMap = HashMap<String, CelValue>;
 
@@ -57,6 +99,10 @@ pub enum CelValue {
     )]
     Duration(Duration),
     ByteCode(CelByteCode),
+    // Error values are now encapsulated.
+    Err(CelError),
+    Binder(String),
+    // Skipped, never serialized
     #[cfg(feature = "protobuf")]
     #[serde(skip_serializing, skip_deserializing)]
     Message(Box<dyn MessageDyn>),
@@ -68,8 +114,6 @@ pub enum CelValue {
     },
     #[serde(skip_serializing, skip_deserializing)]
     Dyn(Arc<dyn CelValueDyn>),
-    // Error values are now encapsulated.
-    Err(CelError),
 }
 
 impl CelValue {
@@ -101,6 +145,11 @@ impl CelValue {
         CelValue::String(val)
     }
 
+    // Not implementing the trait because the trait expects to be able to parse the
+    // str into a target data type. To me, that implies "3" should be a CelValue::Int
+    // (or uint) not a CelValue::String with value "3". This from_str always creates
+    // a CelValue::String with value copied directly from the str.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(val: &str) -> CelValue {
         CelValue::String(val.to_owned())
     }
@@ -217,19 +266,11 @@ impl CelValue {
     }
 
     pub fn is_err(&self) -> bool {
-        if let CelValue::Err(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, CelValue::Err(_))
     }
 
     pub fn is_obj(&self) -> bool {
-        match self {
-            CelValue::Map(_) => true,
-            CelValue::Dyn(_) => true,
-            _ => false,
-        }
+        matches!(self, CelValue::Map(_) | CelValue::Dyn(_))
     }
 
     pub fn is_zero(&self) -> bool {
@@ -316,11 +357,7 @@ impl CelValue {
     }
 
     pub fn is_null(&self) -> bool {
-        if let CelValue::Null = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, CelValue::Null)
     }
 
     fn type_prop(lhs: CelValue, rhs: CelValue) -> (CelValue, CelValue) {
@@ -555,7 +592,7 @@ impl CelValue {
                         return CelValue::from_err(CelError::value("List access out of bounds"));
                     }
 
-                    return list[index as usize].clone();
+                    list[index as usize].clone()
                 } else if let CelValue::Int(index) = index {
                     if index < 0 {
                         if cfg!(feature = "neg_index") {
@@ -579,9 +616,7 @@ impl CelValue {
 
                             list[adjusted_index as usize].clone()
                         } else {
-                            return CelValue::from_err(CelError::value(
-                                "Negative index is not allowed",
-                            ));
+                            CelValue::from_err(CelError::value("Negative index is not allowed"))
                         }
                     } else {
                         if index as usize >= list.len() {
@@ -593,18 +628,14 @@ impl CelValue {
                         list[index as usize].clone()
                     }
                 } else {
-                    return CelValue::from_err(CelError::value(
-                        "List index can only be int or uint",
-                    ));
+                    CelValue::from_err(CelError::value("List index can only be int or uint"))
                 }
             }
             CelValue::Map(map) => {
                 if let CelValue::String(index) = index {
                     match map.get(index.as_str()) {
-                        Some(val) => return val.clone(),
-                        None => {
-                            return CelValue::from_err(CelError::attribute("obj", &index));
-                        }
+                        Some(val) => val.clone(),
+                        None => CelValue::from_err(CelError::attribute("obj", &index)),
                     }
                 } else {
                     CelValue::from_err(CelError::value(&format!(
@@ -615,7 +646,7 @@ impl CelValue {
             }
             CelValue::Dyn(d) => {
                 if let CelValue::String(index) = index {
-                    return d.access(&index);
+                    d.access(&index)
                 } else {
                     CelValue::from_err(CelError::value(&format!(
                         "Dyn index operator mush be a string, found {:?}",
@@ -649,13 +680,14 @@ impl CelValueDyn for CelValue {
             CelValue::TimeStamp(_) => CelValue::timestamp_type(),
             CelValue::Duration(_) => CelValue::duration_type(),
             CelValue::ByteCode(_) => CelValue::bytecode_type(),
+            CelValue::Binder(_) => CelValue::from_type("binder"),
             #[cfg(feature = "protobuf")]
             CelValue::Message(msg) => CelValue::message_type(&msg.descriptor_dyn()),
             #[cfg(feature = "protobuf")]
             CelValue::Enum {
                 descriptor,
                 value: _value,
-            } => CelValue::enum_type(&descriptor),
+            } => CelValue::enum_type(descriptor),
             CelValue::Dyn(obj) => obj.as_type(),
             CelValue::Err(_) => CelValue::err_type(),
         }
@@ -792,7 +824,7 @@ impl CelValueDyn for CelValue {
                         },
                         CelValue::String(strval),
                     ) => {
-                        if let Some(_) = l_desc.value_by_name(&strval) {
+                        if l_desc.value_by_name(&strval).is_some() {
                             CelValue::true_()
                         } else {
                             CelValue::false_()
@@ -814,10 +846,10 @@ impl CelValueDyn for CelValue {
             CelValue::UInt(u) => *u != 0,
             CelValue::Float(f) => *f != 0.0,
             CelValue::Bool(b) => *b,
-            CelValue::String(s) => s.len() != 0,
+            CelValue::String(s) => !s.is_empty(),
             CelValue::Bytes(b) => b.len() != 0,
-            CelValue::List(l) => l.len() != 0,
-            CelValue::Map(m) => m.len() != 0,
+            CelValue::List(l) => !l.is_empty(),
+            CelValue::Map(m) => !m.is_empty(),
             CelValue::Null => false,
             CelValue::Type(_) => true,
             CelValue::TimeStamp(_) => true,
@@ -835,7 +867,7 @@ impl CelValueDyn for CelValue {
         }
     }
 
-    fn any_ref<'a>(&'a self) -> &'a dyn Any {
+    fn any_ref(&self) -> &dyn Any {
         self
     }
 }
@@ -861,7 +893,7 @@ impl From<&Value> for CelValue {
             Value::String(val) => CelValue::from_string(val.clone()),
             Value::Bool(val) => CelValue::from_bool(*val),
             Value::Array(val) => {
-                let list: Vec<CelValue> = val.iter().map(|x| CelValue::from(x)).collect();
+                let list: Vec<CelValue> = val.iter().map(CelValue::from).collect();
                 CelValue::from_list(list)
             }
             Value::Null => CelValue::from_null(),
@@ -899,7 +931,7 @@ impl From<Value> for CelValue {
             Value::String(val) => CelValue::from_string(val),
             Value::Bool(val) => CelValue::from_bool(val),
             Value::Array(val) => {
-                let list: Vec<CelValue> = val.iter().map(|x| CelValue::from(x)).collect();
+                let list: Vec<CelValue> = val.iter().map(CelValue::from).collect();
                 CelValue::from_list(list)
             }
             Value::Null => CelValue::from_null(),
@@ -1240,12 +1272,18 @@ impl Add for CelValue {
             match lhs {
                 CelValue::Int(val1) => {
                     if let CelValue::Int(val2) = rhs {
-                        return CelValue::from(val1 + val2);
+                        return match val1.checked_add(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::UInt(val1) => {
                     if let CelValue::UInt(val2) = rhs {
-                        return CelValue::from(val1 + val2);
+                        return match val1.checked_add(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::Float(val1) => {
@@ -1276,12 +1314,12 @@ impl Add for CelValue {
                 }
                 CelValue::TimeStamp(v1) => {
                     if let CelValue::Duration(v2) = rhs {
-                        return CelValue::from_timestamp(v1 + v2);
+                        return timestamp_result(v1.checked_add_signed(v2));
                     }
                 }
                 CelValue::Duration(v1) => match rhs {
-                    CelValue::TimeStamp(v2) => return CelValue::from_timestamp(v2 + v1),
-                    CelValue::Duration(v2) => return CelValue::Duration(v1 + v2),
+                    CelValue::TimeStamp(v2) => return timestamp_result(v2.checked_add_signed(v1)),
+                    CelValue::Duration(v2) => return duration_result(v1.checked_add(&v2)),
                     _ => {}
                 },
                 _ => {}
@@ -1312,12 +1350,18 @@ impl Sub for CelValue {
             match lhs {
                 CelValue::Int(val1) => {
                     if let CelValue::Int(val2) = rhs {
-                        return CelValue::from(val1 - val2);
+                        return match val1.checked_sub(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::UInt(val1) => {
                     if let CelValue::UInt(val2) = rhs {
-                        return CelValue::from(val1 - val2);
+                        return match val1.checked_sub(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::Float(val1) => {
@@ -1326,13 +1370,17 @@ impl Sub for CelValue {
                     }
                 }
                 CelValue::TimeStamp(v1) => match rhs {
-                    CelValue::Duration(v2) => return CelValue::from_timestamp(v1 - v2),
-                    CelValue::TimeStamp(v2) => return CelValue::from_duration(v1 - v2),
+                    CelValue::Duration(v2) => return timestamp_result(v1.checked_sub_signed(v2)),
+                    // signed_duration_since saturates rather than wrapping; anything
+                    // past int64 nanoseconds is caught by the range check.
+                    CelValue::TimeStamp(v2) => {
+                        return duration_result(Some(v1.signed_duration_since(v2)))
+                    }
                     _ => {}
                 },
                 CelValue::Duration(v1) => match rhs {
-                    CelValue::TimeStamp(v2) => return CelValue::from_timestamp(v2 - v1),
-                    CelValue::Duration(v2) => return CelValue::from_duration(v1 - v2),
+                    CelValue::TimeStamp(v2) => return timestamp_result(v2.checked_sub_signed(v1)),
+                    CelValue::Duration(v2) => return duration_result(v1.checked_sub(&v2)),
                     _ => {}
                 },
                 _ => {}
@@ -1363,12 +1411,18 @@ impl Mul for CelValue {
             match lhs {
                 CelValue::Int(val1) => {
                     if let CelValue::Int(val2) = rhs {
-                        return CelValue::from(val1 * val2);
+                        return match val1.checked_mul(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::UInt(val1) => {
                     if let CelValue::UInt(val2) = rhs {
-                        return CelValue::from(val1 * val2);
+                        return match val1.checked_mul(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::Float(val1) => {
@@ -1408,7 +1462,11 @@ impl Div for CelValue {
                             return CelValue::from_err(CelError::DivideByZero);
                         }
 
-                        return CelValue::from(val1 / val2);
+                        // i64::MIN / -1 has no int64 representation
+                        return match val1.checked_div(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::UInt(val1) => {
@@ -1453,11 +1511,23 @@ impl Rem for CelValue {
             match lhs {
                 CelValue::Int(val1) => {
                     if let CelValue::Int(val2) = rhs {
-                        return CelValue::from(val1 % val2);
+                        if val2 == 0 {
+                            return CelValue::from_err(CelError::DivideByZero);
+                        }
+
+                        // i64::MIN % -1 overflows the same way the division does
+                        return match val1.checked_rem(val2) {
+                            Some(v) => CelValue::from(v),
+                            None => CelValue::from_err(CelError::Overflow),
+                        };
                     }
                 }
                 CelValue::UInt(val1) => {
                     if let CelValue::UInt(val2) = rhs {
+                        if val2 == 0 {
+                            return CelValue::from_err(CelError::DivideByZero);
+                        }
+
                         return CelValue::from(val1 % val2);
                     }
                 }
@@ -1484,7 +1554,10 @@ impl Neg for CelValue {
 
         match self {
             CelValue::Int(val1) => {
-                return CelValue::from(-val1);
+                return match val1.checked_neg() {
+                    Some(v) => CelValue::from(v),
+                    None => CelValue::from_err(CelError::Overflow),
+                };
             }
             CelValue::Float(val1) => {
                 return CelValue::from(-val1);
@@ -1551,6 +1624,7 @@ impl fmt::Display for CelValue {
             TimeStamp(val) => write!(f, "{}", val),
             Duration(val) => write!(f, "{}", val),
             ByteCode(val) => write!(f, "{:?}", val),
+            Binder(name) => write!(f, "binder:{}", name),
             #[cfg(feature = "protobuf")]
             Message(msg) => write!(f, "{}", msg.as_ref()),
             #[cfg(feature = "protobuf")]

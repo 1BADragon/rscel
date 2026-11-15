@@ -1,5 +1,5 @@
 use rscel::Program;
-use rscel_to_sql::IntoSqlBuilder;
+use rscel_to_sql::ToSqlBuilder;
 use std::env;
 
 fn main() {
@@ -14,7 +14,7 @@ fn main() {
     let sql_builder = p
         .ast()
         .unwrap()
-        .into_sql_builder()
+        .to_sql_builder()
         .expect("Failed to generate SQL builder");
     let sql = sql_builder.to_sql().expect("Failed to generate SQL");
 

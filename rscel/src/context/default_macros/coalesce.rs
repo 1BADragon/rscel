@@ -1,10 +1,10 @@
 use crate::interp::Interpreter;
-use crate::types::CelByteCode;
+use crate::types::MacroArg;
 use crate::{CelError, CelValue};
 
-pub fn coalesce_impl(ctx: &Interpreter, _this: CelValue, bytecode: &[&CelByteCode]) -> CelValue {
-    for arg in bytecode.iter() {
-        match ctx.run_raw(arg, true) {
+pub fn coalesce_impl(ctx: &Interpreter, _this: CelValue, args: &[MacroArg]) -> CelValue {
+    for arg in args.iter() {
+        match arg.eval(ctx) {
             Ok(CelValue::Null) => {}
             Ok(val) => return val,
             Err(CelError::Binding { .. }) | Err(CelError::Attribute { .. }) => {}

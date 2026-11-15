@@ -1,10 +1,14 @@
 pub use super::types::{ByteCode, JmpWhen};
-use crate::{types::CelByteCode, CelValueDyn};
+use crate::{
+    interp::runtime::{runtime_copy, start_runtime, start_runtime_prebuilt, InterpRuntime},
+    types::CelByteCode,
+    CelValueDyn,
+};
 use std::{collections::HashMap, fmt};
 
 use crate::{
     context::construct_type, utils::ScopedCounter, BindContext, CelContext, CelError, CelResult,
-    CelValue, RsCelFunction, RsCelMacro,
+    CelValue, MacroArg, RsCelFunction, RsCelMacro,
 };
 
 struct InterpStack<'a, 'b> {
@@ -47,11 +51,11 @@ impl<'a, 'b> InterpStack<'a, 'b> {
                     if let Some(ctx) = self.ctx.cel {
                         // Allow for loaded programs to run as values
                         if let Some(prog) = ctx.get_program(&name) {
-                            return self.ctx.run_raw(prog.bytecode(), true).map(|x| x.into());
+                            return self.ctx.run_raw(prog.bytecode(), true);
                         }
                     }
 
-                    Ok(CelValue::from_err(CelError::binding(&name)).into())
+                    Ok(CelValue::from_err(CelError::binding(&name)))
                 } else {
                     Ok(stack_val)
                 }
@@ -118,11 +122,31 @@ impl<'a> Interpreter<'a> {
         self.bindings.cloned()
     }
 
-    pub fn run_program(&self, name: &str) -> CelResult<CelValue> {
+    pub(crate) fn bindings_ref(&'a self) -> Option<&'a BindContext<'a>> {
+        self.bindings
+    }
+
+    pub fn run_program(&self, name: &str) -> (CelResult<CelValue>, InterpRuntime) {
+        let _runtime = start_runtime(self);
+
+        (self.run_program_inner(name), runtime_copy())
+    }
+
+    pub fn run_program_with_rt(
+        &self,
+        name: &str,
+        rt: InterpRuntime,
+    ) -> (CelResult<CelValue>, InterpRuntime) {
+        let _runtime = start_runtime_prebuilt(self, rt);
+
+        (self.run_program_inner(name), runtime_copy())
+    }
+
+    fn run_program_inner(&self, name: &str) -> CelResult<CelValue> {
         match self.cel {
             Some(cel) => match cel.get_program(name) {
                 Some(prog) => self.run_raw(prog.bytecode(), true),
-                None => Err(CelError::binding(&name)),
+                None => Err(CelError::binding(name)),
             },
             None => Err(CelError::internal("No CEL context bound to interpreter")),
         }
@@ -323,13 +347,10 @@ impl<'a> Interpreter<'a> {
                             CelValue::Map(ref map) => match map.get(ident.as_str()) {
                                 Some(val) => stack.push(val.clone()),
                                 None => {
-                                    stack.push(
-                                        CelValue::from_err(CelError::attribute(
-                                            "obj",
-                                            ident.as_str(),
-                                        ))
-                                        .into(),
-                                    );
+                                    stack.push(CelValue::from_err(CelError::attribute(
+                                        "obj",
+                                        ident.as_str(),
+                                    )));
                                 }
                             },
                             #[cfg(feature = "protobuf")]
@@ -348,24 +369,18 @@ impl<'a> Interpreter<'a> {
                                 stack.push(d.access(ident.as_str()));
                             }
                             CelValue::Err(e) => stack.push(CelValue::Err(e)),
-                            obj => stack.push(
-                                CelValue::from_err(CelError::value(&format!(
-                                    "Access operator invalid between {:?} and IDENT",
-                                    obj.as_type(),
-                                )))
-                                .into(),
-                            ),
+                            obj => stack.push(CelValue::from_err(CelError::value(&format!(
+                                "Access operator invalid between {:?} and IDENT",
+                                obj.as_type(),
+                            )))),
                         }
                     } else {
                         let obj_type = stack.pop()?.as_type();
-                        stack.push(
-                            CelValue::from_err(CelError::value(&format!(
-                                "Access operator invalid between {:?} and {:?}",
-                                obj_type,
-                                index.as_type(),
-                            )))
-                            .into(),
-                        );
+                        stack.push(CelValue::from_err(CelError::value(&format!(
+                            "Access operator invalid between {:?} and {:?}",
+                            obj_type,
+                            index.as_type(),
+                        ))));
                     }
                 }
                 ByteCode::CallMethod(n_args) => {
@@ -397,13 +412,10 @@ impl<'a> Interpreter<'a> {
                             let arg_values = self.resolve_args(args)?;
                             stack.push(construct_type(&type_name, arg_values));
                         }
-                        other => stack.push(
-                            CelValue::from_err(CelError::runtime(&format!(
-                                "{:?} cannot be called",
-                                other
-                            )))
-                            .into(),
-                        ),
+                        other => stack.push(CelValue::from_err(CelError::runtime(&format!(
+                            "{:?} cannot be called",
+                            other
+                        )))),
                     };
                 }
                 ByteCode::Call(n_args) => {
@@ -444,13 +456,10 @@ impl<'a> Interpreter<'a> {
                             let arg_values = self.resolve_args(args)?;
                             stack.push(construct_type(&type_name, arg_values));
                         }
-                        other => stack.push(
-                            CelValue::from_err(CelError::runtime(&format!(
-                                "{:?} cannot be called",
-                                other
-                            )))
-                            .into(),
-                        ),
+                        other => stack.push(CelValue::from_err(CelError::runtime(&format!(
+                            "{:?} cannot be called",
+                            other
+                        )))),
                     };
                 }
                 ByteCode::FmtString(nsegments) => {
@@ -488,15 +497,15 @@ impl<'a> Interpreter<'a> {
     fn call_macro(
         &self,
         this: &CelValue,
-        args: &Vec<CelValue>,
+        args: &[CelValue],
         macro_: &RsCelMacro,
     ) -> Result<CelValue, CelError> {
-        let mut v = Vec::new();
+        let mut v: Vec<MacroArg> = Vec::new();
         for arg in args.iter() {
-            if let CelValue::ByteCode(bc) = arg {
-                v.push(bc);
-            } else {
-                return Err(CelError::internal("macro args must be bytecode"));
+            match arg {
+                CelValue::ByteCode(bc) => v.push(MacroArg::Expr(bc)),
+                CelValue::Binder(name) => v.push(MacroArg::Binder(name.clone())),
+                _ => return Err(CelError::internal("macro args must be bytecode or binder")),
             }
         }
         let res = macro_(self, this.clone(), &v);
@@ -506,10 +515,14 @@ impl<'a> Interpreter<'a> {
     fn resolve_args(&self, args: Vec<CelValue>) -> Result<Vec<CelValue>, CelError> {
         let mut arg_values = Vec::new();
         for arg in args.into_iter() {
-            if let CelValue::ByteCode(bc) = arg {
-                arg_values.push(self.run_raw(&bc, true)?);
-            } else {
-                arg_values.push(arg)
+            match arg {
+                CelValue::ByteCode(bc) => arg_values.push(self.run_raw(&bc, true)?),
+                CelValue::Binder(name) => {
+                    let bc =
+                        CelByteCode::from_code_point(ByteCode::Push(CelValue::from_ident(&name)));
+                    arg_values.push(self.run_raw(&bc, true)?);
+                }
+                other => arg_values.push(other),
             }
         }
         Ok(arg_values)

@@ -1,8 +1,11 @@
-mod interp;
+mod interpreter;
+mod runtime;
 mod types;
 
-pub use interp::Interpreter;
+pub use interpreter::Interpreter;
 pub use types::*;
+
+pub use runtime::{runtime_start_time, InterpRuntime};
 
 #[cfg(test)]
 mod test {

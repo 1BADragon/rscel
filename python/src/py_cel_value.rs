@@ -34,7 +34,7 @@ impl rscel::CelValueDyn for PyCelValue {
         <CelValue as rscel::CelValueDyn>::is_truthy(&self.0)
     }
 
-    fn any_ref<'a>(&'a self) -> &'a dyn std::any::Any {
+    fn any_ref(&self) -> &dyn std::any::Any {
         <CelValue as rscel::CelValueDyn>::any_ref(&self.0)
     }
 }
@@ -89,7 +89,7 @@ impl<'py, 'a> IntoPyObject<'py> for PyCelValueRef<'a> {
             String(s) => s.into_pyobject_or_pyerr(py).map(|o| o.into_any()),
             Bytes(s) => Ok(PyBytes::new(py, s.as_slice()).into_any()),
             List(l) => l
-                .into_iter()
+                .iter()
                 .map(|x| {
                     PyCelValueRef(x)
                         .into_pyobject_or_pyerr(py)
@@ -99,7 +99,7 @@ impl<'py, 'a> IntoPyObject<'py> for PyCelValueRef<'a> {
                 .into_pyobject_or_pyerr(py)
                 .map(|o| o.into_any()),
             Map(m) => m
-                .into_iter()
+                .iter()
                 .map(|(k, v)| PyCelValueRef(v).into_pyobject_or_pyerr(py).map(|o| (k, o)))
                 .collect::<Result<HashMap<_, _>, PyErr>>()?
                 .into_pyobject_or_pyerr(py)

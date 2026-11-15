@@ -1,6 +1,6 @@
 use crate::{
-    compiler::{compiler::CelCompiler, string_tokenizer::StringTokenizer},
-    BindContext, ByteCode, CelContext, CelError, CelValue, Program,
+    compiler::{cel_compiler::CelCompiler, string_tokenizer::StringTokenizer},
+    BindContext, ByteCode, CelContext, CelError, CelValue, InterpRuntime, Program,
 };
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use serde_json::Value;
@@ -359,6 +359,7 @@ fn test_contains() {
 #[test_case("format(255, '10x')", "        ff"; "format int hex space padded width 10")]
 #[test_case("format(7, '08b')", "00000111"; "format int binary zero padded width 8")]
 #[test_case("format(7, '8b')", "     111"; "format int binary space padded width 8")]
+#[test_case("now() == now()", true; "now() returns same value whole execution")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
@@ -544,7 +545,7 @@ fn test_object_access_in_array() {
     let mut obj_map = HashMap::<String, CelValue>::new();
     obj_map.insert("foo".to_owned(), "value".into());
 
-    let obj = CelValue::from_val_slice(&vec![obj_map.into()]);
+    let obj = CelValue::from_val_slice(&[obj_map.into()]);
     exec.bind_param("my_list", obj);
 
     assert_eq!(ctx.exec("entry", &exec).unwrap(), "value".into());
@@ -589,7 +590,7 @@ fn test_has_in_reduce() {
         .unwrap()
         .into();
 
-    exec.bind_param("my_list", obj.into());
+    exec.bind_param("my_list", obj);
 
     assert_eq!(ctx.exec("entry", &exec).unwrap(), 2.into());
 }
@@ -601,7 +602,7 @@ fn test_timestamp_functions() {
     let mut exec = BindContext::new();
 
     let dt = Utc
-        .ymd(2024, 01, 10)
+        .ymd(2024, 1, 10)
         .and_hms_milli_opt(8, 57, 45, 123)
         .unwrap();
     exec.bind_param("time", CelValue::from_timestamp(dt));
@@ -612,7 +613,9 @@ fn test_timestamp_functions() {
         ("time.getDayOfMonth()", 9),
         ("time.getDayOfMonth('US/Pacific')", 9),
         ("time.getDayOfWeek()", 3),
-        ("time.getDayOfWeek('US/Pacific')", 4),
+        // Same instant and same local day as getDayOfWeek() above, so it must agree:
+        // day-of-week is 0-based from Sunday.
+        ("time.getDayOfWeek('US/Pacific')", 3),
         ("time.getDayOfYear()", 9),
         ("time.getDayOfYear('US/Pacific')", 9),
         ("time.getFullYear()", 2024),
@@ -645,7 +648,7 @@ fn test_timestamp_set_functions() {
     let mut exec = BindContext::new();
 
     let dt = Utc
-        .ymd(2024, 01, 10)
+        .ymd(2024, 1, 10)
         .and_hms_milli_opt(8, 57, 45, 123)
         .unwrap();
     exec.bind_param("time", CelValue::from_timestamp(dt));
@@ -851,8 +854,11 @@ fn test_match_captures_all() {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
 
-    ctx.add_program_str("main", r#"'one1two2three3'.matchCapturesAll('([a-z]+)([0-9])')"#)
-        .unwrap();
+    ctx.add_program_str(
+        "main",
+        r#"'one1two2three3'.matchCapturesAll('([a-z]+)([0-9])')"#,
+    )
+    .unwrap();
 
     let result = ctx.exec("main", &exec_ctx).unwrap();
 
@@ -863,6 +869,118 @@ fn test_match_captures_all() {
     ]);
 
     assert_eq!(result, expected);
+}
+
+// Integer arithmetic must yield an error value on overflow rather than wrapping
+// (release) or panicking (debug), which is what the unchecked operators did.
+#[test_case("9223372036854775807 + 1"; "int add overflow")]
+#[test_case("-9223372036854775808 - 1"; "int sub overflow")]
+#[test_case("-9223372036854775808 + (-1)"; "int add negative overflow")]
+#[test_case("5000000000 * 5000000000"; "int mul overflow")]
+#[test_case("(-5000000000) * 5000000000"; "int mul negative overflow")]
+#[test_case("-(-9223372036854775808)"; "int negate overflow")]
+#[test_case("(-9223372036854775808) * -1"; "int negate via mul")]
+#[test_case("(-9223372036854775808) / -1"; "int negate via div")]
+#[test_case("18446744073709551615u + 1u"; "uint add overflow")]
+#[test_case("0u - 1u"; "uint sub overflow")]
+#[test_case("5000000000u * 5000000000u"; "uint mul overflow")]
+fn test_integer_overflow_is_error(prog: &str) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+
+    assert!(
+        matches!(ctx.exec("main", &exec_ctx), Err(CelError::Overflow)),
+        "expected overflow error from {prog}"
+    );
+}
+
+// Modulo by zero was entirely unguarded, unlike division.
+#[test_case("34 % 0"; "int mod zero")]
+#[test_case("34u % 0u"; "uint mod zero")]
+#[test_case("34 / 0"; "int div zero")]
+#[test_case("34u / 0u"; "uint div zero")]
+fn test_divide_by_zero_is_error(prog: &str) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+
+    assert!(
+        matches!(ctx.exec("main", &exec_ctx), Err(CelError::DivideByZero)),
+        "expected divide-by-zero error from {prog}"
+    );
+}
+
+// Timezone arguments accept a fixed numeric offset, not just an IANA name.
+#[test_case("timestamp('2009-02-13T23:31:30Z').getDayOfMonth('+11:00')", 13.into(); "numeric tz positive")]
+#[test_case("timestamp('2009-02-13T02:00:00Z').getDayOfMonth('-02:30')", 11.into(); "numeric tz negative")]
+#[test_case("timestamp('2009-02-13T23:31:30Z').getHours('02:00')", 1.into(); "numeric tz unsigned")]
+#[test_case("timestamp('2009-02-13T23:31:30Z').getSeconds('-00:00')", 30.into(); "numeric tz zero")]
+// Named zones must still resolve DST rather than freezing one instant's offset.
+#[test_case("timestamp('2024-06-10T12:00:00Z').getHours('US/Pacific')", 5.into(); "named tz dst")]
+#[test_case("timestamp('2024-01-10T12:00:00Z').getHours('US/Pacific')", 4.into(); "named tz standard")]
+fn test_timezone_arguments(prog: &str, expected: CelValue) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+    assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), expected);
+}
+
+// CEL bounds timestamps to years 1..=9999 and durations to what fits in int64 nanos.
+#[test_case("timestamp('0000-01-01T00:00:00Z')"; "timestamp under range")]
+#[test_case("timestamp('9999-12-31T23:59:59Z') + duration('1s')"; "add over range")]
+#[test_case("timestamp('9999-12-31T23:59:59.999999999Z') + duration('1ns')"; "add nanos over range")]
+#[test_case("timestamp('9999-12-31T23:59:59Z') - timestamp('0001-01-01T00:00:00Z')"; "duration over range")]
+#[test_case("timestamp('0001-01-01T00:00:00Z') - timestamp('9999-12-31T23:59:59Z')"; "duration under range")]
+fn test_time_range_is_error(prog: &str) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+    assert!(
+        ctx.exec("main", &exec_ctx).is_err(),
+        "expected out-of-range error from {prog}"
+    );
+}
+
+#[test_case("string(timestamp('2009-02-13T23:31:30Z'))", "2009-02-13T23:31:30Z"; "rfc3339 uses Z")]
+#[test_case("string(timestamp('9999-12-31T23:59:59.999999999Z'))", "9999-12-31T23:59:59.999999999Z"; "rfc3339 keeps nanos")]
+fn test_timestamp_to_string(prog: &str, expected: &str) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+    assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), expected.into());
+}
+
+#[test_case("type(timestamp('2009-02-13T23:31:30Z'))", "timestamp"; "timestamp type name")]
+#[test_case("type(duration('1s'))", "duration"; "duration type name")]
+fn test_time_type_names(prog: &str, expected: &str) {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", prog).unwrap();
+    assert_eq!(
+        ctx.exec("main", &exec_ctx).unwrap(),
+        CelValue::from_type(expected)
+    );
+}
+
+// Durations are signed; duration_str does not accept the leading minus itself.
+#[test]
+fn test_negative_duration() {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str(
+        "main",
+        "timestamp('0001-01-01T00:00:01.000000001Z') + duration('-999999999ns') == timestamp('0001-01-01T00:00:00.000000002Z')",
+    )
+    .unwrap();
+    assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), true.into());
 }
 
 #[test]
@@ -902,4 +1020,129 @@ fn test_neq_propagates_dyn_eq_error() {
     let obj = CelValue::Dyn(Arc::new(ErrOnEq));
     // Must not panic; the eq() error propagates out through neq().
     assert!(obj.neq(CelValue::from_null()).is_err());
+}
+
+#[test]
+fn test_now_is_stable_across_execution() {
+    let mut ctx = CelContext::new();
+    let mut exec_ctx = BindContext::new();
+
+    let sleep = |_this: CelValue, _args: Vec<CelValue>| -> CelValue {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        CelValue::from_null()
+    };
+    exec_ctx.bind_func("sleep", &sleep);
+
+    ctx.add_program_str("main", "[now(), sleep(), now()]")
+        .unwrap();
+
+    let res = ctx.exec("main", &exec_ctx).unwrap();
+    let CelValue::List(items) = res else {
+        panic!("expected list, got {res:?}");
+    };
+    assert_eq!(items[0], items[2]);
+}
+
+#[test]
+fn test_now_nested_exec_does_not_panic() {
+    let mut inner_ctx = CelContext::new();
+    inner_ctx.add_program_str("inner", "now()").unwrap();
+    let inner_ctx = std::cell::RefCell::new(inner_ctx);
+
+    let inner = move |_this: CelValue, _args: Vec<CelValue>| -> CelValue {
+        inner_ctx
+            .borrow_mut()
+            .exec("inner", &BindContext::new())
+            .unwrap_or_else(CelValue::from_err)
+    };
+
+    let mut ctx = CelContext::new();
+    let mut exec_ctx = BindContext::new();
+    exec_ctx.bind_func("inner", &inner);
+
+    ctx.add_program_str("main", "now() == inner()").unwrap();
+    assert_eq!(ctx.exec("main", &exec_ctx).unwrap(), true.into());
+
+    // Runtime is cleared after the outer run, so a later run gets a fresh time.
+    ctx.add_program_str("outside", "now()").unwrap();
+    let first = ctx.exec("outside", &exec_ctx).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    let second = ctx.exec("outside", &exec_ctx).unwrap();
+    assert_ne!(first, second);
+}
+
+#[test_case("now()", true; "now")]
+#[test_case("clockNow()", true; "clock now")]
+#[test_case("string(now())", true; "now nested in call arg")]
+#[test_case("timestamp(string(now()))", true; "now nested two calls deep")]
+#[test_case("[now()]", true; "now in list")]
+#[test_case("{'a': now()}", true; "now in map")]
+#[test_case("now() + duration('1s')", true; "now in binary op")]
+#[test_case("now().getFullYear()", true; "method on now")]
+#[test_case("size([1].map(x, now()))", true; "now in macro arg")]
+#[test_case("x ? now() : timestamp(0)", true; "now in ternary")]
+#[test_case("1 + 2", false; "arith literal")]
+#[test_case("string(x)", false; "pure call with param")]
+#[test_case("size([1, 2])", false; "folded pure call")]
+#[test_case("timestamp(0)", false; "timestamp literal")]
+#[test_case("f'{now()}'", true; "non-pure in format string")]
+#[test_case("null.now()", true; "non-pure method call")]
+fn test_program_details_impure(prog: &str, impure: bool) {
+    let mut ctx = CelContext::new();
+    ctx.add_program_str("main", prog).unwrap();
+
+    assert_eq!(ctx.program_details("main").unwrap().impure(), impure);
+}
+
+#[test]
+fn test_exec_with_rt_fixes_now() {
+    let start = Utc.with_ymd_and_hms(2020, 5, 17, 12, 30, 0).unwrap();
+    let mut ctx = CelContext::new();
+    ctx.add_program_str("main", "now()").unwrap();
+    let exec_ctx = BindContext::new();
+
+    let (res, rt) = ctx.exec_with_rt("main", &exec_ctx, Some(InterpRuntime::new(start)));
+    assert_eq!(res.unwrap(), CelValue::from_timestamp(start));
+    assert_eq!(rt.start_time(), start);
+
+    // With no runtime, a fresh one is created and returned.
+    let (res, rt) = ctx.exec_with_rt("main", &exec_ctx, None);
+    assert_eq!(res.unwrap(), CelValue::from_timestamp(rt.start_time()));
+    assert_ne!(rt.start_time(), start);
+}
+
+#[test]
+fn test_exec_with_rt_nested_explicit_runtime_wins_and_restores() {
+    let outer_start = Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap();
+    let inner_start = Utc.with_ymd_and_hms(1999, 12, 31, 23, 59, 59).unwrap();
+
+    let mut inner_ctx = CelContext::new();
+    inner_ctx.add_program_str("inner", "now()").unwrap();
+    let inner_ctx = std::cell::RefCell::new(inner_ctx);
+
+    let inner = move |_this: CelValue, _args: Vec<CelValue>| -> CelValue {
+        let (res, _) = inner_ctx.borrow_mut().exec_with_rt(
+            "inner",
+            &BindContext::new(),
+            Some(InterpRuntime::new(inner_start)),
+        );
+        res.unwrap_or_else(CelValue::from_err)
+    };
+
+    let mut ctx = CelContext::new();
+    let mut exec_ctx = BindContext::new();
+    exec_ctx.bind_func("inner", &inner);
+    ctx.add_program_str("main", "[now(), inner(), now()]")
+        .unwrap();
+
+    let (res, rt) = ctx.exec_with_rt("main", &exec_ctx, Some(InterpRuntime::new(outer_start)));
+    assert_eq!(
+        res.unwrap(),
+        CelValue::from_list(vec![
+            CelValue::from_timestamp(outer_start),
+            CelValue::from_timestamp(inner_start),
+            CelValue::from_timestamp(outer_start),
+        ])
+    );
+    assert_eq!(rt.start_time(), outer_start);
 }

@@ -153,7 +153,7 @@ impl<'a> AstDumper<'a> {
         self.format_output(node, depth);
         match node.node() {
             MemberPrime::MemberAccess { ident } => {
-                self.dump_ident(&ident, depth + 1);
+                self.dump_ident(ident, depth + 1);
             }
             MemberPrime::Call { call } => self.dump_expr_list(call, depth + 1),
             MemberPrime::ArrayAccess { access } => self.dump_expr_node(access, depth + 1),
@@ -186,7 +186,7 @@ impl<'a> AstDumper<'a> {
     }
 
     fn format_output<T>(&self, ast: &AstNode<T>, depth: usize) {
-        let spacing: String = std::iter::repeat(' ').take(depth).collect();
+        let spacing: String = std::iter::repeat_n(' ', depth).collect();
 
         println!(
             "{} {} -- '{}'::{},{}",
