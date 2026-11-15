@@ -58,8 +58,13 @@ impl PyCelContext {
             bindctx.bind_param(key, val.clone());
         }
 
-        for (key, val) in bindings.funcs().iter() {
-            bindctx.bind_func(key, val);
+        // bind_func borrows, so the closures must outlive bindctx's use below.
+        let mut funcs = Vec::with_capacity(bindings.funcs().len());
+        for (key, callable) in bindings.funcs().iter() {
+            funcs.push((key, callable.clone().into_fn()));
+        }
+        for (key, func) in funcs.iter() {
+            bindctx.bind_func(key, func);
         }
 
         let runtime = runtime.map(|rt| rt.inner().clone());

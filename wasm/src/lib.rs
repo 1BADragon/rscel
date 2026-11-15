@@ -1,6 +1,3 @@
-#![feature(fn_traits)]
-#![feature(unboxed_closures)]
-
 mod bind_context;
 mod cel_context;
 mod cel_js_callable;
@@ -88,8 +85,13 @@ fn cel_eval_impl(
         }
     }
 
-    for (name, callable) in callables.iter() {
-        exec_ctx.bind_func(name, callable);
+    // bind_func borrows, so the closures must outlive exec_ctx's use below.
+    let mut funcs = Vec::with_capacity(callables.len());
+    for (name, callable) in callables {
+        funcs.push((name, callable.into_fn()));
+    }
+    for (name, func) in funcs.iter() {
+        exec_ctx.bind_func(name, func);
     }
 
     match ctx.exec_with_rt("entry", &exec_ctx, runtime).0 {

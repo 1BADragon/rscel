@@ -563,9 +563,9 @@ impl<'l> StringTokenizer<'l> {
 impl Tokenizer for StringTokenizer<'_> {
     fn peek(&mut self) -> Result<Option<&TokenWithLoc>, SyntaxError> {
         if self.current.is_none() {
-            match self.collect_next_token() {
-                Ok(token) => self.current = token,
-                Err(err) => return Err(err),
+            {
+                let token = self.collect_next_token()?;
+                self.current = token
             };
         }
         Ok(self.current.as_ref())

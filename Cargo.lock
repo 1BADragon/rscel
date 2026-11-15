@@ -845,7 +845,6 @@ dependencies = [
  "num-traits",
  "protobuf",
  "protobuf-codegen",
- "protoc-bin-vendored",
  "regex",
  "rscel-macro",
  "serde",

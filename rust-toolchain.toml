@@ -1,4 +1,5 @@
 [toolchain]
-channel = "nightly-2026-11-14"
-components = [ "rustfmt", "rustc-dev", "rust-analyzer" ]
+channel = "1.100.0"
+components = [ "rustfmt", "clippy", "rust-analyzer" ]
+targets = [ "wasm32-unknown-unknown" ]
 profile = "minimal"

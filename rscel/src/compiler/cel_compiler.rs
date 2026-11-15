@@ -1165,7 +1165,7 @@ impl<'l> CelCompiler<'l> {
                         return Err(SyntaxError::from_location(self.tokenizer.location())
                             .with_message(format!(
                                 "Unexpected token {}, expected RPARAN",
-                                &token.map_or("NOTHING".to_string(), |x| format!("{:?}", x))
+                                token.map_or("NOTHING".to_string(), |x| format!("{:?}", x))
                             ))
                             .into());
                     }
@@ -1232,7 +1232,7 @@ impl<'l> CelCompiler<'l> {
                             return Err(SyntaxError::from_location(self.tokenizer.location())
                                 .with_message(format!(
                                     "Unexpected token {}, expected RBRACKET",
-                                    &next_token
+                                    next_token
                                         .map_or("NOTHING".to_string(), |x| format!("{:?}", x))
                                 ))
                                 .into());

@@ -6,9 +6,7 @@ pub use remove_methods::dispatch as remove;
 mod remove_methods {
     use crate::CelValue;
 
-    fn remove(mut this: String, pattern: String) -> String {
-        this.remove_matches(&pattern);
-
-        this
+    fn remove(this: String, pattern: String) -> String {
+        this.replace(&pattern, "")
     }
 }

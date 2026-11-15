@@ -1,5 +1,3 @@
-#![feature(fn_traits)]
-#![feature(unboxed_closures)]
 use py_cel_error::PyCelError;
 use py_cel_value::PyCelValue;
 use rscel::{BindContext, CelContext, CelValue, Program};
@@ -66,8 +64,13 @@ fn eval(
         }
     }
 
-    for callable in callables.iter() {
-        exec_ctx.bind_func(&callable.0, &callable.1);
+    // bind_func borrows, so the closures must outlive exec_ctx's use below.
+    let mut funcs = Vec::with_capacity(callables.len());
+    for (name, callable) in callables {
+        funcs.push((name, callable.into_fn()));
+    }
+    for (name, func) in funcs.iter() {
+        exec_ctx.bind_func(name, func);
     }
 
     let res = ctx

@@ -12,11 +12,12 @@ ast_ser = []
 debug_output = []
 type_prop = []
 neg_index = []
-protobuf = ["dep:protobuf"]
+# protobuf-codegen only generates the test protos (RSCEL_TEST_PROTO=1); it needs
+# `protoc` on PATH.
+protobuf = ["dep:protobuf", "dep:protobuf-codegen"]
 
 [build-dependencies]
-protobuf-codegen = { version = "3.7.1" }
-protoc-bin-vendored = { version = "3.1.0" }
+protobuf-codegen = { version = "3.7.2", optional = true }
 
 [dependencies]
 rscel-macro = { version = "1.0.8", path = "../rscel-macro" }
