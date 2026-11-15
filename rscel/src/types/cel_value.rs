@@ -99,6 +99,10 @@ pub enum CelValue {
     )]
     Duration(Duration),
     ByteCode(CelByteCode),
+    // Error values are now encapsulated.
+    Err(CelError),
+    Binder(String),
+    // Skipped, never serialized
     #[cfg(feature = "protobuf")]
     #[serde(skip_serializing, skip_deserializing)]
     Message(Box<dyn MessageDyn>),
@@ -110,9 +114,6 @@ pub enum CelValue {
     },
     #[serde(skip_serializing, skip_deserializing)]
     Dyn(Arc<dyn CelValueDyn>),
-    // Error values are now encapsulated.
-    Err(CelError),
-    Binder(String),
 }
 
 impl CelValue {

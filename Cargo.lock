@@ -839,6 +839,7 @@ name = "rscel"
 version = "1.0.9"
 dependencies = [
  "base64",
+ "bincode",
  "chrono",
  "chrono-tz",
  "duration-str",
