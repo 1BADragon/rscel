@@ -1,3 +1,4 @@
+import datetime
 from typing import Any, Callable, Tuple
 
 
@@ -10,7 +11,29 @@ CelCallable = Callable[[*Tuple[CelValue, ...]], CelValue]
 
 CelBinding = dict[str, CelValue | CelCallable | Any]
 
-def eval(prog: str, binding: CelBinding) -> CelValue:
+class InterpRuntime:
+    """Per-execution runtime state. `start_time` is what `now()` returns during a run."""
+
+    def __init__(self, start_time: datetime.datetime | None = None):
+        """Start at `start_time`, or now if omitted. Naive datetimes are local time."""
+        ...
+
+    @staticmethod
+    def from_ns(ns: int) -> "InterpRuntime":
+        """Create from nanoseconds since the Unix epoch, for exact replay."""
+        ...
+
+    @property
+    def start_time(self) -> datetime.datetime:
+        """Timezone-aware UTC start time (microsecond precision)."""
+        ...
+
+    @property
+    def start_time_ns(self) -> int:
+        """Start time as nanoseconds since the Unix epoch (full precision)."""
+        ...
+
+def eval(prog: str, binding: CelBinding, *, runtime: InterpRuntime | None = None) -> CelValue:
     ...
 
 class CelProgram:
@@ -58,5 +81,7 @@ class CelContext:
     def add_program(self, name: str, prog: "CelProgram"):
         ...
 
-    def exec(self, name: str, bindings: BindContext) -> CelValue:
+    def exec(
+        self, name: str, bindings: BindContext, *, runtime: InterpRuntime | None = None
+    ) -> CelValue:
         ...

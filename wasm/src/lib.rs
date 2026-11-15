@@ -6,6 +6,7 @@ mod cel_context;
 mod cel_js_callable;
 mod cel_program;
 mod from_jsvalue;
+mod interp_runtime;
 mod into_jsvalue;
 mod object_iter;
 mod types;
@@ -13,8 +14,9 @@ mod utils;
 
 use cel_js_callable::CelJsCallable;
 use from_jsvalue::WasmCelValue;
+use interp_runtime::WasmInterpRuntime;
 use object_iter::ObjectIterator;
-use rscel::{BindContext, CelCompiler, CelContext, CelError, StringTokenizer};
+use rscel::{BindContext, CelCompiler, CelContext, CelError, InterpRuntime, StringTokenizer};
 use types::{api, CelDetailsResult, CelEvalResult};
 use wasm_bindgen::{prelude::*, JsCast, JsValue};
 
@@ -39,6 +41,25 @@ extern "C" {
 
 #[wasm_bindgen(js_name = celEval)]
 pub fn cel_eval(prog: &str, binding: api::WasmCelBinding) -> CelEvalResult {
+    cel_eval_impl(prog, binding, None)
+}
+
+/// Like `celEval`, but `now()` returns `runtime.startTime`. The runtime is not consumed,
+/// so it can be reused to replay several evaluations with the same time.
+#[wasm_bindgen(js_name = celEvalWithRuntime)]
+pub fn cel_eval_with_runtime(
+    prog: &str,
+    binding: api::WasmCelBinding,
+    runtime: &WasmInterpRuntime,
+) -> CelEvalResult {
+    cel_eval_impl(prog, binding, Some(runtime.inner().clone()))
+}
+
+fn cel_eval_impl(
+    prog: &str,
+    binding: api::WasmCelBinding,
+    runtime: Option<InterpRuntime>,
+) -> CelEvalResult {
     let mut ctx = CelContext::new();
     let mut exec_ctx = BindContext::new();
 
@@ -71,7 +92,7 @@ pub fn cel_eval(prog: &str, binding: api::WasmCelBinding) -> CelEvalResult {
         exec_ctx.bind_func(name, callable);
     }
 
-    match ctx.exec("entry", &exec_ctx) {
+    match ctx.exec_with_rt("entry", &exec_ctx, runtime).0 {
         Ok(ok) => CelEvalResult::from_value(ok),
         Err(err) => CelEvalResult::from_error(err),
     }

@@ -1,8 +1,11 @@
-use crate::{py_cel_program::PyCelProgram, py_cel_value::PyCelValue};
+use crate::{
+    py_cel_program::PyCelProgram, py_cel_value::PyCelValue, py_interp_runtime::PyInterpRuntime,
+};
 
 use super::py_bind_context::PyBindContext;
 use pyo3::{
-    exceptions::PyValueError, pyclass, pymethods, IntoPyObjectExt, Py, PyAny, PyRefMut, PyResult,
+    exceptions::PyValueError, pyclass, pymethods, IntoPyObjectExt, Py, PyAny, PyRef, PyRefMut,
+    PyResult,
 };
 use rscel::{BindContext, CelContext};
 
@@ -42,10 +45,12 @@ impl PyCelContext {
         }
     }
 
+    #[pyo3(signature = (name, bindings, *, runtime=None))]
     pub fn exec(
         mut slf: PyRefMut<'_, Self>,
         name: &str,
         bindings: &PyBindContext,
+        runtime: Option<PyRef<'_, PyInterpRuntime>>,
     ) -> PyResult<Py<PyAny>> {
         let mut bindctx = BindContext::new();
 
@@ -57,7 +62,9 @@ impl PyCelContext {
             bindctx.bind_func(key, val);
         }
 
-        match slf.ctx.exec(name, &bindctx) {
+        let runtime = runtime.map(|rt| rt.inner().clone());
+
+        match slf.ctx.exec_with_rt(name, &bindctx, runtime).0 {
             Ok(val) => Ok(PyCelValue::new(val)
                 .into_pyobject_or_pyerr(slf.py())?
                 .unbind()),

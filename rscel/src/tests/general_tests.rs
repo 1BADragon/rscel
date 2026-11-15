@@ -1,6 +1,6 @@
 use crate::{
     compiler::{cel_compiler::CelCompiler, string_tokenizer::StringTokenizer},
-    BindContext, ByteCode, CelContext, CelError, CelValue, Program,
+    BindContext, ByteCode, CelContext, CelError, CelValue, InterpRuntime, Program,
 };
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use serde_json::Value;
@@ -1090,4 +1090,57 @@ fn test_program_details_impure(prog: &str, impure: bool) {
     ctx.add_program_str("main", prog).unwrap();
 
     assert_eq!(ctx.program_details("main").unwrap().impure(), impure);
+}
+
+#[test]
+fn test_exec_with_rt_fixes_now() {
+    let start = Utc.with_ymd_and_hms(2020, 5, 17, 12, 30, 0).unwrap();
+    let mut ctx = CelContext::new();
+    ctx.add_program_str("main", "now()").unwrap();
+    let exec_ctx = BindContext::new();
+
+    let (res, rt) = ctx.exec_with_rt("main", &exec_ctx, Some(InterpRuntime::new(start)));
+    assert_eq!(res.unwrap(), CelValue::from_timestamp(start));
+    assert_eq!(rt.start_time(), start);
+
+    // With no runtime, a fresh one is created and returned.
+    let (res, rt) = ctx.exec_with_rt("main", &exec_ctx, None);
+    assert_eq!(res.unwrap(), CelValue::from_timestamp(rt.start_time()));
+    assert_ne!(rt.start_time(), start);
+}
+
+#[test]
+fn test_exec_with_rt_nested_explicit_runtime_wins_and_restores() {
+    let outer_start = Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap();
+    let inner_start = Utc.with_ymd_and_hms(1999, 12, 31, 23, 59, 59).unwrap();
+
+    let mut inner_ctx = CelContext::new();
+    inner_ctx.add_program_str("inner", "now()").unwrap();
+    let inner_ctx = std::cell::RefCell::new(inner_ctx);
+
+    let inner = move |_this: CelValue, _args: Vec<CelValue>| -> CelValue {
+        let (res, _) = inner_ctx.borrow_mut().exec_with_rt(
+            "inner",
+            &BindContext::new(),
+            Some(InterpRuntime::new(inner_start)),
+        );
+        res.unwrap_or_else(CelValue::from_err)
+    };
+
+    let mut ctx = CelContext::new();
+    let mut exec_ctx = BindContext::new();
+    exec_ctx.bind_func("inner", &inner);
+    ctx.add_program_str("main", "[now(), inner(), now()]")
+        .unwrap();
+
+    let (res, rt) = ctx.exec_with_rt("main", &exec_ctx, Some(InterpRuntime::new(outer_start)));
+    assert_eq!(
+        res.unwrap(),
+        CelValue::from_list(vec![
+            CelValue::from_timestamp(outer_start),
+            CelValue::from_timestamp(inner_start),
+            CelValue::from_timestamp(outer_start),
+        ])
+    );
+    assert_eq!(rt.start_time(), outer_start);
 }
