@@ -1,9 +1,12 @@
+use std::collections::HashSet;
+
 use rscel::{
     Addition, AstNode, BindContext, CelContext, CelResult, CelValue, ConditionalAnd, ConditionalOr,
     Expr, ExprList, Ident, Member, MemberPrime, Multiplication, NegList, NotList, ObjInit,
     ObjInits, Primary, Relation, SourceRange, Unary,
 };
 
+#[derive(Debug)]
 struct RangeNode {
     pub range: SourceRange,
 
@@ -57,23 +60,27 @@ fn main() {
     let mut queue = Vec::new();
     queue.push((*tree, 0));
 
+    let mut ranges = HashSet::new();
+
     while let Some((curr_node, depth)) = queue.pop() {
         // for now only handle one line
         let range = curr_node.range();
 
-        let start = range.start().col();
-        let end = range.end().col();
+        if !ranges.contains(&range) {
+            let start = range.start().col();
+            let end = range.end().col();
 
-        let src = &args[1][start..end];
+            let src = &args[1][start..end];
 
-        if let Ok(val) = eval(src, &bindings) {
-            println!("{}{} => {}", " ".to_owned().repeat(depth), src, val);
+            if let Ok(val) = eval(src, &bindings) {
+                println!("{}{} => {}", " ".to_owned().repeat(depth), src, val);
+            }
         }
 
+        ranges.insert(range);
+
         for node in curr_node.into_children().into_iter().rev() {
-            if node.range() != range {
-                queue.push((node, depth + 1));
-            }
+            queue.push((node, depth + 1));
         }
     }
 }
