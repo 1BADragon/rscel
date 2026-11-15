@@ -1099,8 +1099,8 @@ impl<'l> CelCompiler<'l> {
                         }
 
                         // Validate argument shapes for known default macros at compile time.
-                        if let Some((ref macro_name, _)) = last_ident {
-                            Self::validate_macro_args(macro_name, &resolved_args, loc)?;
+                        if let Some((ref ident, _)) = last_ident {
+                            Self::validate_macro_args(ident, &resolved_args, loc)?;
                         }
 
                         // Arguments are pushed in reverse so they are popped off the stack in order.
@@ -1123,8 +1123,11 @@ impl<'l> CelCompiler<'l> {
                         }
 
                         member_prime_node.details_mut().union_from(details);
-
                         if let Some((last_ident, last_ident_ast)) = last_ident {
+                            if DEFAULT_FUNCS.iter().any(|f| f.0 == last_ident && !f.2) {
+                                member_prime_node.details_mut().mark_impure();
+                            }
+
                             member_prime_node = args_node.consume_child(
                                 CompiledProg::from_children2_w_bytecode_cannone(
                                     member_prime_node,
@@ -1526,6 +1529,8 @@ impl<'l> CelCompiler<'l> {
             }) => {
                 let mut bytecode = Vec::<PreResolvedCodePoint>::new();
 
+                let mut details = ProgramDetails::new();
+
                 for segment in segments.iter() {
                     match segment {
                         FStringSegment::Lit(c) => {
@@ -1537,11 +1542,13 @@ impl<'l> CelCompiler<'l> {
 
                             let (e, _) = comp.parse_expression()?;
 
+                            let (c, d) = e.into_parts();
+
+                            details.union_from(d);
+
                             bytecode.push(
-                                ByteCode::Push(CelValue::ByteCode(
-                                    e.into_unresolved_bytecode().resolve(),
-                                ))
-                                .into(),
+                                ByteCode::Push(CelValue::ByteCode(c.into_bytecode().resolve()))
+                                    .into(),
                             );
                         }
                     }
@@ -1552,8 +1559,11 @@ impl<'l> CelCompiler<'l> {
                 // Reverse it so its evaluated in order on the stack
                 bytecode.push(ByteCode::FmtString(segments.len() as u32).into());
 
+                let mut prog = CompiledProg::with_code_points(bytecode);
+                prog.details_mut().union_from(details);
+
                 Ok((
-                    CompiledProg::with_code_points(bytecode),
+                    prog,
                     AstNode::new(
                         Primary::Literal(LiteralsAndKeywords::FStringList(segments.clone())),
                         loc,

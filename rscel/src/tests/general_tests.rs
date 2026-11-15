@@ -1085,6 +1085,8 @@ fn test_now_nested_exec_does_not_panic() {
 #[test_case("string(x)", false; "pure call with param")]
 #[test_case("size([1, 2])", false; "folded pure call")]
 #[test_case("timestamp(0)", false; "timestamp literal")]
+#[test_case("f'{now()}'", true; "non-pure in format string")]
+#[test_case("null.now()", true; "non-pure method call")]
 fn test_program_details_impure(prog: &str, impure: bool) {
     let mut ctx = CelContext::new();
     ctx.add_program_str("main", prog).unwrap();

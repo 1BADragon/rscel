@@ -66,10 +66,8 @@ fn main() {
 
         let src = &args[1][start..end];
 
-        print!("{}{} => ", " ".to_owned().repeat(depth), src);
-        match eval(src, &bindings) {
-            Ok(val) => println!("{}", val),
-            Err(err) => println!("err: {}", err),
+        if let Ok(val) = eval(src, &bindings) {
+            println!("{}{} => {}", " ".to_owned().repeat(depth), src, val);
         }
 
         for node in curr_node.into_children().into_iter().rev() {

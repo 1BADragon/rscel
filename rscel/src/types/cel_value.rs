@@ -99,11 +99,6 @@ pub enum CelValue {
     )]
     Duration(Duration),
     ByteCode(CelByteCode),
-    /// A bare-identifier macro argument encoded at compile time.
-    /// Only ever appears as `ByteCode::Push(CelValue::Binder(name))` in compiled programs;
-    /// consumed by `call_macro` and never evaluated directly by the interpreter.
-    #[serde(skip_serializing, skip_deserializing)]
-    Binder(String),
     #[cfg(feature = "protobuf")]
     #[serde(skip_serializing, skip_deserializing)]
     Message(Box<dyn MessageDyn>),
@@ -117,6 +112,7 @@ pub enum CelValue {
     Dyn(Arc<dyn CelValueDyn>),
     // Error values are now encapsulated.
     Err(CelError),
+    Binder(String),
 }
 
 impl CelValue {

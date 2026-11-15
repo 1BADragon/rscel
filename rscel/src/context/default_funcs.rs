@@ -270,7 +270,11 @@ fn zip_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     ret_val.into()
 }
 
-fn now_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
+fn now_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
+    if !this.is_null() {
+        return CelValue::from_err(CelError::argument("now() is not a method"));
+    }
+
     if !args.is_empty() {
         return CelValue::from_err(CelError::argument("now() expects no arguments"));
     }
@@ -278,7 +282,11 @@ fn now_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
     runtime_start_time().into()
 }
 
-fn clock_timestamp_impl(_this: CelValue, args: Vec<CelValue>) -> CelValue {
+fn clock_timestamp_impl(this: CelValue, args: Vec<CelValue>) -> CelValue {
+    if !this.is_null() {
+        return CelValue::from_err(CelError::argument("clockNow() is not a method"));
+    }
+
     if !args.is_empty() {
         return CelValue::from_err(CelError::argument("clockNow() expects no arguments"));
     }
