@@ -1668,6 +1668,7 @@ impl<'l> CelCompiler<'l> {
         // (min_args, max_args, binder_positions)
         let (min_args, max_args, binder_positions): (usize, usize, &[usize]) = match name {
             "has" => (1, 1, &[]),
+            "hasThen" => (3, 3, &[1]),
             "all" | "count" | "exists" | "exists_one" | "filter" | "find" | "flatMap" => {
                 (2, 2, &[0])
             }

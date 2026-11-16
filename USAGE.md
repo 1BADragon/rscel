@@ -43,6 +43,7 @@ Macros operate on unresolved bytecode and therefore require identifiers for loop
 | Macro | Signature | Description |
 | --- | --- | --- |
 | `has(expr)` | `has(expr)` | Evaluates the expression and returns `true` unless a binding or attribute error occurs; other errors propagate. |
+| `hasThen(expr, var, then)` | `hasThen(foo.bar, x, x > 300)` | Evaluates `expr`; if a binding or attribute error occurs, returns `false`. Otherwise binds the result to `var` and returns the value of `then`, which need not be a bool (e.g. `hasThen(foo.bar, x, x)` returns the value of `foo.bar`). Other errors propagate. |
 | `coalesce(expr...)` | `coalesce(e1, e2, ...)` | Returns the first argument that does not resolve to `null` and is not a binding/attribute error; resolves each expression in order. |
 | `list.all(var, predicate)` | `[1,2,3].all(x, x < 5)` | Binds each element to `var` and ensures every iteration is truthy. Returns `false` upon the first falsy result. |
 | `list.exists(var, predicate)` | `[items].exists(x, test)` | Returns `true` as soon as one predicate evaluates truthy. |

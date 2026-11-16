@@ -11,6 +11,7 @@ mod filter;
 mod find;
 mod flat_map;
 mod has;
+mod has_then;
 mod helpers;
 mod map;
 mod reduce;
@@ -24,11 +25,13 @@ pub use filter::filter_impl;
 pub use find::find_impl;
 pub use flat_map::flat_map_impl;
 pub use has::has_impl;
+pub use has_then::has_then_impl;
 pub use map::map_impl;
 pub use reduce::reduce_impl;
 
 const DEFAULT_MACROS: &[(&str, &RsCelMacro)] = &[
     ("has", &has_impl),
+    ("hasThen", &has_then_impl),
     ("all", &all_impl),
     ("count", &count_impl),
     ("exists", &exists_impl),
