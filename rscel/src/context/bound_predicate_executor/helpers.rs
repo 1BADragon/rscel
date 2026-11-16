@@ -7,7 +7,7 @@ use crate::{BindContext, CelContext};
 /// than cloning it, so functions, macros, and types are shared by reference. Only the
 /// loop variable (added via `bind_param` each iteration) lives in the child's local
 /// params table.
-pub(super) fn child_scope<'a>(ctx: &'a Interpreter<'a>) -> (CelContext, BindContext<'a>) {
+pub(crate) fn child_scope<'a>(ctx: &'a Interpreter<'a>) -> (CelContext, BindContext<'a>) {
     let cel = ctx.cel_copy().unwrap_or_default();
     let child = match ctx.bindings_ref() {
         Some(b) => b.child_scope(),

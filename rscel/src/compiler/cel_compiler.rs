@@ -1099,8 +1099,20 @@ impl<'l> CelCompiler<'l> {
                         }
 
                         // Validate argument shapes for known default macros at compile time.
-                        if let Some((ref ident, _)) = last_ident {
-                            Self::validate_macro_args(ident, &resolved_args, loc)?;
+                        // The macro name is the trailing `.ident` for a method call
+                        // (`list.map(...)`), or the primary ident for a direct call
+                        // (`hasThen(...)`).
+                        let macro_name = match (&last_ident, primary_ast.node()) {
+                            (Some((ident, _)), _) => Some(ident.as_str()),
+                            (None, Primary::Ident(Ident(callee)))
+                                if member_prime_ast.is_empty() =>
+                            {
+                                Some(callee.as_str())
+                            }
+                            _ => None,
+                        };
+                        if let Some(name) = macro_name {
+                            Self::validate_macro_args(name, &resolved_args, loc)?;
                         }
 
                         // Arguments are pushed in reverse so they are popped off the stack in order.
@@ -1668,7 +1680,9 @@ impl<'l> CelCompiler<'l> {
         // (min_args, max_args, binder_positions)
         let (min_args, max_args, binder_positions): (usize, usize, &[usize]) = match name {
             "has" => (1, 1, &[]),
-            "hasThen" => (3, 3, &[1]),
+            "hasThen" => (3, 4, &[1]),
+            "hasAll" | "hasAny" => (0, usize::MAX, &[]),
+            "bind" => (3, 3, &[0]),
             "all" | "count" | "exists" | "exists_one" | "filter" | "find" | "flatMap" => {
                 (2, 2, &[0])
             }
@@ -2004,5 +2018,82 @@ mod test {
     #[test]
     fn reduce_macro_accepts_four_args() {
         Program::from_source("[1,2,3].reduce(acc, n, acc + n, 0)").unwrap();
+    }
+
+    #[test]
+    fn has_macro_rejects_wrong_arity_direct_call() {
+        let err = Program::from_source("has(a, b)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("has") && msg.contains("exactly 1"),
+            "expected arity error for has, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn coalesce_macro_rejects_no_args() {
+        let err = Program::from_source("coalesce()").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("coalesce") && msg.contains("at least 1"),
+            "expected arity error for coalesce, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn has_then_macro_rejects_wrong_arity() {
+        let err = Program::from_source("hasThen(a.b, x)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("hasThen") && msg.contains("3 to 4"),
+            "expected arity error for hasThen, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn has_then_macro_rejects_expression_binder() {
+        let err = Program::from_source("hasThen(a.b, x + 1, true)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("hasThen") && msg.contains("bare identifier"),
+            "expected binder error for hasThen, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn bind_macro_rejects_wrong_arity() {
+        let err = Program::from_source("bind(x, 1)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("bind") && msg.contains("exactly 3"),
+            "expected arity error for bind, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn bind_macro_rejects_expression_binder() {
+        let err = Program::from_source("bind(1, x, x + 1)").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("bind") && msg.contains("bare identifier"),
+            "expected binder error for bind, got: {}",
+            msg
+        );
+    }
+
+    #[test_case("has(a.b)"; "has")]
+    #[test_case("hasThen(a.b, x, x)"; "hasThen")]
+    #[test_case("hasThen(a.b, x, x, 0)"; "hasThen with else")]
+    #[test_case("hasAll(a.b, c.d)"; "hasAll")]
+    #[test_case("hasAny(a.b, c.d)"; "hasAny")]
+    #[test_case("bind(x, a.b, x + 1)"; "bind")]
+    #[test_case("coalesce(a.b, 0)"; "coalesce")]
+    fn direct_call_macros_accept_valid_args(prog: &str) {
+        Program::from_source(prog).unwrap();
     }
 }

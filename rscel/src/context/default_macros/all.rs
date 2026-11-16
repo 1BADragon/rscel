@@ -1,4 +1,4 @@
-use super::helpers;
+use crate::context::bound_predicate_executor::BoundPredicateExecutor;
 use crate::interp::Interpreter;
 use crate::types::MacroArg;
 use crate::{CelError, CelValue, CelValueDyn};
@@ -10,26 +10,21 @@ pub fn all_impl(ctx: &Interpreter, this: CelValue, args: &[MacroArg]) -> CelValu
         ));
     }
 
-    let ident_name = match args[0].as_binder() {
-        Ok(s) => s.to_owned(),
-        Err(e) => return e.into(),
-    };
-
     match this {
         CelValue::List(list) => {
-            let (cel, mut bindings) = helpers::child_scope(ctx);
+            let mut p = match BoundPredicateExecutor::new(&args[0], &args[1], ctx) {
+                Ok(p) => p,
+                Err(e) => return e.into(),
+            };
 
             for value in list.into_iter() {
-                bindings.bind_param(&ident_name, value.clone());
-                let interp = Interpreter::new(&cel, &bindings);
-
-                let res = match args[1].eval(&interp) {
-                    Ok(val) => val,
+                match p.eval(value) {
+                    Ok(val) => {
+                        if !val.is_truthy() {
+                            return false.into();
+                        }
+                    }
                     Err(err) => return err.into(),
-                };
-
-                if !res.is_truthy() {
-                    return false.into();
                 }
             }
 

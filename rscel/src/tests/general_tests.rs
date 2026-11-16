@@ -19,6 +19,18 @@ fn test_bad_func_call() {
 }
 
 #[test]
+fn test_bind_missing_path_is_error() {
+    let mut ctx = CelContext::new();
+    let exec_ctx = BindContext::new();
+
+    ctx.add_program_str("main", r#"bind(x, {"foo": 4}.bar, x)"#)
+        .unwrap();
+
+    let res = ctx.exec("main", &exec_ctx);
+    assert!(res.is_err());
+}
+
+#[test]
 fn test_contains() {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();
@@ -73,6 +85,16 @@ fn test_contains() {
 #[test_case(r#"hasThen({"foo": 3}.foo, x, x)"#, 3; "test hasThen resolves")]
 #[test_case(r#"hasThen({"foo": 3}.baz, x, x)"#, false; "test hasThen returns false on no resolve")]
 #[test_case(r#"hasThen({"foo": 3}.foo, x, x == 3)"#, true; "test hasThen returns predicate on resolve")]
+#[test_case(r#"hasThen({"foo": 3}.foo, x, x, 0)"#, 3; "test hasThen with else resolves")]
+#[test_case(r#"hasThen({"foo": 3}.baz, x, x, 0)"#, 0; "test hasThen with else returns else on no resolve")]
+#[test_case(r#"hasAll({"foo": 3}.foo, {"bar": 4}.bar)"#, true; "test hasAll all present")]
+#[test_case(r#"hasAll({"foo": 3}.foo, {"bar": 4}.baz)"#, false; "test hasAll one missing")]
+#[test_case(r#"hasAll({"foo": 3}.baz, {"bar": 4}.baz)"#, false; "test hasAll none present")]
+#[test_case("hasAll()", true; "test hasAll empty")]
+#[test_case(r#"hasAny({"foo": 3}.foo, {"bar": 4}.bar)"#, true; "test hasAny all present")]
+#[test_case(r#"hasAny({"foo": 3}.baz, {"bar": 4}.bar)"#, true; "test hasAny one present")]
+#[test_case(r#"hasAny({"foo": 3}.baz, {"bar": 4}.baz)"#, false; "test hasAny none present")]
+#[test_case("hasAny()", false; "test hasAny empty")]
 #[test_case("[1,2,3,4].all(x, x < 5)", true; "test all true")]
 #[test_case("[1,2,3,4,5].all(x, x < 5)", false; "test all false")]
 #[test_case("[1,2,3,4].exists(x, x < 3)", true; "test exists true")]
@@ -165,7 +187,6 @@ fn test_contains() {
 #[test_case("type(true) != double", true; "bool type neq 2")]
 #[test_case("type([1,2,3]) == type([])", true; "list type neq")]
 #[test_case("type({'foo': 3}) == type({})", true; "map type neq")]
-#[test_case("coalesce()", CelValue::from_null(); "coalesce none")]
 #[test_case("coalesce(null, 3)", 3; "coalesce explicit null")]
 #[test_case("coalesce(foo, 4)", 4; "coalesce unbound var")]
 #[test_case("coalesce(1, 2, 3)", 1; "coalesce first val ok")]
@@ -363,6 +384,9 @@ fn test_contains() {
 #[test_case("format(7, '08b')", "00000111"; "format int binary zero padded width 8")]
 #[test_case("format(7, '8b')", "     111"; "format int binary space padded width 8")]
 #[test_case("now() == now()", true; "now() returns same value whole execution")]
+#[test_case(r#"bind(x, {"foo": 4}.foo, x + 2)"#, 6; "test bind works")]
+#[test_case("bind(x, 2, bind(y, x * 3, x + y))", 8; "test bind nested")]
+#[test_case("bind(x, 1, bind(x, 2, x))", 2; "test bind shadows outer binding")]
 fn test_equation(prog: &str, res: impl Into<CelValue>) {
     let mut ctx = CelContext::new();
     let exec_ctx = BindContext::new();

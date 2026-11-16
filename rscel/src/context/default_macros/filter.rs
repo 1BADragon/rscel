@@ -1,4 +1,4 @@
-use super::helpers;
+use crate::context::bound_predicate_executor::BoundPredicateExecutor;
 use crate::interp::Interpreter;
 use crate::types::MacroArg;
 use crate::{CelError, CelValue, CelValueDyn};
@@ -10,14 +10,9 @@ pub fn filter_impl(ctx: &Interpreter, this: CelValue, args: &[MacroArg]) -> CelV
         ));
     }
 
-    let ident_name = match args[0].as_binder() {
-        Ok(s) => s.to_owned(),
-        Err(e) => return e.into(),
-    };
-
     match this {
-        CelValue::List(list) => filter_list(ctx, list, &ident_name, &args[1]),
-        CelValue::Map(map) => filter_map(ctx, map, &ident_name, &args[1]),
+        CelValue::List(list) => filter_list(ctx, list, &args[0], &args[1]),
+        CelValue::Map(map) => filter_map(ctx, map, &args[0], &args[1]),
         CelValue::Err(e) => CelValue::Err(e),
         _ => CelValue::from_err(CelError::value("filter() only available on list")),
     }
@@ -26,17 +21,17 @@ pub fn filter_impl(ctx: &Interpreter, this: CelValue, args: &[MacroArg]) -> CelV
 fn filter_list(
     ctx: &Interpreter,
     list: Vec<CelValue>,
-    ident_name: &str,
+    binder: &MacroArg,
     predicate: &MacroArg,
 ) -> CelValue {
-    let (cel, mut bindings) = helpers::child_scope(ctx);
+    let mut p = match BoundPredicateExecutor::new(binder, predicate, ctx) {
+        Ok(p) => p,
+        Err(e) => return e.into(),
+    };
     let mut filtered_list = Vec::new();
 
     for value in list.into_iter() {
-        bindings.bind_param(ident_name, value.clone());
-        let interp = Interpreter::new(&cel, &bindings);
-
-        let res = match predicate.eval(&interp) {
+        let res = match p.eval(value.clone()) {
             Ok(val) => val,
             Err(err) => return err.into(),
         };
@@ -52,18 +47,18 @@ fn filter_list(
 fn filter_map(
     ctx: &Interpreter,
     map: std::collections::HashMap<String, CelValue>,
-    ident_name: &str,
+    binder: &MacroArg,
     predicate: &MacroArg,
 ) -> CelValue {
-    let (cel, mut bindings) = helpers::child_scope(ctx);
+    let mut p = match BoundPredicateExecutor::new(binder, predicate, ctx) {
+        Ok(p) => p,
+        Err(e) => return e.into(),
+    };
     let mut filtered_list = Vec::new();
 
     for key in map.into_keys() {
         let value: CelValue = key.into();
-        bindings.bind_param(ident_name, value.clone());
-        let interp = Interpreter::new(&cel, &bindings);
-
-        let res = match predicate.eval(&interp) {
+        let res = match p.eval(value.clone()) {
             Ok(val) => val,
             Err(err) => return err.into(),
         };

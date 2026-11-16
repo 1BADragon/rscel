@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
 mod bind_context;
+mod bound_predicate_executor;
 mod default_funcs;
 mod default_macros;
 mod type_funcs;
+
 use crate::{
     compiler::{cel_compiler::CelCompiler, string_tokenizer::StringTokenizer},
     interp::{InterpRuntime, Interpreter},

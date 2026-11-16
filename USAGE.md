@@ -43,7 +43,10 @@ Macros operate on unresolved bytecode and therefore require identifiers for loop
 | Macro | Signature | Description |
 | --- | --- | --- |
 | `has(expr)` | `has(expr)` | Evaluates the expression and returns `true` unless a binding or attribute error occurs; other errors propagate. |
-| `hasThen(expr, var, then)` | `hasThen(foo.bar, x, x > 300)` | Evaluates `expr`; if a binding or attribute error occurs, returns `false`. Otherwise binds the result to `var` and returns the value of `then`, which need not be a bool (e.g. `hasThen(foo.bar, x, x)` returns the value of `foo.bar`). Other errors propagate. |
+| `hasAll(expr...)` | `hasAll(foo.bar, foo.baz)` | Returns `true` if every expression evaluates without a binding or attribute error, stopping at the first one that fails. Other errors propagate. `hasAll()` returns `true`. |
+| `hasAny(expr...)` | `hasAny(foo.bar, foo.baz)` | Returns `true` as soon as one expression evaluates without a binding or attribute error. Other errors propagate. `hasAny()` returns `false`. |
+| `hasThen(expr, var, then[, else])` | `hasThen(foo.bar, x, x > 300)` | Evaluates `expr`; if a binding or attribute error occurs, returns `else` when given, otherwise `false`. If `expr` resolves, binds the result to `var` and returns the value of `then`, which need not be a bool (e.g. `hasThen(foo.bar, x, x, 0)` returns `foo.bar`, or `0` when it is missing). Other errors propagate. |
+| `bind(var, init, body)` | `bind(x, foo.bar * 2, x + x)` | Evaluates `init` once, binds it to `var`, and returns the value of `body`. Unlike `hasThen`, a missing `init` is an error. Note the argument order differs from `hasThen`: the variable comes first, matching CEL's `cel.bind`. |
 | `coalesce(expr...)` | `coalesce(e1, e2, ...)` | Returns the first argument that does not resolve to `null` and is not a binding/attribute error; resolves each expression in order. |
 | `list.all(var, predicate)` | `[1,2,3].all(x, x < 5)` | Binds each element to `var` and ensures every iteration is truthy. Returns `false` upon the first falsy result. |
 | `list.exists(var, predicate)` | `[items].exists(x, test)` | Returns `true` as soon as one predicate evaluates truthy. |

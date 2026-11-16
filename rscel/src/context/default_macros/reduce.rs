@@ -1,7 +1,8 @@
-use super::helpers;
 use crate::interp::Interpreter;
 use crate::types::MacroArg;
 use crate::{CelError, CelValue};
+
+use super::super::bound_predicate_executor::helpers;
 
 // reduce [].reduce(curr, next, expression, starting)
 pub fn reduce_impl(ctx: &Interpreter, this: CelValue, args: &[MacroArg]) -> CelValue {
