@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use pyo3::{exceptions::PyValueError, pyclass, pymethods, PyRefMut, PyResult};
 use rscel::Program;
 
@@ -37,34 +35,10 @@ impl PyCelProgram {
         }
     }
 
-    fn add_serialized_bincode(
-        mut slf: PyRefMut<'_, PyCelProgram>,
-        serialized_bincode: &[u8],
-    ) -> PyResult<()> {
-        match bincode::deserialize(serialized_bincode) {
-            Ok(p) => {
-                slf.program = Some(p);
-                Ok(())
-            }
-            Err(e) => Err(PyValueError::new_err(format!("{e}"))),
-        }
-    }
-
     fn serialize_to_json(slf: PyRefMut<'_, PyCelProgram>) -> PyResult<String> {
         if let Some(program) = &slf.program {
             match serde_json::to_string(&program) {
                 Ok(s) => Ok(s),
-                Err(e) => Err(PyValueError::new_err(format!("{e}"))),
-            }
-        } else {
-            Err(PyValueError::new_err("Program source not set"))
-        }
-    }
-
-    fn serialize_to_bincode(slf: PyRefMut<'_, PyCelProgram>) -> PyResult<Cow<'_, [u8]>> {
-        if let Some(program) = &slf.program {
-            match bincode::serialize(program) {
-                Ok(b) => Ok(Cow::Owned(b)),
                 Err(e) => Err(PyValueError::new_err(format!("{e}"))),
             }
         } else {

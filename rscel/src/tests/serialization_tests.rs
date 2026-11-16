@@ -1,12 +1,7 @@
 //! Compiled programs must survive a serialize/deserialize round trip in every format the
-//! bindings expose (JSON and bincode) and still produce the same result.
-//!
-//! bincode encodes enum variants by index. serde's derive numbers variants by declaration
-//! position when serializing, but skips `skip_deserializing` variants when deserializing, so
-//! any serializable `CelValue` variant declared after a skipped one becomes unreadable. Keep
-//! the skipped variants (`Message`, `Enum`, `Dyn`) at the end of the enum.
+//! bindings expose (JSON) and still produce the same result.
 
-use crate::{BindContext, CelContext, CelError, CelValue, Program};
+use crate::{BindContext, CelContext, CelValue, Program};
 use test_case::test_case;
 
 fn bindings() -> BindContext<'static> {
@@ -26,11 +21,6 @@ fn exec(prog: Program) -> CelValue {
 fn json_round_trip(prog: &Program) -> Program {
     let json = serde_json::to_string(prog).expect("program should serialize to json");
     serde_json::from_str(&json).expect("program should deserialize from json")
-}
-
-fn bincode_round_trip(prog: &Program) -> Program {
-    let bytes = bincode::serialize(prog).expect("program should serialize to bincode");
-    bincode::deserialize(&bytes).expect("program should deserialize from bincode")
 }
 
 // Single-identifier call arguments compile to `CelValue::Binder`, so nearly every case here
@@ -55,21 +45,4 @@ fn test_program_serialization_round_trip(source: &str) {
     let expected = exec(prog.clone());
 
     assert_eq!(exec(json_round_trip(&prog)), expected, "json round trip");
-    assert_eq!(
-        exec(bincode_round_trip(&prog)),
-        expected,
-        "bincode round trip"
-    );
-}
-
-// Exercises the variant indices directly, independent of what the compiler emits.
-#[test_case(CelValue::from(7i64); "int")]
-#[test_case(CelValue::Binder("i".to_owned()); "binder")]
-#[test_case(CelValue::from_err(CelError::misc("boom")); "err")]
-fn test_cel_value_bincode_round_trip(value: CelValue) {
-    let bytes = bincode::serialize(&value).unwrap();
-    let back: CelValue = bincode::deserialize(&bytes).unwrap();
-
-    // CelError has no PartialEq, so compare the debug representation.
-    assert_eq!(format!("{back:?}"), format!("{value:?}"));
 }

@@ -35,4 +35,3 @@ base64 = "0.23.1"
 
 [dev-dependencies]
 test-case = "3.3.1"
-bincode = { workspace = true }
