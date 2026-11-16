@@ -35,7 +35,9 @@ jobs:
         run: cargo build --workspace
 
       - name: Install wasm-pack
-        run: cargo install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
 
       - name: Run tests
         run: make run-all-tests
