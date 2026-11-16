@@ -9,7 +9,7 @@ use rscel::InterpRuntime;
 /// Per-execution runtime state. Its start time is what `now()` returns during a run.
 ///
 /// Pass the same runtime to several executions to replay them with an identical time.
-#[pyclass(name = "InterpRuntime", eq, frozen, skip_from_py_object)]
+#[pyclass(name = "InterpRuntime", eq, frozen)]
 #[derive(Clone, PartialEq)]
 pub struct PyInterpRuntime {
     inner: InterpRuntime,
