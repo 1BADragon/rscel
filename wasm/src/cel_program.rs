@@ -42,39 +42,11 @@ impl WasmCelProgram {
         }
     }
 
-    #[wasm_bindgen(js_name = addSerializedBincode)]
-    pub fn add_serialized_bincode(
-        &mut self,
-        serialized_bincode: js_sys::Uint8Array,
-    ) -> Result<(), JsValue> {
-        let mut buf = vec![0u8; serialized_bincode.length() as usize];
-        serialized_bincode.copy_to(&mut buf[..]);
-
-        match bincode::deserialize::<Program>(&buf) {
-            Ok(program) => {
-                self.program = Some(program);
-                Ok(())
-            }
-            Err(err) => Err(JsValue::from_str(&err.to_string())),
-        }
-    }
-
     #[wasm_bindgen(js_name = serializeToJson)]
     pub fn serialize_to_json(&self) -> Result<String, JsValue> {
         match &self.program {
             Some(program) => match serde_json::to_string(program) {
                 Ok(json) => Ok(json),
-                Err(err) => Err(JsValue::from_str(&err.to_string())),
-            },
-            None => Err(JsValue::from_str("Program source not set")),
-        }
-    }
-
-    #[wasm_bindgen(js_name = serializeToBincode)]
-    pub fn serialize_to_bincode(&self) -> Result<js_sys::Uint8Array, JsValue> {
-        match &self.program {
-            Some(program) => match bincode::serialize(program) {
-                Ok(bytes) => Ok(js_sys::Uint8Array::from(bytes.as_slice())),
                 Err(err) => Err(JsValue::from_str(&err.to_string())),
             },
             None => Err(JsValue::from_str("Program source not set")),

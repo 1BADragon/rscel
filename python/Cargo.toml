@@ -19,7 +19,6 @@ pyo3 = { version = "0.30.1", features = [
 ] }
 chrono = { workspace = true }
 serde_json = { workspace = true }
-bincode = {workspace = true}
 
 [build-dependencies]
 pyo3-build-config = "0.30.1"
