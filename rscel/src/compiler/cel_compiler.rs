@@ -1072,7 +1072,7 @@ impl<'l> CelCompiler<'l> {
                         let mut args_ast = Vec::new();
                         let mut resolved_args: Vec<CelValue> = Vec::new();
 
-                        let mut details = ProgramDetails::new();
+                        let mut arg_details: Vec<ProgramDetails> = Vec::new();
 
                         // Resolve each arg's bytecode and detect bare-identifier binders.
                         // A single-ident arg (e.g. `x` in `list.map(x, ...)`) is encoded as
@@ -1082,7 +1082,7 @@ impl<'l> CelCompiler<'l> {
                             args_ast.push(ast);
 
                             let (c, d) = a.into_parts();
-                            details.union_from(d);
+                            arg_details.push(d);
 
                             let bc = c.into_bytecode().resolve();
 
@@ -1101,6 +1101,28 @@ impl<'l> CelCompiler<'l> {
                         // Validate argument shapes for known default macros at compile time.
                         if let Some((ref ident, _)) = last_ident {
                             Self::validate_macro_args(ident, &resolved_args, loc)?;
+
+                            // Macro binders (e.g. `x` in `list.map(x, x + 1)`) are loop
+                            // variables, not program inputs. Drop them from the params of the
+                            // args evaluated in the binder scope. Uses outside that scope (the
+                            // receiver, or reduce's initial value) still count as params.
+                            if let Some((_, _, binder_positions)) = Self::macro_shape(ident) {
+                                let outer_scope_args = Self::macro_outer_scope_args(ident);
+                                for &pos in binder_positions {
+                                    if let Some(CelValue::Binder(name)) = resolved_args.get(pos) {
+                                        for (i, d) in arg_details.iter_mut().enumerate() {
+                                            if !outer_scope_args.contains(&i) {
+                                                d.remove_param(name);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        let mut details = ProgramDetails::new();
+                        for d in arg_details {
+                            details.union_from(d);
                         }
 
                         // Arguments are pushed in reverse so they are popped off the stack in order.
@@ -1655,6 +1677,30 @@ impl<'l> CelCompiler<'l> {
         Ok(inits)
     }
 
+    /// Shape of the built-in macros: `(min_args, max_args, binder_positions)`.
+    /// Returns `None` for names that are not built-in macros.
+    fn macro_shape(name: &str) -> Option<(usize, usize, &'static [usize])> {
+        Some(match name {
+            "has" => (1, 1, &[]),
+            "all" | "count" | "exists" | "exists_one" | "filter" | "find" | "flatMap" => {
+                (2, 2, &[0])
+            }
+            "map" => (2, 3, &[0]),
+            "reduce" => (4, 4, &[0, 1]),
+            "coalesce" => (1, usize::MAX, &[]),
+            _ => return None,
+        })
+    }
+
+    /// Argument positions of a built-in macro that are evaluated in the caller's scope rather
+    /// than the macro's binder scope (e.g. the initial value of `reduce`).
+    fn macro_outer_scope_args(name: &str) -> &'static [usize] {
+        match name {
+            "reduce" => &[3],
+            _ => &[],
+        }
+    }
+
     #[inline]
     /// Validate argument shapes for known default macros at compile time.
     ///
@@ -1665,16 +1711,8 @@ impl<'l> CelCompiler<'l> {
     /// Only validates names that match built-in macros; unknown names are passed through
     /// unchanged so user-defined functions/macros with those names still compile.
     fn validate_macro_args(name: &str, args: &[CelValue], loc: SourceRange) -> CelResult<()> {
-        // (min_args, max_args, binder_positions)
-        let (min_args, max_args, binder_positions): (usize, usize, &[usize]) = match name {
-            "has" => (1, 1, &[]),
-            "all" | "count" | "exists" | "exists_one" | "filter" | "find" | "flatMap" => {
-                (2, 2, &[0])
-            }
-            "map" => (2, 3, &[0]),
-            "reduce" => (4, 4, &[0, 1]),
-            "coalesce" => (1, usize::MAX, &[]),
-            _ => return Ok(()),
+        let Some((min_args, max_args, binder_positions)) = Self::macro_shape(name) else {
+            return Ok(());
         };
 
         if args.len() < min_args || args.len() > max_args {
@@ -2003,5 +2041,37 @@ mod test {
     #[test]
     fn reduce_macro_accepts_four_args() {
         Program::from_source("[1,2,3].reduce(acc, n, acc + n, 0)").unwrap();
+    }
+
+    fn sorted_params(source: &str) -> Vec<String> {
+        let prog = Program::from_source(source).unwrap();
+        let mut params: Vec<String> = prog.params().into_iter().map(String::from).collect();
+        params.sort();
+        params
+    }
+
+    #[test]
+    fn macro_binder_not_a_param() {
+        assert!(sorted_params("[1,2,3].map(x, x * 2)").is_empty());
+        assert!(sorted_params("[1,2,3].filter(x, x > 1)").is_empty());
+        assert!(sorted_params("[1,2,3].map(x, x > 1, x * 2)").is_empty());
+        assert!(sorted_params("[1,2,3].reduce(acc, n, acc + n, 0)").is_empty());
+        assert_eq!(sorted_params("foo.map(x, x * y)"), vec!["foo", "y"]);
+        assert_eq!(
+            sorted_params("[1].map(x, [2].map(y, x + y + z))"),
+            vec!["z"]
+        );
+    }
+
+    #[test]
+    fn macro_binder_used_outside_macro_is_a_param() {
+        assert_eq!(sorted_params("x.map(x, x * 2)"), vec!["x"]);
+        assert_eq!(sorted_params("x + size([1].map(x, x))"), vec!["x"]);
+        assert_eq!(sorted_params("[1].map(x, x) + [x]"), vec!["x"]);
+        // reduce's initial value is evaluated outside the binder scope.
+        assert_eq!(
+            sorted_params("[1].reduce(acc, n, acc + n, acc)"),
+            vec!["acc"]
+        );
     }
 }
